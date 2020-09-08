@@ -7,9 +7,13 @@ NATS Controllers for Kubernetes (NACK)
 ### JetStream Controller
 
 ```sh
+$ kubectl apply -f deploy/crds.yaml
+$ kubectl apply -f deploy/example-stream.yaml
+
 # Start NATS Server with JetStream enabled
 $ nats-server -DV -js
 
 # Start JetStream Controller
 KUBERNETES_CONFIG_FILE=~/.kube/config go run cmd/jetstream-controller/main.go
 ```
+
