@@ -14,6 +14,13 @@ $ kubectl apply -f deploy/example-stream.yaml
 $ nats-server -DV -js
 
 # Start JetStream Controller
-KUBERNETES_CONFIG_FILE=~/.kube/config go run cmd/jetstream-controller/main.go
-```
+make jetstream-controller
+KUBERNETES_CONFIG_FILE=~/.kube/config ./jetstream-controller
 
+# Start leaf config Controller
+make leaf-config-controller
+KUBERNETES_CONFIG_FILE=~/.kube/config ./leaf-config-controller
+
+# Build all controllers
+make build
+```
