@@ -1,5 +1,6 @@
 ---
-apiVersion: jetstream.nats.io/v1alpha1
+#   streams.jetstreamcontroller.nats.io
+apiVersion: jetstreamcontroller.nats.io/v1alpha1
 kind: Stream
 metadata:
   name: my-js-stream

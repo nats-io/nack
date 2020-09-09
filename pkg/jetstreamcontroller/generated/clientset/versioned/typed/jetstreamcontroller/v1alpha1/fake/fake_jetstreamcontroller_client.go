@@ -25,8 +25,8 @@ type FakeJetstreamcontrollerV1alpha1 struct {
 	*testing.Fake
 }
 
-func (c *FakeJetstreamcontrollerV1alpha1) Foos(namespace string) v1alpha1.FooInterface {
-	return &FakeFoos{c, namespace}
+func (c *FakeJetstreamcontrollerV1alpha1) Streams(namespace string) v1alpha1.StreamInterface {
+	return &FakeStreams{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

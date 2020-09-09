@@ -21,8 +21,8 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// Foos returns a FooInformer.
-	Foos() FooInformer
+	// Streams returns a StreamInformer.
+	Streams() StreamInformer
 }
 
 type version struct {
@@ -36,7 +36,7 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
 }
 
-// Foos returns a FooInformer.
-func (v *version) Foos() FooInformer {
-	return &fooInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+// Streams returns a StreamInformer.
+func (v *version) Streams() StreamInformer {
+	return &streamInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

@@ -7,32 +7,28 @@ import (
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// Foo is a specification for a Foo resource
-type Foo struct {
+// Stream is a specification for a Stream resource
+type Stream struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   FooSpec   `json:"spec"`
-	Status FooStatus `json:"status"`
+	Spec   StreamSpec   `json:"spec"`
 }
 
-// FooSpec is the spec for a Foo resource
-type FooSpec struct {
-	DeploymentName string `json:"deploymentName"`
-	Replicas       *int32 `json:"replicas"`
-}
-
-// FooStatus is the status for a Foo resource
-type FooStatus struct {
-	AvailableReplicas int32 `json:"availableReplicas"`
+// StreamSpec is the spec for a Stream resource
+type StreamSpec struct {
+	StreamName string   `json:"name"`
+	Subjects   []string `json:"subjects"`
+	Storage    string   `json:"storage"`
+	MaxAge     int64    `json:"maxAge,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// FooList is a list of Foo resources
-type FooList struct {
+// StreamList is a list of Stream resources
+type StreamList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`
 
-	Items []Foo `json:"items"`
+	Items []Stream `json:"items"`
 }

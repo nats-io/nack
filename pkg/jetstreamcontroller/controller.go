@@ -20,9 +20,11 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -63,6 +65,9 @@ type Controller struct {
 
 	// client to interact with Kubernetes resources.
 	kc kubernetes.Interface
+
+	// client to interact with JetStream CRDs.
+	jsc jsk8sclient.Interface
 
 	// opts is the set of options.
 	opts *Options
@@ -105,8 +110,30 @@ func (c *Controller) Run(ctx context.Context) error {
 		return err
 	}
 
+	// Initial refresh, find all Stream CRD that have been created on start.
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	streams, err := c.jsc.JetstreamcontrollerV1alpha1().Streams("default").List(ctx, v1.ListOptions{})
+	if err != nil {
+		log.Errorf("Error: %s", err)
+	} else {
+		// Make sure that the Stream CRDs are mapped to a Jetstream Stream.
+		for _, stream := range streams.Items {
+			name := stream.Spec.StreamName
+			log.Infof("Found stream: %s", name)
+			streamInfo, err := c.nc.RequestWithContext(ctx, "$JS.API.STREAM.INFO.ORDERS", []byte(""))
+			if err != nil {
+				// If not found error, then start task to create the stream as per the Stream CRD definition.
+				log.Infof("Stream named %q was not found, creating it...", stream.Spec.StreamName)
+			} else {
+				log.Debugf("Found Stream: %+v", string(streamInfo.Data))
+			}
+		}
+	}
+
 	// Run until context is cancelled via a signal.x
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel = context.WithCancel(ctx)
 	c.quit = func() {
 		// Signal cancellation of the main context.
 		cancel()
@@ -114,6 +141,10 @@ func (c *Controller) Run(ctx context.Context) error {
 	if !c.opts.NoSignals {
 		go c.SetupSignalHandler(ctx)
 	}
+
+	// 
+	// Start watches for streams and consumers.
+	// 
 
 	// Wait for context to get cancelled or get a signal.
 	select {
@@ -162,7 +193,7 @@ func (c *Controller) setupK8S() error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("The JetStream client:", jsc)
+	c.jsc = jsc
 
 	return nil
 }

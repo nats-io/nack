@@ -15,10 +15,10 @@
 
 package v1alpha1
 
-// FooListerExpansion allows custom methods to be added to
-// FooLister.
-type FooListerExpansion interface{}
+// StreamListerExpansion allows custom methods to be added to
+// StreamLister.
+type StreamListerExpansion interface{}
 
-// FooNamespaceListerExpansion allows custom methods to be added to
-// FooNamespaceLister.
-type FooNamespaceListerExpansion interface{}
+// StreamNamespaceListerExpansion allows custom methods to be added to
+// StreamNamespaceLister.
+type StreamNamespaceListerExpansion interface{}

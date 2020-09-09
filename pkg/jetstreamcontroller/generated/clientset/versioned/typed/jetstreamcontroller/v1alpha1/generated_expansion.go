@@ -15,4 +15,4 @@
 
 package v1alpha1
 
-type FooExpansion interface{}
+type StreamExpansion interface{}
