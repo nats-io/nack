@@ -16,25 +16,25 @@ leafConfigControllerSrc := $(shell find cmd/leaf-config-controller pkg/leafconfi
 vendor: go.mod go.sum
 	go mod vendor
 
-$(jetstreamControllerGenOut): $(codeGenerator) $(jetstreamControllerGenIn) pkg/k8scodegen/file-header.txt
+$(jetstreamControllerGenOut): $(codeGenerator) pkg/k8scodegen/file-header.txt $(jetstreamControllerGenIn)
 	GOFLAGS='' bash $< all \
 		github.com/nats-io/nack/pkg/jetstreamcontroller/generated \
 		github.com/nats-io/nack/pkg/jetstreamcontroller/apis \
 		"jetstreamcontroller:v1alpha1" \
-		--go-header-file "pkg/k8scodegen/file-header.txt"
+		--go-header-file $(word 2,$^)
 
 jetstream-controller: $(jetstreamControllerSrc) vendor
-	go build -o $@ github.com/nats-io/nack/cmd/jetstream-controller
+	go build -race -o $@ github.com/nats-io/nack/cmd/jetstream-controller
 
-$(leafConfigControllerGenOut): $(codeGenerator) $(leafConfigControllerGenIn) pkg/k8scodegen/file-header.txt
+$(leafConfigControllerGenOut): $(codeGenerator) pkg/k8scodegen/file-header.txt $(leafConfigControllerGenIn)
 	GOFLAGS='' bash $< all \
 		github.com/nats-io/nack/pkg/leafconfigcontroller/generated \
 		github.com/nats-io/nack/pkg/leafconfigcontroller/apis \
 		"leafconfigcontroller:v1alpha1" \
-		--go-header-file "pkg/k8scodegen/file-header.txt"
+		--go-header-file $(word 2,$^)
 
 leaf-config-controller: $(leafConfigControllerSrc) vendor
-	go build -o $@ github.com/nats-io/nack/cmd/leaf-config-controller
+	go build -race -o $@ github.com/nats-io/nack/cmd/leaf-config-controller
 
 .PHONY: build
 build: jetstream-controller leaf-config-controller
