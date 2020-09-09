@@ -21,7 +21,7 @@ import (
 	"runtime"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/nats-io/nack/pkg/jetstreamcontroller/apis/jetstreamcontroller"
+	"github.com/nats-io/nack/pkg/leafconfigcontroller/apis/leafconfigcontroller"
 )
 
 var (
@@ -31,14 +31,14 @@ var (
 )
 
 func main() {
-	fs := flag.NewFlagSet("nack-jetstream-controller", flag.ExitOnError)
+	fs := flag.NewFlagSet("leaf-config-controller", flag.ExitOnError)
 	flag.Usage = func() {
-		fmt.Printf("Usage: nack-jetstream-controller [options...]\n\n")
+		fmt.Printf("Usage: leaf-config-controller [options...]\n\n")
 		fs.PrintDefaults()
 		fmt.Println()
 	}
 
-	opts := &jetstreamcontroller.Options{}
+	opts := &leafconfigcontroller.Options{}
 	fs.BoolVar(&showHelp, "h", false, "Show help")
 	fs.BoolVar(&showHelp, "help", false, "Show help")
 	fs.BoolVar(&showVersion, "v", false, "Show version")
@@ -55,7 +55,7 @@ func main() {
 		flag.Usage()
 		os.Exit(0)
 	case showVersion:
-		fmt.Printf("NATS JetStream Controller v%s\n", jetstreamcontroller.Version)
+		fmt.Printf("NATS Leaf Config Controller v%s\n", leafconfigcontroller.Version)
 		os.Exit(0)
 	}
 
@@ -68,8 +68,8 @@ func main() {
 	}
 	log.SetFormatter(formatter)
 
-	controller := jetstreamcontroller.NewController(opts)
-	log.Infof("Starting NATS JetStream Controller v%s", jetstreamcontroller.Version)
+	controller := leafconfigcontroller.NewController(opts)
+	log.Infof("Starting NATS Leaf Config Controller v%s", leafconfigcontroller.Version)
 	log.Infof("Go Version: %s", runtime.Version())
 
 	err := controller.Run(context.Background())
