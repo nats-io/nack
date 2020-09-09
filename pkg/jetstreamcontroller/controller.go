@@ -22,14 +22,16 @@ import (
 	"syscall"
 	"time"
 
+	jsapiv1 "github.com/nats-io/nack/pkg/jetstreamcontroller/apis/jetstreamcontroller/v1alpha1"
+	jsk8sclient "github.com/nats-io/nack/pkg/jetstreamcontroller/generated/clientset/versioned"
 	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8sfields "k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	k8scache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
-	// jsapiv1 "github.com/nats-io/nack/pkg/jetstreamcontroller/apis/jetstreamcontroller/v1alpha1"
-	jsk8sclient "github.com/nats-io/nack/pkg/jetstreamcontroller/generated/clientset/versioned"
 
 	// Load all auth plugins
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -142,15 +144,24 @@ func (c *Controller) Run(ctx context.Context) error {
 		go c.SetupSignalHandler(ctx)
 	}
 
-	// 
+	//
 	// Start watches for streams and consumers.
-	// 
+	//
+	_, informer := NewInformer(c, k8scache.ResourceEventHandlerFuncs{
+		AddFunc: func(o interface{}) {
+			log.Infof("New stream? Maybe: %v", o)
+			// TODO
+		},
+		UpdateFunc: func(o interface{}, n interface{}) {
+			// TODO
+		},
+		DeleteFunc: func(o interface{}) {
+			// TODO
+		},
+	}, 5*time.Second)
 
 	// Wait for context to get cancelled or get a signal.
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	}
+	informer.Run(ctx.Done())
 
 	return nil
 }
@@ -196,6 +207,38 @@ func (c *Controller) setupK8S() error {
 	c.jsc = jsc
 
 	return nil
+}
+
+// NewInformer takes a controller and a set of resource handlers and
+// returns an indexer and a controller that are subscribed to changes
+// to the state of a NATS cluster resource.
+func NewInformer(
+	c *Controller,
+	resourceFuncs k8scache.ResourceEventHandlerFuncs,
+	interval time.Duration,
+) (k8scache.Indexer, k8scache.Controller) {
+	listWatcher := k8scache.NewListWatchFromClient(
+		c.jsc.JetstreamcontrollerV1alpha1().RESTClient(),
+
+		// Plural name of the CRD
+		"streams",
+
+		// Namespace where the clusters will be created.
+		c.opts.PodNamespace,
+		k8sfields.Everything(),
+	)
+	return k8scache.NewIndexerInformer(
+		listWatcher,
+		&jsapiv1.Stream{},
+
+		// How often it will poll for the state
+		// of the resources.
+		interval,
+
+		// Handlers
+		resourceFuncs,
+		k8scache.Indexers{},
+	)
 }
 
 // SetupSignalHandler enables handling process signals.
