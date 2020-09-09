@@ -1,15 +1,10 @@
 ---
-apiVersion: jetstream.nats.io/v1
+apiVersion: jetstream.nats.io/v1alpha1
 kind: Stream
 metadata:
-  name: "my-js-stream"
+  name: my-js-stream
 spec:
-  # Include fields here based from:
-  # https://github.com/nats-io/jetstream/blob/master/schemas/jetstream/api/v1/stream_create_request.json
-  # 
-  name: "helloworld"
-  # TODO: 
-  # subjects: ["ORDERS.*"]
-  # storage: "file"
-  # To human: API schema for durations?
-  # max_age: 365d
+  name: mystream
+  subjects: ["orders.*"]
+  storage: memory
+  maxAge: 3600000000 #1h

@@ -1,0 +1,52 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: streams.jetstream.nats.io
+spec:
+  group: jetstream.nats.io
+  scope: Namespaced
+  names:
+    kind: Stream
+    singular: stream
+    plural: streams
+    shortNames:
+    - str
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    # Enable this version.
+    served: true
+    # Only one version should set this to true.
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              name:
+                description: A unique name for the Stream, empty for Stream Templates.
+                type: string
+                pattern: ^[^.*>]*$
+                minLength: 0
+              subjects:
+                description: A list of subjects to consume, supports wildcards.
+                type: array
+                minLength: 1
+                items:
+                  type: string
+                  minLength: 1
+              storage:
+                description: The storage backend to use for the Stream.
+                type: string
+                enum:
+                - file
+                - memory
+                default: memory
+              maxAge:
+                description: Maximum age of any message in the stream, expressed in microseconds. 0 for unlimited.
+                type: integer
+                minimum: 0
+                default: 0
