@@ -21,7 +21,7 @@ import (
 	"runtime"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/nats-io/nack/pkg/jetstreamcontroller/apis/jetstreamcontroller"
+	"github.com/nats-io/nack/pkg/jetstreamcontroller"
 )
 
 var (

@@ -26,6 +26,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	// jsapiv1 "github.com/nats-io/nack/pkg/jetstreamcontroller/apis/jetstreamcontroller/v1alpha1"
+	jsk8sclient "github.com/nats-io/nack/pkg/jetstreamcontroller/generated/clientset/versioned"
 
 	// Load all auth plugins
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -155,6 +157,12 @@ func (c *Controller) setupK8S() error {
 		return err
 	}
 	c.kc = clientset
+
+	jsc, err := jsk8sclient.NewForConfig(config)
+	if err != nil {
+		return err
+	}
+	fmt.Println("The JetStream client:", jsc)
 
 	return nil
 }
