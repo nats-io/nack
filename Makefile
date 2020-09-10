@@ -3,41 +3,25 @@ export GO111MODULE := on
 
 codeGenerator := vendor/k8s.io/code-generator/generate-groups.sh
 
-jetstreamControllerGenOut := pkg/jetstreamcontroller/generated \
-pkg/jetstreamcontroller/apis/jetstreamcontroller/v1alpha1/zz_generated.deepcopy.go
-jetstreamControllerGenIn:= $(shell grep -l -R -F "// +" pkg/jetstreamcontroller/apis | grep -v "zz_generated.deepcopy.go")
-jetstreamControllerSrc := $(shell find cmd/jetstream-controller pkg/jetstreamcontroller -name "*.go")
-
-leafConfigControllerGenOut := pkg/leafconfigcontroller/generated \
-pkg/leafconfigcontroller/apis/leafconfigcontroller/v1alpha1/zz_generated.deepcopy.go
-leafConfigControllerGenIn:= $(shell grep -l -R -F "// +" pkg/leafconfigcontroller/apis | grep -v "zz_generated.deepcopy.go")
-leafConfigControllerSrc := $(shell find cmd/leaf-config-controller pkg/leafconfigcontroller -name "*.go")
+jetstreamGenOut := pkg/jetstream/generated pkg/jetstream/apis/jetstream/v1/zz_generated.deepcopy.go
+jetstreamGenIn:= $(shell grep -l -R -F "// +" pkg/jetstream/apis | grep -v "zz_generated.deepcopy.go")
+jetstreamSrc := $(shell find cmd/jetstream-controller pkg/jetstream -name "*.go")
 
 vendor: go.mod go.sum
 	go mod vendor
 
-$(jetstreamControllerGenOut): $(codeGenerator) pkg/k8scodegen/file-header.txt $(jetstreamControllerGenIn)
+$(jetstreamGenOut): $(codeGenerator) $(jetstreamGenIn) pkg/k8scodegen/file-header.txt
 	GOFLAGS='' bash $< all \
-		github.com/nats-io/nack/pkg/jetstreamcontroller/generated \
-		github.com/nats-io/nack/pkg/jetstreamcontroller/apis \
-		"jetstreamcontroller:v1alpha1" \
-		--go-header-file $(word 2,$^)
+		github.com/nats-io/nack/pkg/jetstream/generated \
+		github.com/nats-io/nack/pkg/jetstream/apis \
+		"jetstream:v1" \
+		--go-header-file $(lastword $^)
 
-jetstream-controller: $(jetstreamControllerSrc) vendor
+jetstream-controller: $(jetstreamSrc) $(jetstreamGenOut) vendor
 	go build -race -o $@ github.com/nats-io/nack/cmd/jetstream-controller
 
-$(leafConfigControllerGenOut): $(codeGenerator) pkg/k8scodegen/file-header.txt $(leafConfigControllerGenIn)
-	GOFLAGS='' bash $< all \
-		github.com/nats-io/nack/pkg/leafconfigcontroller/generated \
-		github.com/nats-io/nack/pkg/leafconfigcontroller/apis \
-		"leafconfigcontroller:v1alpha1" \
-		--go-header-file $(word 2,$^)
-
-leaf-config-controller: $(leafConfigControllerSrc) vendor
-	go build -race -o $@ github.com/nats-io/nack/cmd/leaf-config-controller
-
 .PHONY: build
-build: jetstream-controller leaf-config-controller
+build: jetstream-controller
 
 .PHONY: clean
 clean:
