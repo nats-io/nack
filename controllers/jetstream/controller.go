@@ -22,12 +22,11 @@ import (
 
 	"github.com/nats-io/jsm.go"
 	jsmapi "github.com/nats-io/jsm.go/api"
-	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 
 	scheme "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/scheme"
 	typed "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/typed/jetstream/v1"
-	informers "github.com/nats-io/nack/pkg/jetstream/generated/informers/externalversions/jetstream/v1"
+	extinformers "github.com/nats-io/nack/pkg/jetstream/generated/informers/externalversions"
 	listers "github.com/nats-io/nack/pkg/jetstream/generated/listers/jetstream/v1"
 
 	k8sapi "k8s.io/api/core/v1"
@@ -49,30 +48,36 @@ var (
 )
 
 type Options struct {
-	Ctx            context.Context
+	Ctx context.Context
+
 	KubeIface      kubernetes.Interface
 	APIExtIface    apiextensionsclientset.Interface
 	JetstreamIface typed.JetstreamV1Interface
-	NATSConn       *nats.Conn
 
-	StreamInformer informers.StreamInformer
+	InformerFactory extinformers.SharedInformerFactory
+
+	NATSClientName string
 }
 
 type Controller struct {
 	ctx context.Context
 
 	// Clients
-	ji typed.JetstreamV1Interface
-	nc *nats.Conn
+	infoFactory extinformers.SharedInformerFactory
+	ji          typed.JetstreamV1Interface
 
 	streamLister listers.StreamLister
 	streamSynced cache.InformerSynced
 	streamQueue  workqueue.RateLimitingInterface
 	streamMap    map[string]*jsm.Stream
 	rec          record.EventRecorder
+
+	natsName string
 }
 
 func NewController(opt Options) (*Controller, error) {
+	streamInformer := opt.InformerFactory.Jetstream().V1().Streams()
+
 	utilruntime.Must(scheme.AddToScheme(k8sscheme.Scheme))
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(logrus.Infof)
@@ -85,12 +90,13 @@ func NewController(opt Options) (*Controller, error) {
 	}
 
 	ctrl := &Controller{
-		ctx: opt.Ctx,
-		ji:  opt.JetstreamIface,
-		nc:  opt.NATSConn,
+		ctx:         opt.Ctx,
+		natsName:    opt.NATSClientName,
+		ji:          opt.JetstreamIface,
+		infoFactory: opt.InformerFactory,
 
-		streamLister: opt.StreamInformer.Lister(),
-		streamSynced: opt.StreamInformer.Informer().HasSynced,
+		streamLister: streamInformer.Lister(),
+		streamSynced: streamInformer.Informer().HasSynced,
 		streamQueue:  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Streams"),
 		streamMap:    make(map[string]*jsm.Stream),
 
@@ -98,8 +104,11 @@ func NewController(opt Options) (*Controller, error) {
 			Component: "jetstream-controller",
 		}),
 	}
+	if ctrl.natsName == "" {
+		ctrl.natsName = "jetstream-controller"
+	}
 
-	opt.StreamInformer.Informer().AddEventHandler(streamEventHandlers(
+	streamInformer.Informer().AddEventHandler(streamEventHandlers(
 		ctrl.ctx,
 		ctrl.streamQueue,
 		ctrl.ji,
@@ -112,6 +121,8 @@ func (c *Controller) Run() error {
 	defer utilruntime.HandleCrash()
 	defer c.streamQueue.ShutDown()
 
+	c.infoFactory.Start(c.ctx.Done())
+
 	if !cache.WaitForCacheSync(c.ctx.Done(), c.streamSynced) {
 		return fmt.Errorf("failed to wait for cache sync")
 	}
@@ -120,7 +131,7 @@ func (c *Controller) Run() error {
 
 	<-c.ctx.Done()
 	// Gracefully shutdown.
-	return c.nc.Drain()
+	return nil
 }
 
 func (c *Controller) normalEvent(o runtime.Object, reason, message string) {

@@ -19,6 +19,7 @@ type Stream struct {
 
 // StreamSpec is the spec for a Stream resource
 type StreamSpec struct {
+	Servers  []string `json:"servers"`
 	Name     string   `json:"name"`
 	Subjects []string `json:"subjects"`
 	Storage  string   `json:"storage"`

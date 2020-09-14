@@ -91,6 +91,17 @@ func getStreamSpecSchema() apiextensions.JSONSchemaProps {
 	return apiextensions.JSONSchemaProps{
 		Type: "object",
 		Properties: map[string]apiextensions.JSONSchemaProps{
+			"servers": {
+				Description: "A list of Jetstream servers to connect to.",
+				Type:        "array",
+				MinLength:   int64Ptr(1),
+				Items: &apiextensions.JSONSchemaPropsOrArray{
+					Schema: &apiextensions.JSONSchemaProps{
+						Type:      "string",
+						MinLength: int64Ptr(1),
+					},
+				},
+			},
 			"name": {
 				Description: "A unique name for the Stream. Read-only after first time.",
 				Type:        "string",

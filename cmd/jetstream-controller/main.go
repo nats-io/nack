@@ -23,7 +23,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/nats-io/nack/controllers/jetstream"
@@ -114,14 +113,6 @@ func run() error {
 		return err
 	}
 
-	nc, err := nats.Connect("nats://localhost:4222")
-	if err != nil {
-		return err
-	}
-	defer nc.Close()
-
-	informerFactory := informers.NewSharedInformerFactory(cs, 30*time.Second)
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ctrl, err := jetstream.NewController(jetstream.Options{
@@ -129,16 +120,14 @@ func run() error {
 		KubeIface:      kcs,
 		APIExtIface:    aecs,
 		JetstreamIface: cs.JetstreamV1(),
-		NATSConn:       nc,
 
-		StreamInformer: informerFactory.Jetstream().V1().Streams(),
+		InformerFactory: informers.NewSharedInformerFactory(cs, 30*time.Second),
 	})
 	if err != nil {
 		return err
 	}
 
 	go handleSignals(cancel)
-	informerFactory.Start(ctx.Done())
 	return ctrl.Run()
 }
 
