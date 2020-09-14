@@ -1,7 +1,8 @@
 package v1
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8sapi "k8s.io/api/core/v1"
+	k8smeta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // +genclient
@@ -9,26 +10,41 @@ import (
 
 // Stream is a specification for a Stream resource
 type Stream struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
+	k8smeta.TypeMeta   `json:",inline"`
+	k8smeta.ObjectMeta `json:"metadata,omitempty"`
 
 	Spec   StreamSpec   `json:"spec"`
+	Status StreamStatus `json:"status"`
 }
 
 // StreamSpec is the spec for a Stream resource
 type StreamSpec struct {
-	StreamName string   `json:"name"`
-	Subjects   []string `json:"subjects"`
-	Storage    string   `json:"storage"`
-	MaxAge     int64    `json:"maxAge,omitempty"`
+	Name     string   `json:"name"`
+	Subjects []string `json:"subjects"`
+	Storage  string   `json:"storage"`
+	MaxAge   string   `json:"maxAge"`
+}
+
+// StreamStatus is the status for a Stream resource
+type StreamStatus struct {
+	ObservedGeneration int64             `json:"observedGeneration"`
+	Conditions         []StreamCondition `json:"conditions"`
+}
+
+type StreamCondition struct {
+	Type               string                 `json:"type"`
+	Status             k8sapi.ConditionStatus `json:"status"`
+	LastTransitionTime string                 `json:"lastTransitionTime,omitempty"`
+	Reason             string                 `json:"reason,omitempty"`
+	Message            string                 `json:"message,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // StreamList is a list of Stream resources
 type StreamList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
+	k8smeta.TypeMeta `json:",inline"`
+	k8smeta.ListMeta `json:"metadata"`
 
 	Items []Stream `json:"items"`
 }

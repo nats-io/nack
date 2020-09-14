@@ -12,12 +12,9 @@ spec:
     plural: streams
     shortNames:
     - str
-  scope: Namespaced
   versions:
   - name: v1
-    # Enable this version.
     served: true
-    # Only one version should set this to true.
     storage: true
     schema:
       openAPIV3Schema:
@@ -29,7 +26,7 @@ spec:
               name:
                 description: A unique name for the Stream, empty for Stream Templates.
                 type: string
-                pattern: ^[^.*>]*$
+                pattern: '^[^.*>]*$'
                 minLength: 0
               subjects:
                 description: A list of subjects to consume, supports wildcards.
@@ -46,7 +43,28 @@ spec:
                 - memory
                 default: memory
               maxAge:
-                description: Maximum age of any message in the stream, expressed in microseconds. 0 for unlimited.
+                description: Maximum age of any message in the stream, expressed in Go's time.Duration format. Empty for unlimited.
+                type: string
+                default: ''
+          status:
+            type: object
+            properties:
+              observedGeneration:
                 type: integer
-                minimum: 0
-                default: 0
+              conditions:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                    status:
+                      type: string
+                    lastTransitionTime:
+                      type: string
+                    reason:
+                      type: string
+                    message:
+                      type: string
+    subresources:
+      status: {}

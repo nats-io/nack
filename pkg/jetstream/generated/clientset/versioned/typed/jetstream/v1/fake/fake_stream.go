@@ -99,6 +99,18 @@ func (c *FakeStreams) Update(ctx context.Context, stream *jetstreamv1.Stream, op
 	return obj.(*jetstreamv1.Stream), err
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+func (c *FakeStreams) UpdateStatus(ctx context.Context, stream *jetstreamv1.Stream, opts v1.UpdateOptions) (*jetstreamv1.Stream, error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateSubresourceAction(streamsResource, "status", c.ns, stream), &jetstreamv1.Stream{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*jetstreamv1.Stream), err
+}
+
 // Delete takes name of the stream and deletes it. Returns an error if one occurs.
 func (c *FakeStreams) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.

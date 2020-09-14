@@ -1,5 +1,4 @@
 ---
-#   streams.jetstream.nats.io
 apiVersion: jetstream.nats.io/v1
 kind: Stream
 metadata:
@@ -8,4 +7,4 @@ spec:
   name: mystream
   subjects: ["orders.*"]
   storage: memory
-  maxAge: 3600000000 #1h
+  maxAge: 1h

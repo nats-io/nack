@@ -27,6 +27,8 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"net"
+	"net/http"
+	"net/textproto"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -37,7 +39,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/nats-io/jwt"
 	"github.com/nats-io/nats.go/util"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nuid"
@@ -45,7 +46,7 @@ import (
 
 // Default Constants
 const (
-	Version                   = "1.10.0"
+	Version                   = "1.11.0"
 	DefaultURL                = "nats://127.0.0.1:4222"
 	DefaultPort               = 4222
 	DefaultMaxReconnect       = 60
@@ -120,6 +121,8 @@ var (
 	ErrMsgNoReply             = errors.New("nats: message does not have a reply")
 	ErrClientIPNotSupported   = errors.New("nats: client IP not supported by this server")
 	ErrDisconnected           = errors.New("nats: server is disconnected")
+	ErrHeadersNotSupported    = errors.New("nats: headers not supported by this server")
+	ErrBadHeaderMsg           = errors.New("nats: message could not decode headers")
 )
 
 func init() {
@@ -382,6 +385,12 @@ type Options struct {
 	// callbacks after Close() is called. Client won't receive notifications
 	// when Close is invoked by user code. Default is to invoke the callbacks.
 	NoCallbacksAfterClientClose bool
+
+	// LameDuckModeHandler sets the callback to invoke when the server notifies
+	// the connection that it entered lame duck mode, that is, going to
+	// gradually disconnect all its connections before shuting down. This is
+	// often used in deployments when upgrading NATS Servers.
+	LameDuckModeHandler ConnHandler
 }
 
 const (
@@ -494,10 +503,36 @@ type Subscription struct {
 type Msg struct {
 	Subject string
 	Reply   string
+	Header  http.Header
 	Data    []byte
 	Sub     *Subscription
 	next    *Msg
 	barrier *barrierInfo
+}
+
+func (m *Msg) headerBytes() ([]byte, error) {
+	var hdr []byte
+	if len(m.Header) == 0 {
+		return hdr, nil
+	}
+
+	var b bytes.Buffer
+	_, err := b.WriteString(hdrLine)
+	if err != nil {
+		return nil, ErrBadHeaderMsg
+	}
+
+	err = m.Header.Write(&b)
+	if err != nil {
+		return nil, ErrBadHeaderMsg
+	}
+
+	_, err = b.WriteString(crlf)
+	if err != nil {
+		return nil, ErrBadHeaderMsg
+	}
+
+	return b.Bytes(), nil
 }
 
 type barrierInfo struct {
@@ -525,6 +560,7 @@ type srv struct {
 	tlsName    string
 }
 
+// The INFO block received from the server.
 type serverInfo struct {
 	ID           string   `json:"server_id"`
 	Host         string   `json:"host"`
@@ -532,12 +568,15 @@ type serverInfo struct {
 	Version      string   `json:"version"`
 	AuthRequired bool     `json:"auth_required"`
 	TLSRequired  bool     `json:"tls_required"`
+	TLSAvailable bool     `json:"tls_available"`
+	Headers      bool     `json:"headers"`
 	MaxPayload   int64    `json:"max_payload"`
 	ConnectURLs  []string `json:"connect_urls,omitempty"`
 	Proto        int      `json:"proto,omitempty"`
 	CID          uint64   `json:"client_id,omitempty"`
 	ClientIP     string   `json:"client_ip,omitempty"`
 	Nonce        string   `json:"nonce,omitempty"`
+	LameDuckMode bool     `json:"ldm,omitempty"`
 }
 
 const (
@@ -564,6 +603,7 @@ type connectInfo struct {
 	Version   string `json:"version"`
 	Protocol  int    `json:"protocol"`
 	Echo      bool   `json:"echo"`
+	Headers   bool   `json:"headers"`
 }
 
 // MsgHandler is a callback function that processes messages delivered to
@@ -947,6 +987,17 @@ func NoCallbacksAfterClientClose() Option {
 	}
 }
 
+// LameDuckModeHandler sets the callback to invoke when the server notifies
+// the connection that it entered lame duck mode, that is, going to
+// gradually disconnect all its connections before shuting down. This is
+// often used in deployments when upgrading NATS Servers.
+func LameDuckModeHandler(cb ConnHandler) Option {
+	return func(o *Options) error {
+		o.LameDuckModeHandler = cb
+		return nil
+	}
+}
+
 // Handler processing
 
 // SetDisconnectHandler will set the disconnect event handler.
@@ -1077,10 +1128,11 @@ func (o Options) Connect() (*Conn, error) {
 }
 
 const (
-	_CRLF_  = "\r\n"
-	_EMPTY_ = ""
-	_SPC_   = " "
-	_PUB_P_ = "PUB "
+	_CRLF_   = "\r\n"
+	_EMPTY_  = ""
+	_SPC_    = " "
+	_PUB_P_  = "PUB "
+	_HPUB_P_ = "HPUB "
 )
 
 const (
@@ -1091,12 +1143,12 @@ const (
 )
 
 const (
-	conProto   = "CONNECT %s" + _CRLF_
-	pingProto  = "PING" + _CRLF_
-	pongProto  = "PONG" + _CRLF_
-	subProto   = "SUB %s %s %d" + _CRLF_
-	unsubProto = "UNSUB %d %s" + _CRLF_
-	okProto    = _OK_OP_ + _CRLF_
+	connectProto = "CONNECT %s" + _CRLF_
+	pingProto    = "PING" + _CRLF_
+	pongProto    = "PONG" + _CRLF_
+	subProto     = "SUB %s %s %d" + _CRLF_
+	unsubProto   = "UNSUB %d %s" + _CRLF_
+	okProto      = _OK_OP_ + _CRLF_
 )
 
 // Return the currently selected server
@@ -1444,9 +1496,9 @@ func (nc *Conn) setup() {
 	nc.fch = make(chan struct{}, flushChanSize)
 	nc.rqch = make(chan struct{})
 
-	// Setup scratch outbound buffer for PUB
-	pub := nc.scratch[:len(_PUB_P_)]
-	copy(pub, _PUB_P_)
+	// Setup scratch outbound buffer for PUB/HPUB
+	pub := nc.scratch[:len(_HPUB_P_)]
+	copy(pub, _HPUB_P_)
 }
 
 // Process a connected connection and initialize properly.
@@ -1550,7 +1602,7 @@ func (nc *Conn) checkForSecure() error {
 	o := nc.Opts
 
 	// Check for mismatch in setups
-	if o.Secure && !nc.info.TLSRequired {
+	if o.Secure && !nc.info.TLSRequired && !nc.info.TLSAvailable {
 		return ErrSecureConnWanted
 	} else if nc.info.TLSRequired && !o.Secure {
 		// Switch to Secure since server needs TLS.
@@ -1660,7 +1712,7 @@ func (nc *Conn) connectProto() (string, error) {
 	}
 
 	cinfo := connectInfo{o.Verbose, o.Pedantic, ujwt, nkey, sig, user, pass, token,
-		o.Secure, o.Name, LangString, Version, clientProtoInfo, !o.NoEcho}
+		o.Secure, o.Name, LangString, Version, clientProtoInfo, !o.NoEcho, true}
 
 	b, err := json.Marshal(cinfo)
 	if err != nil {
@@ -1672,7 +1724,7 @@ func (nc *Conn) connectProto() (string, error) {
 		return _EMPTY_, ErrNoEchoNotSupported
 	}
 
-	return fmt.Sprintf(conProto, b), nil
+	return fmt.Sprintf(connectProto, b), nil
 }
 
 // normalizeErr removes the prefix -ERR, trim spaces and remove the quotes.
@@ -2264,8 +2316,27 @@ func (nc *Conn) processMsg(data []byte) {
 	msgPayload := make([]byte, len(data))
 	copy(msgPayload, data)
 
+	// Check if we have headers encoded here.
+	var h http.Header
+	var err error
+
+	if nc.ps.ma.hdr > 0 {
+		hbuf := msgPayload[:nc.ps.ma.hdr]
+		msgPayload = msgPayload[nc.ps.ma.hdr:]
+		h, err = decodeHeadersMsg(hbuf)
+		if err != nil {
+			// We will pass the message through but send async error.
+			nc.mu.Lock()
+			nc.err = ErrBadHeaderMsg
+			if nc.Opts.AsyncErrorCB != nil {
+				nc.ach.push(func() { nc.Opts.AsyncErrorCB(nc, sub, ErrBadHeaderMsg) })
+			}
+			nc.mu.Unlock()
+		}
+	}
+
 	// FIXME(dlc): Should we recycle these containers?
-	m := &Msg{Data: msgPayload, Subject: subj, Reply: reply, Sub: sub}
+	m := &Msg{Header: h, Data: msgPayload, Subject: subj, Reply: reply, Sub: sub}
 
 	sub.mu.Lock()
 
@@ -2457,6 +2528,9 @@ func (nc *Conn) processInfo(info string) error {
 	// did not include themselves in the async INFO protocol.
 	// If empty, do not remove the implicit servers from the pool.
 	if len(ncInfo.ConnectURLs) == 0 {
+		if ncInfo.LameDuckMode && nc.Opts.LameDuckModeHandler != nil {
+			nc.ach.push(func() { nc.Opts.LameDuckModeHandler(nc) })
+		}
 		return nil
 	}
 	// Note about pool randomization: when the pool was first created,
@@ -2517,7 +2591,9 @@ func (nc *Conn) processInfo(info string) error {
 			nc.ach.push(func() { nc.Opts.DiscoveredServersCB(nc) })
 		}
 	}
-
+	if ncInfo.LameDuckMode && nc.Opts.LameDuckModeHandler != nil {
+		nc.ach.push(func() { nc.Opts.LameDuckModeHandler(nc) })
+	}
 	return nil
 }
 
@@ -2601,7 +2677,34 @@ func (nc *Conn) kickFlusher() {
 // argument is left untouched and needs to be correctly interpreted on
 // the receiver.
 func (nc *Conn) Publish(subj string, data []byte) error {
-	return nc.publish(subj, _EMPTY_, data)
+	return nc.publish(subj, _EMPTY_, nil, data)
+}
+
+// Used to create a new message for publishing that will use headers.
+func NewMsg(subject string) *Msg {
+	return &Msg{
+		Subject: subject,
+		Header:  make(http.Header),
+	}
+}
+
+const (
+	hdrLine   = "NATS/1.0\r\n"
+	crlf      = "\r\n"
+	hdrPreEnd = len(hdrLine) - len(crlf)
+)
+
+// decodeHeadersMsg will decode and headers.
+func decodeHeadersMsg(data []byte) (http.Header, error) {
+	tp := textproto.NewReader(bufio.NewReader(bytes.NewReader(data)))
+	if l, err := tp.ReadLine(); err != nil || l != hdrLine[:hdrPreEnd] {
+		return nil, ErrBadHeaderMsg
+	}
+	mh, err := tp.ReadMIMEHeader()
+	if err != nil {
+		return nil, ErrBadHeaderMsg
+	}
+	return http.Header(mh), nil
 }
 
 // PublishMsg publishes the Msg structure, which includes the
@@ -2610,14 +2713,29 @@ func (nc *Conn) PublishMsg(m *Msg) error {
 	if m == nil {
 		return ErrInvalidMsg
 	}
-	return nc.publish(m.Subject, m.Reply, m.Data)
+
+	var hdr []byte
+	var err error
+
+	if len(m.Header) > 0 {
+		if !nc.info.Headers {
+			return ErrHeadersNotSupported
+		}
+
+		hdr, err = m.headerBytes()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nc.publish(m.Subject, m.Reply, hdr, m.Data)
 }
 
-// PublishRequest will perform a Publish() excpecting a response on the
+// PublishRequest will perform a Publish() expecting a response on the
 // reply subject. Use Request() for automatically waiting for a response
 // inline.
 func (nc *Conn) PublishRequest(subj, reply string, data []byte) error {
-	return nc.publish(subj, reply, data)
+	return nc.publish(subj, reply, nil, data)
 }
 
 // Used for handrolled itoa
@@ -2626,7 +2744,7 @@ const digits = "0123456789"
 // publish is the internal function to publish messages to a nats-server.
 // Sends a protocol data message by queuing into the bufio writer
 // and kicking the flush go routine. These writes should be protected.
-func (nc *Conn) publish(subj, reply string, data []byte) error {
+func (nc *Conn) publish(subj, reply string, hdr, data []byte) error {
 	if nc == nil {
 		return ErrInvalidConnection
 	}
@@ -2646,7 +2764,7 @@ func (nc *Conn) publish(subj, reply string, data []byte) error {
 	}
 
 	// Proactively reject payloads over the threshold set by server.
-	msgSize := int64(len(data))
+	msgSize := int64(len(data) + len(hdr))
 	if msgSize > nc.info.MaxPayload {
 		nc.mu.Unlock()
 		return ErrMaxPayload
@@ -2664,37 +2782,65 @@ func (nc *Conn) publish(subj, reply string, data []byte) error {
 		}
 	}
 
-	msgh := nc.scratch[:len(_PUB_P_)]
-	msgh = append(msgh, subj...)
-	msgh = append(msgh, ' ')
+	var mh []byte
+	if hdr != nil {
+		mh = nc.scratch[:len(_HPUB_P_)]
+	} else {
+		mh = nc.scratch[1:len(_HPUB_P_)]
+	}
+	mh = append(mh, subj...)
+	mh = append(mh, ' ')
 	if reply != "" {
-		msgh = append(msgh, reply...)
-		msgh = append(msgh, ' ')
+		mh = append(mh, reply...)
+		mh = append(mh, ' ')
 	}
 
 	// We could be smarter here, but simple loop is ok,
-	// just avoid strconv in fast path
+	// just avoid strconv in fast path.
 	// FIXME(dlc) - Find a better way here.
 	// msgh = strconv.AppendInt(msgh, int64(len(data)), 10)
+	// go 1.14 some values strconv faster, may be able to switch over.
 
 	var b [12]byte
 	var i = len(b)
-	if len(data) > 0 {
-		for l := len(data); l > 0; l /= 10 {
-			i -= 1
+
+	if hdr != nil {
+		if len(hdr) > 0 {
+			for l := len(hdr); l > 0; l /= 10 {
+				i--
+				b[i] = digits[l%10]
+			}
+		} else {
+			i--
+			b[i] = digits[0]
+		}
+		mh = append(mh, b[i:]...)
+		mh = append(mh, ' ')
+		// reset for below.
+		i = len(b)
+	}
+
+	if msgSize > 0 {
+		for l := msgSize; l > 0; l /= 10 {
+			i--
 			b[i] = digits[l%10]
 		}
 	} else {
-		i -= 1
+		i--
 		b[i] = digits[0]
 	}
 
-	msgh = append(msgh, b[i:]...)
-	msgh = append(msgh, _CRLF_...)
+	mh = append(mh, b[i:]...)
+	mh = append(mh, _CRLF_...)
 
-	_, err := nc.bw.Write(msgh)
+	_, err := nc.bw.Write(mh)
 	if err == nil {
-		_, err = nc.bw.Write(data)
+		if hdr != nil {
+			_, err = nc.bw.Write(hdr)
+		}
+		if err == nil {
+			_, err = nc.bw.Write(data)
+		}
 	}
 	if err == nil {
 		_, err = nc.bw.WriteString(_CRLF_)
@@ -2705,7 +2851,7 @@ func (nc *Conn) publish(subj, reply string, data []byte) error {
 	}
 
 	nc.OutMsgs++
-	nc.OutBytes += uint64(len(data))
+	nc.OutBytes += uint64(len(data) + len(hdr))
 
 	if len(nc.fch) == 0 {
 		nc.kickFlusher()
@@ -2757,7 +2903,7 @@ func (nc *Conn) respHandler(m *Msg) {
 }
 
 // Helper to setup and send new request style requests. Return the chan to receive the response.
-func (nc *Conn) createNewRequestAndSend(subj string, data []byte) (chan *Msg, string, error) {
+func (nc *Conn) createNewRequestAndSend(subj string, hdr, data []byte) (chan *Msg, string, error) {
 	// Do setup for the new style if needed.
 	if nc.respMap == nil {
 		nc.initNewResp()
@@ -2781,28 +2927,55 @@ func (nc *Conn) createNewRequestAndSend(subj string, data []byte) (chan *Msg, st
 	}
 	nc.mu.Unlock()
 
-	if err := nc.PublishRequest(subj, respInbox, data); err != nil {
+	if err := nc.publish(subj, respInbox, hdr, data); err != nil {
 		return nil, token, err
 	}
 
 	return mch, token, nil
 }
 
+// RequestMsg will send a request payload including optional headers and deliver
+// the response message, or an error, including a timeout if no message was received properly.
+func (nc *Conn) RequestMsg(msg *Msg, timeout time.Duration) (*Msg, error) {
+	var hdr []byte
+	var err error
+
+	if len(msg.Header) > 0 {
+		if !nc.info.Headers {
+			return nil, ErrHeadersNotSupported
+		}
+
+		hdr, err = msg.headerBytes()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return nc.request(msg.Subject, hdr, msg.Data, timeout)
+}
+
 // Request will send a request payload and deliver the response message,
 // or an error, including a timeout if no message was received properly.
 func (nc *Conn) Request(subj string, data []byte, timeout time.Duration) (*Msg, error) {
+	return nc.request(subj, nil, data, timeout)
+}
+
+func (nc *Conn) request(subj string, hdr, data []byte, timeout time.Duration) (*Msg, error) {
 	if nc == nil {
 		return nil, ErrInvalidConnection
 	}
 
 	nc.mu.Lock()
-	// If user wants the old style.
 	if nc.Opts.UseOldRequestStyle {
 		nc.mu.Unlock()
-		return nc.oldRequest(subj, data, timeout)
+		return nc.oldRequest(subj, hdr, data, timeout)
 	}
 
-	mch, token, err := nc.createNewRequestAndSend(subj, data)
+	return nc.newRequest(subj, hdr, data, timeout)
+}
+
+func (nc *Conn) newRequest(subj string, hdr, data []byte, timeout time.Duration) (*Msg, error) {
+	mch, token, err := nc.createNewRequestAndSend(subj, hdr, data)
 	if err != nil {
 		return nil, err
 	}
@@ -2831,7 +3004,7 @@ func (nc *Conn) Request(subj string, data []byte, timeout time.Duration) (*Msg, 
 // oldRequest will create an Inbox and perform a Request() call
 // with the Inbox reply and return the first reply received.
 // This is optimized for the case of multiple responses.
-func (nc *Conn) oldRequest(subj string, data []byte, timeout time.Duration) (*Msg, error) {
+func (nc *Conn) oldRequest(subj string, hdr, data []byte, timeout time.Duration) (*Msg, error) {
 	inbox := NewInbox()
 	ch := make(chan *Msg, RequestChanLen)
 
@@ -2842,10 +3015,11 @@ func (nc *Conn) oldRequest(subj string, data []byte, timeout time.Duration) (*Ms
 	s.AutoUnsubscribe(1)
 	defer s.Unsubscribe()
 
-	err = nc.PublishRequest(subj, inbox, data)
+	err = nc.publish(subj, inbox, hdr, data)
 	if err != nil {
 		return nil, err
 	}
+
 	return s.NextMsg(timeout)
 }
 
@@ -3536,6 +3710,21 @@ func (m *Msg) Respond(data []byte) error {
 	return nc.Publish(m.Reply, data)
 }
 
+// RespondMsg allows a convenient way to respond to requests in service based subscriptions that might include headers
+func (m *Msg) RespondMsg(msg *Msg) error {
+	if m == nil || m.Sub == nil {
+		return ErrMsgNotBound
+	}
+	if m.Reply == "" {
+		return ErrMsgNoReply
+	}
+	m.Sub.mu.Lock()
+	nc := m.Sub.conn
+	m.Sub.mu.Unlock()
+	// No need to check the connection here since the call to publish will do all the checking.
+	return nc.PublishMsg(msg)
+}
+
 // FIXME: This is a hack
 // removeFlushEntry is needed when we need to discard queued up responses
 // for our pings as part of a flush call. This happens when we have a flush
@@ -4186,7 +4375,7 @@ func userFromFile(userFile string) (string, error) {
 		return _EMPTY_, fmt.Errorf("nats: %v", err)
 	}
 	defer wipeSlice(contents)
-	return jwt.ParseDecoratedJWT(contents)
+	return nkeys.ParseDecoratedJWT(contents)
 }
 
 func homeDir() (string, error) {
@@ -4235,7 +4424,7 @@ func nkeyPairFromSeedFile(seedFile string) (nkeys.KeyPair, error) {
 		return nil, fmt.Errorf("nats: %v", err)
 	}
 	defer wipeSlice(contents)
-	return jwt.ParseDecoratedNKey(contents)
+	return nkeys.ParseDecoratedNKey(contents)
 }
 
 // Sign authentication challenges from the server.

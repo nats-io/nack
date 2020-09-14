@@ -18,10 +18,22 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/signal"
 	"runtime"
+	"syscall"
+	"time"
 
+	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
-	"github.com/nats-io/nack/pkg/jetstream"
+
+	"github.com/nats-io/nack/controllers/jetstream"
+	clientset "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned"
+	informers "github.com/nats-io/nack/pkg/jetstream/generated/informers/externalversions"
+
+	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 var (
@@ -31,6 +43,12 @@ var (
 )
 
 func main() {
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func run() error {
 	fs := flag.NewFlagSet("jetstream-controller", flag.ExitOnError)
 	flag.Usage = func() {
 		fmt.Printf("Usage: jetstream-controller [options...]\n\n")
@@ -38,16 +56,15 @@ func main() {
 		fmt.Println()
 	}
 
-	opts := &jetstream.Options{}
 	fs.BoolVar(&showHelp, "h", false, "Show help")
 	fs.BoolVar(&showHelp, "help", false, "Show help")
 	fs.BoolVar(&showVersion, "v", false, "Show version")
 	fs.BoolVar(&showVersion, "version", false, "Show version")
 	fs.BoolVar(&debug, "D", false, "Enable debug mode")
-	fs.StringVar(&opts.NatsCredentials, "creds", "", "NATS Credentials")
-	fs.StringVar(&opts.NatsServerURL, "s", "nats://localhost:4222", "NATS Server URL")
-	fs.StringVar(&opts.ClusterName, "name", "nats", "NATS Cluster Name")
-	// fs.StringVar(&opts.ConfigMapName, "cm", "", "NATS Cluster ConfigMap")
+	//fs.StringVar(&opts.NatsCredentials, "creds", "", "NATS Credentials")
+	//fs.StringVar(&opts.NatsServerURL, "s", "nats://localhost:4222", "NATS Server URL")
+	//fs.StringVar(&opts.ClusterName, "name", "nats", "NATS Cluster Name")
+	//fs.StringVar(&opts.ConfigMapName, "cm", "", "NATS Cluster ConfigMap")
 	fs.Parse(os.Args[1:])
 
 	switch {
@@ -55,8 +72,19 @@ func main() {
 		flag.Usage()
 		os.Exit(0)
 	case showVersion:
-		fmt.Printf("NATS JetStream Controller v%s\n", jetstream.Version)
+		fmt.Printf("NATS JetStream Controller v1")
 		os.Exit(0)
+	}
+
+	var err error
+	var config *rest.Config
+	if kubeconfig := os.Getenv("KUBERNETES_CONFIG_FILE"); kubeconfig != "" {
+		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
+	} else {
+		config, err = rest.InClusterConfig()
+	}
+	if err != nil {
+		return err
 	}
 
 	// Top level global config.
@@ -68,13 +96,63 @@ func main() {
 	}
 	log.SetFormatter(formatter)
 
-	controller := jetstream.NewController(opts)
-	log.Infof("Starting NATS JetStream Controller v%s", jetstream.Version)
+	log.Infof("Starting NATS JetStream Controller v1")
 	log.Infof("Go Version: %s", runtime.Version())
 
-	err := controller.Run(context.Background())
-	if err != nil && err != context.Canceled {
-		log.Errorf(err.Error())
-		os.Exit(1)
+	kcs, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return err
+	}
+
+	cs, err := clientset.NewForConfig(config)
+	if err != nil {
+		return err
+	}
+
+	aecs, err := apiextensionsclientset.NewForConfig(config)
+	if err != nil {
+		return err
+	}
+
+	nc, err := nats.Connect("nats://localhost:4222")
+	if err != nil {
+		return err
+	}
+	defer nc.Close()
+
+	informerFactory := informers.NewSharedInformerFactory(cs, 30*time.Second)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ctrl, err := jetstream.NewController(jetstream.Options{
+		Ctx:            ctx,
+		KubeIface:      kcs,
+		APIExtIface:    aecs,
+		JetstreamIface: cs.JetstreamV1(),
+		NATSConn:       nc,
+
+		StreamInformer: informerFactory.Jetstream().V1().Streams(),
+	})
+	if err != nil {
+		return err
+	}
+
+	go handleSignals(cancel)
+	informerFactory.Start(ctx.Done())
+	return ctrl.Run()
+}
+
+func handleSignals(cancel context.CancelFunc) {
+	sigc := make(chan os.Signal, 2)
+	signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM)
+
+	for sig := range sigc {
+		switch sig {
+		case syscall.SIGINT:
+			os.Exit(130)
+		case syscall.SIGTERM:
+			cancel()
+			return
+		}
 	}
 }
