@@ -170,6 +170,11 @@ func (c *Controller) streamWorker() {
 func getNATSOptions(connName string) []nats.Option {
 	return []nats.Option{
 		nats.Name(connName),
+		nats.Option(func(o *nats.Options) error {
+			o.Pedantic = true
+			return nil
+
+		}),
 	}
 }
 
