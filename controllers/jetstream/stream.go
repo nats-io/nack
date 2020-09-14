@@ -17,7 +17,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/nats-io/jsm.go"
@@ -114,7 +113,10 @@ func validateStreamUpdate(prev, next *apis.Stream) (err error) {
 	}
 
 	if prev.Spec.Name != next.Spec.Name {
-		return fmt.Errorf("renaming streams is not allowed")
+		return fmt.Errorf("updating stream name is not allowed, please recreate")
+	}
+	if prev.Spec.Storage != next.Spec.Storage {
+		return fmt.Errorf("updating stream storage is not allowed, please recreate")
 	}
 
 	if equality.Semantic.DeepEqual(prev.Spec, next.Spec) {
@@ -194,8 +196,6 @@ func (c *Controller) processStream(ns, name string) (err error) {
 	}
 	updateOK := (streamExists && !deleteOK && newGeneration)
 	createOK := (!streamExists && !deleteOK && newGeneration)
-
-	log.Println("state:", deleteOK, updateOK, createOK)
 
 	switch {
 	case updateOK:

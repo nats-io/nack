@@ -50,6 +50,20 @@ func createStreamCRD(c apiextensionsclientset.Interface) error {
 							},
 						},
 					},
+					AdditionalPrinterColumns: []apiextensions.CustomResourceColumnDefinition{
+						{
+							Name: "Stream Name",
+							Type: "string",
+							Description: "The name of the Jetstream Stream",
+							JSONPath: ".spec.name",
+						},
+						{
+							Name: "Subjects",
+							Type: "string",
+							Description: "The subjects this Stream produces",
+							JSONPath: ".spec.subjects",
+						},
+					},
 				},
 			},
 		},
@@ -78,7 +92,7 @@ func getStreamSpecSchema() apiextensions.JSONSchemaProps {
 		Type: "object",
 		Properties: map[string]apiextensions.JSONSchemaProps{
 			"name": {
-				Description: "A unique name for the Stream, empty for Stream Templates.",
+				Description: "A unique name for the Stream. Read-only after first time.",
 				Type:        "string",
 				Pattern:     `^[^.*>]*$`,
 				MinLength:   int64Ptr(0),
@@ -95,7 +109,7 @@ func getStreamSpecSchema() apiextensions.JSONSchemaProps {
 				},
 			},
 			"storage": {
-				Description: "The storage backend to use for the Stream.",
+				Description: "The storage backend to use for the Stream. Read-only after first time.",
 				Type:        "string",
 				Enum: []apiextensions.JSON{
 					{Raw: []byte(`"file"`)},
