@@ -5,7 +5,7 @@ metadata:
   name: my-js-stream
 spec:
   servers:
-  - nats://localhost:4222
+  - nats://variadico.xyz:4222
   name: mystream
   subjects: ["orders.*"]
   storage: memory

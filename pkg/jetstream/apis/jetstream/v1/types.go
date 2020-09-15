@@ -35,9 +35,9 @@ type StreamStatus struct {
 type StreamCondition struct {
 	Type               string                 `json:"type"`
 	Status             k8sapi.ConditionStatus `json:"status"`
-	LastTransitionTime string                 `json:"lastTransitionTime,omitempty"`
-	Reason             string                 `json:"reason,omitempty"`
-	Message            string                 `json:"message,omitempty"`
+	Reason             string                 `json:"reason"`
+	Message            string                 `json:"message"`
+	LastTransitionTime string                 `json:"lastTransitionTime"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

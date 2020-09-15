@@ -38,6 +38,7 @@ import (
 
 const (
 	streamFinalizerKey = "streamfinalizer.jetstream.nats.io"
+	streamReadyCondType = "Ready"
 )
 
 func streamEventHandlers(ctx context.Context, q workqueue.RateLimitingInterface, jif typed.JetstreamV1Interface) cache.ResourceEventHandlerFuncs {
@@ -367,8 +368,8 @@ func setStreamErrored(ctx context.Context, s *apis.Stream, sif typed.StreamInter
 	}
 
 	sc := s.DeepCopy()
-	sc.Status.Conditions = append(sc.Status.Conditions, apis.StreamCondition{
-		Type:               "Ready",
+	sc.Status.Conditions = upsertStreamCondition(sc.Status.Conditions, apis.StreamCondition{
+		Type:               streamReadyCondType,
 		Status:             k8sapi.ConditionFalse,
 		LastTransitionTime: time.Now().UTC().Format(time.RFC3339Nano),
 		Reason:             "Errored",
@@ -391,8 +392,8 @@ func setStreamSynced(ctx context.Context, s *apis.Stream, i typed.StreamInterfac
 	sc := s.DeepCopy()
 
 	sc.Status.ObservedGeneration = s.Generation
-	sc.Status.Conditions = append(sc.Status.Conditions, apis.StreamCondition{
-		Type:               "Ready",
+	sc.Status.Conditions = upsertStreamCondition(sc.Status.Conditions, apis.StreamCondition{
+		Type:               streamReadyCondType,
 		Status:             k8sapi.ConditionTrue,
 		LastTransitionTime: time.Now().UTC().Format(time.RFC3339Nano),
 		Reason:             "Synced",
@@ -409,6 +410,19 @@ func setStreamSynced(ctx context.Context, s *apis.Stream, i typed.StreamInterfac
 	}
 
 	return res, nil
+}
+
+func upsertStreamCondition(cs []apis.StreamCondition, next apis.StreamCondition) []apis.StreamCondition {
+	for i := 0; i < len(cs); i++ {
+		if cs[i].Type != next.Type {
+			continue
+		}
+
+		cs[i] = next
+		return cs
+	}
+
+	return append(cs, next)
 }
 
 func pruneConditions(cs []apis.StreamCondition) []apis.StreamCondition {

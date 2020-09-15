@@ -52,6 +52,12 @@ func createStreamCRD(c apiextensionsclientset.Interface) error {
 					},
 					AdditionalPrinterColumns: []apiextensions.CustomResourceColumnDefinition{
 						{
+							Name: "State",
+							Type: "string",
+							Description: "The name of the Jetstream Stream",
+							JSONPath: fmt.Sprintf(".status.conditions[?(@.type == %q)].reason", streamReadyCondType),
+						},
+						{
 							Name: "Stream Name",
 							Type: "string",
 							Description: "The name of the Jetstream Stream",
