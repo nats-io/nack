@@ -36,6 +36,10 @@ import (
 )
 
 var (
+	BuildTime = "not-set"
+)
+
+var (
 	showVersion bool
 	showHelp    bool
 	debug       bool
@@ -97,6 +101,7 @@ func run() error {
 
 	log.Infof("Starting NATS JetStream Controller v1")
 	log.Infof("Go Version: %s", runtime.Version())
+	log.Infof("BuildTime: %s", BuildTime)
 
 	kcs, err := kubernetes.NewForConfig(config)
 	if err != nil {

@@ -1,0 +1,3 @@
+image:
+  name: connecteverything/jetstream-controller
+  version: 1.0.0

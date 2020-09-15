@@ -192,18 +192,19 @@ func (c *Controller) processStream(ns, name string) (err error) {
 		return err
 	}
 
-	c.normalEvent(stream, "Processing", fmt.Sprintf("Processing stream %q", stream.Spec.Name))
+	sif := c.ji.Streams(stream.Namespace)
 
 	nc, err := nats.Connect(
 		strings.Join(stream.Spec.Servers, ","),
 		getNATSOptions(c.natsName)...,
 	)
 	if err != nil {
+		if _, serr := setStreamErrored(c.ctx, stream, sif, err); serr != nil {
+			return fmt.Errorf("%s: %w", err, serr)
+		}
 		return err
 	}
 	defer nc.Close()
-
-	sif := c.ji.Streams(stream.Namespace)
 
 	deleteOK := stream.GetDeletionTimestamp() != nil
 	newGeneration := stream.Generation != stream.Status.ObservedGeneration
@@ -236,8 +237,11 @@ func (c *Controller) processStream(ns, name string) (err error) {
 		}
 		stream = res
 
-		_, err = setStreamSynced(c.ctx, stream, sif)
-		return err
+		if _, err := setStreamSynced(c.ctx, stream, sif); err != nil {
+			return err
+		}
+		c.normalEvent(stream, "Updated", fmt.Sprintf("Updated stream %q", stream.Spec.Name))
+		return nil
 	case createOK:
 		c.normalEvent(stream, "Creating", fmt.Sprintf("Creating stream %q", stream.Spec.Name))
 		if err := createStream(c.ctx, stream, nc); err != nil {
@@ -256,7 +260,10 @@ func (c *Controller) processStream(ns, name string) (err error) {
 		}
 		stream = res
 
-		_, err = setStreamSynced(c.ctx, stream, sif)
+		if _, err := setStreamSynced(c.ctx, stream, sif); err != nil {
+			return err
+		}
+		c.normalEvent(stream, "Created", fmt.Sprintf("Created stream %q", stream.Spec.Name))
 		return err
 	case deleteOK:
 		c.normalEvent(stream, "Deleting", fmt.Sprintf("Deleting stream %q", stream.Spec.Name))
