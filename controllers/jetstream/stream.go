@@ -20,8 +20,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nats-io/jsm.go"
-	jsmapi "github.com/nats-io/jsm.go/api"
 	"github.com/nats-io/nats.go"
 
 	apis "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1"
@@ -36,8 +34,10 @@ import (
 	"k8s.io/client-go/util/workqueue"
 )
 
+var testMode bool
+
 const (
-	streamFinalizerKey = "streamfinalizer.jetstream.nats.io"
+	streamFinalizerKey  = "streamfinalizer.jetstream.nats.io"
 	streamReadyCondType = "Ready"
 )
 
@@ -128,7 +128,7 @@ func validateStreamUpdate(prev, next *apis.Stream) (err error) {
 	return nil
 }
 
-func (c *Controller) streamWorker() {
+func (c *Controller) runStreamQueue() {
 	for {
 		item, shutdown := c.streamQueue.Get()
 		if shutdown {
@@ -195,21 +195,18 @@ func (c *Controller) processStream(ns, name string) (err error) {
 
 	sif := c.ji.Streams(stream.Namespace)
 
-	nc, err := nats.Connect(
-		strings.Join(stream.Spec.Servers, ","),
-		getNATSOptions(c.natsName)...,
-	)
+	err = c.sc.Connect(strings.Join(stream.Spec.Servers, ","), getNATSOptions(c.natsName)...)
 	if err != nil {
 		if _, serr := setStreamErrored(c.ctx, stream, sif, err); serr != nil {
 			return fmt.Errorf("%s: %w", err, serr)
 		}
 		return err
 	}
-	defer nc.Close()
+	defer c.sc.Close()
 
 	deleteOK := stream.GetDeletionTimestamp() != nil
 	newGeneration := stream.Generation != stream.Status.ObservedGeneration
-	streamExists, err := natsStreamExists(c.ctx, stream.Spec.Name, nc)
+	streamExists, err := c.sc.Exists(c.ctx, stream.Spec.Name)
 	if err != nil {
 		if _, serr := setStreamErrored(c.ctx, stream, sif, err); serr != nil {
 			return fmt.Errorf("%s: %w", err, serr)
@@ -222,7 +219,7 @@ func (c *Controller) processStream(ns, name string) (err error) {
 	switch {
 	case updateOK:
 		c.normalEvent(stream, "Updating", fmt.Sprintf("Updating stream %q", stream.Spec.Name))
-		if err := updateStream(c.ctx, stream, nc); err != nil {
+		if err := c.sc.Update(c.ctx, stream); err != nil {
 			if _, serr := setStreamErrored(c.ctx, stream, sif, err); serr != nil {
 				return fmt.Errorf("%s: %w", err, serr)
 			}
@@ -245,7 +242,7 @@ func (c *Controller) processStream(ns, name string) (err error) {
 		return nil
 	case createOK:
 		c.normalEvent(stream, "Creating", fmt.Sprintf("Creating stream %q", stream.Spec.Name))
-		if err := createStream(c.ctx, stream, nc); err != nil {
+		if err := c.sc.Create(c.ctx, stream); err != nil {
 			if _, serr := setStreamErrored(c.ctx, stream, sif, err); serr != nil {
 				return fmt.Errorf("%s: %w", err, serr)
 			}
@@ -268,7 +265,7 @@ func (c *Controller) processStream(ns, name string) (err error) {
 		return err
 	case deleteOK:
 		c.normalEvent(stream, "Deleting", fmt.Sprintf("Deleting stream %q", stream.Spec.Name))
-		if err := deleteStream(c.ctx, stream, nc, sif); err != nil {
+		if err := c.sc.Delete(c.ctx, stream.Spec.Name); err != nil {
 			if _, serr := setStreamErrored(c.ctx, stream, sif, err); serr != nil {
 				return fmt.Errorf("%s: %w", err, serr)
 			}
@@ -289,79 +286,6 @@ func (c *Controller) processStream(ns, name string) (err error) {
 	return nil
 }
 
-func deleteStream(ctx context.Context, s *apis.Stream, nc *nats.Conn, sif typed.StreamInterface) (err error) {
-	defer func() {
-		if err != nil {
-			err = fmt.Errorf("failed to delete stream %q: %w", s.Spec.Name, err)
-		}
-	}()
-
-	var apierr jsmapi.ApiError
-	js, err := jsm.LoadStream(s.Spec.Name, jsm.WithConnection(nc), jsm.WithContext(ctx))
-	if errors.As(err, &apierr) && apierr.NotFoundError() {
-		return nil
-	} else if err != nil {
-		return err
-	}
-
-	return js.Delete()
-}
-
-func updateStream(ctx context.Context, s *apis.Stream, nc *nats.Conn) (err error) {
-	defer func() {
-		if err != nil {
-			err = fmt.Errorf("failed to update stream %q: %w", s.Spec.Name, err)
-		}
-	}()
-
-	js, err := jsm.LoadStream(s.Spec.Name, jsm.WithConnection(nc), jsm.WithContext(ctx))
-	if err != nil {
-		return err
-	}
-
-	c := js.Configuration()
-
-	maxDur, err := time.ParseDuration(s.Spec.MaxAge)
-	if err != nil {
-		return err
-	}
-	c.MaxAge = maxDur
-
-	return js.UpdateConfiguration(c)
-}
-
-func createStream(ctx context.Context, s *apis.Stream, nc *nats.Conn) (err error) {
-	defer func() {
-		if err != nil {
-			err = fmt.Errorf("failed to create stream %q: %w", s.Spec.Name, err)
-		}
-	}()
-
-	maxDur, err := time.ParseDuration(s.Spec.MaxAge)
-	if err != nil {
-		return err
-	}
-
-	storage, err := getStorageType(s.Spec.Storage)
-	if err != nil {
-		return err
-	}
-
-	opts := []jsm.StreamOption{
-		jsm.StreamConnection(jsm.WithConnection(nc), jsm.WithContext(ctx)),
-		jsm.Subjects(s.Spec.Subjects...),
-		jsm.MaxAge(maxDur),
-	}
-	if storage == jsmapi.MemoryStorage {
-		opts = append(opts, jsm.MemoryStorage())
-	} else if storage == jsmapi.FileStorage {
-		opts = append(opts, jsm.FileStorage())
-	}
-
-	_, err = jsm.NewStream(s.Spec.Name, opts...)
-	return err
-}
-
 func setStreamErrored(ctx context.Context, s *apis.Stream, sif typed.StreamInterface, err error) (*apis.Stream, error) {
 	if err == nil {
 		return s, nil
@@ -375,7 +299,7 @@ func setStreamErrored(ctx context.Context, s *apis.Stream, sif typed.StreamInter
 		Reason:             "Errored",
 		Message:            err.Error(),
 	})
-	sc.Status.Conditions = pruneConditions(sc.Status.Conditions)
+	sc.Status.Conditions = pruneStreamConditions(sc.Status.Conditions)
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
@@ -399,7 +323,7 @@ func setStreamSynced(ctx context.Context, s *apis.Stream, i typed.StreamInterfac
 		Reason:             "Synced",
 		Message:            "Stream is synced with spec",
 	})
-	sc.Status.Conditions = pruneConditions(sc.Status.Conditions)
+	sc.Status.Conditions = pruneStreamConditions(sc.Status.Conditions)
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
@@ -425,7 +349,7 @@ func upsertStreamCondition(cs []apis.StreamCondition, next apis.StreamCondition)
 	return append(cs, next)
 }
 
-func pruneConditions(cs []apis.StreamCondition) []apis.StreamCondition {
+func pruneStreamConditions(cs []apis.StreamCondition) []apis.StreamCondition {
 	const maxCond = 10
 	if len(cs) < maxCond {
 		return cs
@@ -482,27 +406,4 @@ func clearStreamFinalizer(ctx context.Context, s *apis.Stream, sif typed.StreamI
 	}
 
 	return res, nil
-}
-
-func natsStreamExists(ctx context.Context, name string, nc *nats.Conn) (ok bool, err error) {
-	defer func() {
-		if err != nil {
-			err = fmt.Errorf("failed to check if stream exists: %w", err)
-		}
-	}()
-
-	_, err = jsm.LoadStream(name, jsm.WithConnection(nc), jsm.WithContext(ctx))
-	if err == nil {
-		return true, nil
-	}
-
-	apierr, ok := err.(jsmapi.ApiError)
-	if !ok {
-		return false, err
-	}
-
-	if apierr.NotFoundError() {
-		return false, nil
-	}
-	return false, apierr
 }

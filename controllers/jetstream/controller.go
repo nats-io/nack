@@ -22,11 +22,11 @@ import (
 
 	"github.com/nats-io/jsm.go"
 	jsmapi "github.com/nats-io/jsm.go/api"
-	"github.com/sirupsen/logrus"
 
+	clientset "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned"
 	scheme "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/scheme"
 	typed "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/typed/jetstream/v1"
-	extinformers "github.com/nats-io/nack/pkg/jetstream/generated/informers/externalversions"
+	informers "github.com/nats-io/nack/pkg/jetstream/generated/informers/externalversions"
 	listers "github.com/nats-io/nack/pkg/jetstream/generated/listers/jetstream/v1"
 
 	k8sapi "k8s.io/api/core/v1"
@@ -41,6 +41,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	klog "k8s.io/klog/v2"
 )
 
 var (
@@ -52,9 +53,7 @@ type Options struct {
 
 	KubeIface      kubernetes.Interface
 	APIExtIface    apiextensionsclientset.Interface
-	JetstreamIface typed.JetstreamV1Interface
-
-	InformerFactory extinformers.SharedInformerFactory
+	JetstreamIface clientset.Interface
 
 	NATSClientName string
 }
@@ -63,8 +62,8 @@ type Controller struct {
 	ctx context.Context
 
 	// Clients
-	infoFactory extinformers.SharedInformerFactory
-	ji          typed.JetstreamV1Interface
+	informerFactory informers.SharedInformerFactory
+	ji              typed.JetstreamV1Interface
 
 	streamLister listers.StreamLister
 	streamSynced cache.InformerSynced
@@ -73,14 +72,16 @@ type Controller struct {
 	rec          record.EventRecorder
 
 	natsName string
+	sc streamClient
 }
 
 func NewController(opt Options) (*Controller, error) {
-	streamInformer := opt.InformerFactory.Jetstream().V1().Streams()
+	informerFactory := informers.NewSharedInformerFactory(opt.JetstreamIface, 30*time.Second)
+	streamInformer := informerFactory.Jetstream().V1().Streams()
 
 	utilruntime.Must(scheme.AddToScheme(k8sscheme.Scheme))
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(logrus.Infof)
+	eventBroadcaster.StartLogging(klog.Infof)
 	eventBroadcaster.StartRecordingToSink(&k8styped.EventSinkImpl{
 		Interface: opt.KubeIface.CoreV1().Events(""),
 	})
@@ -90,10 +91,9 @@ func NewController(opt Options) (*Controller, error) {
 	}
 
 	ctrl := &Controller{
-		ctx:         opt.Ctx,
-		natsName:    opt.NATSClientName,
-		ji:          opt.JetstreamIface,
-		infoFactory: opt.InformerFactory,
+		ctx:             opt.Ctx,
+		ji:              opt.JetstreamIface.JetstreamV1(),
+		informerFactory: informerFactory,
 
 		streamLister: streamInformer.Lister(),
 		streamSynced: streamInformer.Informer().HasSynced,
@@ -103,6 +103,9 @@ func NewController(opt Options) (*Controller, error) {
 		rec: eventBroadcaster.NewRecorder(k8sscheme.Scheme, k8sapi.EventSource{
 			Component: "jetstream-controller",
 		}),
+
+		natsName:        opt.NATSClientName,
+		sc:              &realStreamClient{},
 	}
 	if ctrl.natsName == "" {
 		ctrl.natsName = "jetstream-controller"
@@ -121,13 +124,13 @@ func (c *Controller) Run() error {
 	defer utilruntime.HandleCrash()
 	defer c.streamQueue.ShutDown()
 
-	c.infoFactory.Start(c.ctx.Done())
+	c.informerFactory.Start(c.ctx.Done())
 
 	if !cache.WaitForCacheSync(c.ctx.Done(), c.streamSynced) {
 		return fmt.Errorf("failed to wait for cache sync")
 	}
 
-	go wait.Until(c.streamWorker, time.Second, c.ctx.Done())
+	go wait.Until(c.runStreamQueue, time.Second, c.ctx.Done())
 
 	<-c.ctx.Done()
 	// Gracefully shutdown.
@@ -135,7 +138,9 @@ func (c *Controller) Run() error {
 }
 
 func (c *Controller) normalEvent(o runtime.Object, reason, message string) {
-	c.rec.Event(o, k8sapi.EventTypeNormal, reason, message)
+	if c.rec != nil {
+		c.rec.Event(o, k8sapi.EventTypeNormal, reason, message)
+	}
 }
 
 func splitNamespaceName(item interface{}) (ns string, name string, err error) {

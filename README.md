@@ -7,20 +7,18 @@ NATS Controllers for Kubernetes (NACK)
 ### JetStream Controller
 
 ```sh
-$ kubectl apply -f deploy/jetstream-crds.yaml 
-$ kubectl apply -f deploy/example-stream.yaml
-
-# Start NATS Server with JetStream enabled
+# Start nightly NATS Server with JetStream enabled.
 $ nats-server -DV -js
 
 # Start JetStream Controller
-make jetstream-controller
-KUBERNETES_CONFIG_FILE=~/.kube/config ./jetstream-controller
+$ make jetstream-controller
+$ ./jetstream-controller -kubeconfig ~/.kube/config
 
-# Start leaf config Controller
-make leaf-config-controller
-KUBERNETES_CONFIG_FILE=~/.kube/config ./leaf-config-controller
+# Create an example stream.
+$ kubectl apply -f deploy/example-stream.yaml
 
-# Build all controllers
-make build
+# Install with Helm
+$ helm install myjsc ./helm/jetstream-controller/
+# Uninstall with Helm
+$ helm uninstall myjsc ./helm/jetstream-controller/
 ```

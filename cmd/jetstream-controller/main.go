@@ -19,101 +19,62 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"runtime"
 	"syscall"
-	"time"
-
-	log "github.com/sirupsen/logrus"
 
 	"github.com/nats-io/nack/controllers/jetstream"
 	clientset "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned"
-	informers "github.com/nats-io/nack/pkg/jetstream/generated/informers/externalversions"
 
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	klog "k8s.io/klog/v2"
 )
 
 var (
-	BuildTime = "not-set"
-)
-
-var (
-	showVersion bool
-	showHelp    bool
-	debug       bool
+	BuildTime = "build-time-not-set"
+	Version   = "version-not-set"
 )
 
 func main() {
 	if err := run(); err != nil {
-		log.Fatal(err)
+		klog.Fatal(err)
 	}
 }
 
 func run() error {
-	fs := flag.NewFlagSet("jetstream-controller", flag.ExitOnError)
-	flag.Usage = func() {
-		fmt.Printf("Usage: jetstream-controller [options...]\n\n")
-		fs.PrintDefaults()
-		fmt.Println()
+	klog.InitFlags(nil)
+	kubeConfig := flag.String("kubeconfig", "", "Path to kubeconfig")
+	version := flag.Bool("version", false, "Print the version and exit")
+	flag.Parse()
+
+	if *version {
+		fmt.Printf("%s version %s, built %s\n", os.Args[0], Version, BuildTime)
+		return nil
 	}
 
-	fs.BoolVar(&showHelp, "h", false, "Show help")
-	fs.BoolVar(&showHelp, "help", false, "Show help")
-	fs.BoolVar(&showVersion, "v", false, "Show version")
-	fs.BoolVar(&showVersion, "version", false, "Show version")
-	fs.BoolVar(&debug, "D", false, "Enable debug mode")
-	//fs.StringVar(&opts.NatsCredentials, "creds", "", "NATS Credentials")
-	//fs.StringVar(&opts.NatsServerURL, "s", "nats://localhost:4222", "NATS Server URL")
-	//fs.StringVar(&opts.ClusterName, "name", "nats", "NATS Cluster Name")
-	//fs.StringVar(&opts.ConfigMapName, "cm", "", "NATS Cluster ConfigMap")
-	fs.Parse(os.Args[1:])
-
-	switch {
-	case showHelp:
-		flag.Usage()
-		os.Exit(0)
-	case showVersion:
-		fmt.Printf("NATS JetStream Controller v1")
-		os.Exit(0)
+	if *kubeConfig == "" {
+		flag.Set("kubeconfig", os.Getenv("KUBECONFIG"))
 	}
 
-	var err error
-	var config *rest.Config
-	if kubeconfig := os.Getenv("KUBERNETES_CONFIG_FILE"); kubeconfig != "" {
-		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
-	} else {
-		config, err = rest.InClusterConfig()
+	config, err := clientcmd.BuildConfigFromFlags("", *kubeConfig)
+	if err != nil {
+		var cerr error
+		config, cerr = rest.InClusterConfig()
+		if cerr != nil {
+			return fmt.Errorf("%s: %w", err, cerr)
+		}
 	}
+
+	kc, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		return err
 	}
-
-	// Top level global config.
-	if debug {
-		log.SetLevel(log.DebugLevel)
-	}
-	formatter := &log.TextFormatter{
-		FullTimestamp: true,
-	}
-	log.SetFormatter(formatter)
-
-	log.Infof("Starting NATS JetStream Controller v1")
-	log.Infof("Go Version: %s", runtime.Version())
-	log.Infof("BuildTime: %s", BuildTime)
-
-	kcs, err := kubernetes.NewForConfig(config)
+	aec, err := apiextensionsclientset.NewForConfig(config)
 	if err != nil {
 		return err
 	}
-
-	cs, err := clientset.NewForConfig(config)
-	if err != nil {
-		return err
-	}
-
-	aecs, err := apiextensionsclientset.NewForConfig(config)
+	jc, err := clientset.NewForConfig(config)
 	if err != nil {
 		return err
 	}
@@ -121,17 +82,17 @@ func run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ctrl, err := jetstream.NewController(jetstream.Options{
-		Ctx:            ctx,
-		KubeIface:      kcs,
-		APIExtIface:    aecs,
-		JetstreamIface: cs.JetstreamV1(),
+		Ctx: ctx,
 
-		InformerFactory: informers.NewSharedInformerFactory(cs, 30*time.Second),
+		KubeIface:      kc,
+		APIExtIface:    aec,
+		JetstreamIface: jc,
 	})
 	if err != nil {
 		return err
 	}
 
+	klog.Infof("Starting %s %s...", os.Args[0], Version)
 	go handleSignals(cancel)
 	return ctrl.Run()
 }

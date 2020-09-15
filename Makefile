@@ -9,10 +9,15 @@ jetstreamSrc := $(shell find cmd/jetstream-controller pkg/jetstream controllers/
 
 now := $(shell date -u +%Y-%m-%dT%H:%M:%S%z)
 
+gitTag := $(shell git describe --tags --abbrev=0 2>/dev/null)
+gitBranch := $(shell git branch --show-current)
+gitCommit := $(shell git rev-parse --short HEAD)
+repoDirty := $(shell git diff --quiet || echo "-dirty")
+
 vendor: go.mod go.sum
 	go mod vendor
 
-$(jetstreamGenOut): $(codeGenerator) $(jetstreamGenIn) pkg/k8scodegen/file-header.txt
+$(jetstreamGenOut): vendor $(codeGenerator) $(jetstreamGenIn) pkg/k8scodegen/file-header.txt
 	GOFLAGS='' bash $(codeGenerator) all \
 		github.com/nats-io/nack/pkg/jetstream/generated \
 		github.com/nats-io/nack/pkg/jetstream/apis \
@@ -22,7 +27,7 @@ $(jetstreamGenOut): $(codeGenerator) $(jetstreamGenIn) pkg/k8scodegen/file-heade
 
 jetstream-controller: $(sort $(jetstreamSrc) $(jetstreamGenOut)) vendor
 	go build -race -o $@ \
-		-ldflags "-X main.BuildTime=$(now)" \
+		-ldflags "-X main.BuildTime=$(now) -X main.Version=$(gitBranch)-$(gitCommit)$(repoDirty)" \
 		github.com/nats-io/nack/cmd/jetstream-controller
 
 .PHONY: build
