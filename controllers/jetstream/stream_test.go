@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 
@@ -13,10 +14,20 @@ import (
 
 	k8smeta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 )
+
+func TestMain(m *testing.M) {
+	// Disable error logs.
+	utilruntime.ErrorHandlers = []func(error){
+		func(err error) {},
+	}
+
+	os.Exit(m.Run())
+}
 
 func TestValidateStreamUpdate(t *testing.T) {
 	t.Parallel()
@@ -296,6 +307,100 @@ func TestProcessStream(t *testing.T) {
 				t.Error("unexpected event")
 				t.Fatalf("got=%s; want=%s", gotEvent, "Creating/Created...")
 			}
+		}
+	})
+}
+
+func TestRunStreamQueue(t *testing.T) {
+	t.Parallel()
+
+	t.Run("bad item key", func(t *testing.T) {
+		t.Parallel()
+
+		limiter := workqueue.DefaultControllerRateLimiter()
+		q := workqueue.NewNamedRateLimitingQueue(limiter, "StreamsTest")
+		defer q.ShutDown()
+
+		ctrl := &Controller{
+			streamQueue: q,
+		}
+
+		key := "this/is/a/bad/key"
+		q.Add(key)
+
+		ctrl.processNextQueueItem()
+
+		if got, want := q.Len(), 0; got != want {
+			t.Error("unexpected number of items in queue")
+			t.Fatalf("got=%d; want=%d", got, want)
+		}
+
+		if got, want := q.NumRequeues(key), 0; got != want {
+			t.Error("unexpected number of requeues")
+			t.Fatalf("got=%d; want=%d", got, want)
+		}
+	})
+
+	t.Run("process error", func(t *testing.T) {
+		t.Parallel()
+
+		limiter := workqueue.DefaultControllerRateLimiter()
+		q := workqueue.NewNamedRateLimitingQueue(limiter, "StreamsTest")
+		defer q.ShutDown()
+
+		jc := clientsetfake.NewSimpleClientset()
+		informerFactory := informers.NewSharedInformerFactory(jc, 0)
+		informer := informerFactory.Jetstream().V1().Streams()
+
+		ns, name := "default", "mystream"
+
+		err := informer.Informer().GetStore().Add(
+			&apis.Stream{
+				ObjectMeta: k8smeta.ObjectMeta{
+					Namespace:  ns,
+					Name:       name,
+					Generation: 1,
+				},
+				Spec: apis.StreamSpec{
+					Name: name,
+				},
+			},
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		ctrl := &Controller{
+			ctx:          context.Background(),
+			streamQueue:  q,
+			streamLister: informer.Lister(),
+			ji:           jc.JetstreamV1(),
+			sc: &mockStreamClient{
+				connectErr: fmt.Errorf("bad connect"),
+			},
+		}
+
+		key := fmt.Sprintf("%s/%s", ns, name)
+		q.Add(key)
+
+		maxGets := maxQueueRetries+1
+		numRequeues := -1
+		for i := 0; i < maxGets; i++ {
+			if i == maxGets-1 {
+				numRequeues = q.NumRequeues(key)
+			}
+
+			ctrl.processNextQueueItem()
+		}
+
+		if got, want := q.Len(), 0; got != want {
+			t.Error("unexpected number of items in queue")
+			t.Fatalf("got=%d; want=%d", got, want)
+		}
+
+		if got, want := numRequeues, 10; got != want {
+			t.Error("unexpected number of requeues")
+			t.Fatalf("got=%d; want=%d", got, want)
 		}
 	})
 }

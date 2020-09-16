@@ -43,6 +43,13 @@ import (
 	klog "k8s.io/klog/v2"
 )
 
+const (
+	// maxQueueRetries is the max times an item will be retried. An item will
+	// be pulled maxQueueRetries+1 times from the queue. On pull number
+	// maxQueueRetries+1, if it fails again, it won't be retried.
+	maxQueueRetries = 10
+)
+
 var (
 	errNothingToUpdate = errors.New("nothing to update")
 )
@@ -74,7 +81,8 @@ type Controller struct {
 }
 
 func NewController(opt Options) (*Controller, error) {
-	informerFactory := informers.NewSharedInformerFactory(opt.JetstreamIface, 30*time.Second)
+	resyncPeriod := 30 * time.Second
+	informerFactory := informers.NewSharedInformerFactory(opt.JetstreamIface, resyncPeriod)
 	streamInformer := informerFactory.Jetstream().V1().Streams()
 
 	utilruntime.Must(scheme.AddToScheme(k8sscheme.Scheme))

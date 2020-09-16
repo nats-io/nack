@@ -128,42 +128,43 @@ func validateStreamUpdate(prev, next *apis.Stream) (err error) {
 
 func (c *Controller) runStreamQueue() {
 	for {
-		item, shutdown := c.streamQueue.Get()
-		if shutdown {
-			return
-		}
-
-		ns, name, err := splitNamespaceName(item)
-		if err != nil {
-			// Probably junk, clean it up.
-			utilruntime.HandleError(err)
-			c.streamQueue.Forget(item)
-			c.streamQueue.Done(item)
-			continue
-		}
-
-		err = c.processStream(ns, name)
-		if err == nil {
-			// Item processed successfully, don't requeue.
-			c.streamQueue.Forget(item)
-			c.streamQueue.Done(item)
-			continue
-		}
-
-		utilruntime.HandleError(err)
-
-		if c.streamQueue.NumRequeues(item) < 10 {
-			// Failed to process item, try again.
-			c.streamQueue.AddRateLimited(item)
-			c.streamQueue.Done(item)
-			continue
-		}
-
-		// If we haven't been able to recover by this point, then just stop.
-		// The user should have enough info in kubectl describe to debug.
-		c.streamQueue.Forget(item)
-		c.streamQueue.Done(item)
+		c.processNextQueueItem()
 	}
+}
+
+func (c *Controller) processNextQueueItem() {
+	item, shutdown := c.streamQueue.Get()
+	if shutdown {
+		return
+	}
+	defer c.streamQueue.Done(item)
+
+	ns, name, err := splitNamespaceName(item)
+	if err != nil {
+		// Probably junk, clean it up.
+		utilruntime.HandleError(err)
+		c.streamQueue.Forget(item)
+		return
+	}
+
+	err = c.processStream(ns, name)
+	if err == nil {
+		// Item processed successfully, don't requeue.
+		c.streamQueue.Forget(item)
+		return
+	}
+
+	utilruntime.HandleError(err)
+
+	if c.streamQueue.NumRequeues(item) < maxQueueRetries {
+		// Failed to process item, try again.
+		c.streamQueue.AddRateLimited(item)
+		return
+	}
+
+	// If we haven't been able to recover by this point, then just stop.
+	// The user should have enough info in kubectl describe to debug.
+	c.streamQueue.Forget(item)
 }
 
 func getNATSOptions(connName string) []nats.Option {
