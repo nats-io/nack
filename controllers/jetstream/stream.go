@@ -34,8 +34,6 @@ import (
 	"k8s.io/client-go/util/workqueue"
 )
 
-var testMode bool
-
 const (
 	streamFinalizerKey  = "streamfinalizer.jetstream.nats.io"
 	streamReadyCondType = "Ready"

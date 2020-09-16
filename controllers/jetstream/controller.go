@@ -72,7 +72,7 @@ type Controller struct {
 	rec          record.EventRecorder
 
 	natsName string
-	sc streamClient
+	sc       streamClient
 }
 
 func NewController(opt Options) (*Controller, error) {
@@ -104,8 +104,8 @@ func NewController(opt Options) (*Controller, error) {
 			Component: "jetstream-controller",
 		}),
 
-		natsName:        opt.NATSClientName,
-		sc:              &realStreamClient{},
+		natsName: opt.NATSClientName,
+		sc:       &realStreamClient{},
 	}
 	if ctrl.natsName == "" {
 		ctrl.natsName = "jetstream-controller"

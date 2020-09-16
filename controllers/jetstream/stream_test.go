@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 	"testing"
 
@@ -18,11 +17,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 )
-
-func TestMain(m *testing.M) {
-	testMode = true
-	os.Exit(m.Run())
-}
 
 func TestValidateStreamUpdate(t *testing.T) {
 	t.Parallel()
@@ -121,19 +115,22 @@ func TestProcessStream(t *testing.T) {
 		ts := k8smeta.Unix(1600216923, 0)
 		name := "my-stream"
 
-		informer.Informer().GetStore().Add(
+		err := informer.Informer().GetStore().Add(
 			&apis.Stream{
 				ObjectMeta: k8smeta.ObjectMeta{
 					Namespace:         "default",
 					Name:              name,
 					DeletionTimestamp: &ts,
-					Finalizers: []string{streamFinalizerKey},
+					Finalizers:        []string{streamFinalizerKey},
 				},
 				Spec: apis.StreamSpec{
 					Name: name,
 				},
 			},
 		)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		jc.PrependReactor("update", "streams", func(a k8stesting.Action) (handled bool, o runtime.Object, err error) {
 			ua, ok := a.(k8stesting.UpdateAction)
@@ -157,8 +154,7 @@ func TestProcessStream(t *testing.T) {
 			},
 		}
 
-		err := ctrl.processStream("default", name)
-		if err != nil {
+		if err := ctrl.processStream("default", name); err != nil {
 			t.Fatal(err)
 		}
 
@@ -181,7 +177,7 @@ func TestProcessStream(t *testing.T) {
 
 		name := "my-stream"
 
-		informer.Informer().GetStore().Add(
+		err := informer.Informer().GetStore().Add(
 			&apis.Stream{
 				ObjectMeta: k8smeta.ObjectMeta{
 					Namespace:  "default",
@@ -196,6 +192,9 @@ func TestProcessStream(t *testing.T) {
 				},
 			},
 		)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		jc.PrependReactor("update", "streams", func(a k8stesting.Action) (handled bool, o runtime.Object, err error) {
 			ua, ok := a.(k8stesting.UpdateAction)
@@ -219,8 +218,7 @@ func TestProcessStream(t *testing.T) {
 			},
 		}
 
-		err := ctrl.processStream("default", name)
-		if err != nil {
+		if err := ctrl.processStream("default", name); err != nil {
 			t.Fatal(err)
 		}
 
@@ -245,7 +243,7 @@ func TestProcessStream(t *testing.T) {
 
 		name := "my-stream"
 
-		informer.Informer().GetStore().Add(
+		err := informer.Informer().GetStore().Add(
 			&apis.Stream{
 				ObjectMeta: k8smeta.ObjectMeta{
 					Namespace:  "default",
@@ -257,6 +255,9 @@ func TestProcessStream(t *testing.T) {
 				},
 			},
 		)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		jc.PrependReactor("update", "streams", func(a k8stesting.Action) (handled bool, o runtime.Object, err error) {
 			ua, ok := a.(k8stesting.UpdateAction)
@@ -280,8 +281,7 @@ func TestProcessStream(t *testing.T) {
 			},
 		}
 
-		err := ctrl.processStream("default", name)
-		if err != nil {
+		if err := ctrl.processStream("default", name); err != nil {
 			t.Fatal(err)
 		}
 
