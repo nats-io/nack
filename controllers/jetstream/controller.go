@@ -30,7 +30,6 @@ import (
 	listers "github.com/nats-io/nack/pkg/jetstream/generated/listers/jetstream/v1"
 
 	k8sapi "k8s.io/api/core/v1"
-	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -52,7 +51,6 @@ type Options struct {
 	Ctx context.Context
 
 	KubeIface      kubernetes.Interface
-	APIExtIface    apiextensionsclientset.Interface
 	JetstreamIface clientset.Interface
 
 	NATSClientName string
@@ -85,10 +83,6 @@ func NewController(opt Options) (*Controller, error) {
 	eventBroadcaster.StartRecordingToSink(&k8styped.EventSinkImpl{
 		Interface: opt.KubeIface.CoreV1().Events(""),
 	})
-
-	if err := createStreamCRD(opt.APIExtIface); err != nil {
-		return nil, err
-	}
 
 	ctrl := &Controller{
 		ctx:             opt.Ctx,

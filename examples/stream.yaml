@@ -2,10 +2,10 @@
 apiVersion: jetstream.nats.io/v1
 kind: Stream
 metadata:
-  name: my-js-stream
+  name: mystream
 spec:
   servers:
-  - nats://variadico.xyz:4222
+  - nats://localhost:4222
   name: mystream
   subjects: ["orders.*"]
   storage: memory

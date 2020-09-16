@@ -7,18 +7,31 @@ NATS Controllers for Kubernetes (NACK)
 ### JetStream Controller
 
 ```sh
-# Start nightly NATS Server with JetStream enabled.
-$ nats-server -DV -js
+# First, build the jetstream controller.
+make jetstream-controller
+# Next, run the controller like this
+./jetstream-controller -kubeconfig ~/.kube/config
+# or this.
+KUBECONFIG=~/.kube/config ./jetstream-controller
 
-# Start JetStream Controller
-$ make jetstream-controller
-$ ./jetstream-controller -kubeconfig ~/.kube/config
+# Pro tip: jetstream-controller uses klog just like kubectl or kube-apiserver.
+# This means you can change the verbosity of logs with the -v flag.
+#
+# For example, this prints raw HTTP requests and responses.
+#     ./jetstream-controller -v=10
 
-# Create an example stream.
-$ kubectl apply -f deploy/example-stream.yaml
 
-# Install with Helm
-$ helm install myjsc ./helm/jetstream-controller/
-# Uninstall with Helm
-$ helm uninstall myjsc ./helm/jetstream-controller/
+# You can install the YAML like this
+kubectl apply -f helm/jetstream-controller/crds/stream.yaml
+# And uninstall like this.
+kubectl delete -f helm/jetstream-controller/crds/stream.yaml
+
+
+# You'll probably want to start a local Jetstream-enabled NATS server, unless
+# you use a public one.
+nats-server -DV -js
+
+
+# Finally, create an example stream.
+kubectl apply -f examples/stream.yaml
 ```

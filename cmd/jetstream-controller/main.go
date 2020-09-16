@@ -24,7 +24,6 @@ import (
 	"github.com/nats-io/nack/controllers/jetstream"
 	clientset "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned"
 
-	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -70,10 +69,6 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	aec, err := apiextensionsclientset.NewForConfig(config)
-	if err != nil {
-		return err
-	}
 	jc, err := clientset.NewForConfig(config)
 	if err != nil {
 		return err
@@ -85,7 +80,6 @@ func run() error {
 		Ctx: ctx,
 
 		KubeIface:      kc,
-		APIExtIface:    aec,
 		JetstreamIface: jc,
 	})
 	if err != nil {
