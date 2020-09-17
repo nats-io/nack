@@ -32,6 +32,9 @@ spec:
                 items:
                   type: string
                   minLength: 1
+              credentials:
+                description: Credentials for the given Jetstream server.
+                type: string
               name:
                 description: A unique name for the Stream, empty for Stream Templates.
                 type: string

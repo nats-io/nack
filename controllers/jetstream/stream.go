@@ -20,11 +20,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nats-io/jwt"
 	"github.com/nats-io/nats.go"
 
 	apis "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1"
 	typed "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/typed/jetstream/v1"
 
+	coreV1Types "k8s.io/client-go/kubernetes/typed/core/v1"
 	k8sapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -167,8 +169,29 @@ func (c *Controller) processNextQueueItem() {
 	c.streamQueue.Forget(item)
 }
 
-func getNATSOptions(connName string) []nats.Option {
-	return []nats.Option{
+func wipeSlice(buf []byte) {
+	for i := range buf {
+		buf[i] = 'x'
+	}
+}
+
+func getNATSOptions(connName string, creds []byte) []nats.Option {
+	userCB := func() (string, error) {
+		return jwt.ParseDecoratedJWT(creds)
+	}
+	sigCB := func(nonce []byte) ([]byte, error) {
+		defer wipeSlice(creds)
+		keys, err := jwt.ParseDecoratedNKey(creds)
+		if err != nil {
+			return nil, err
+		}
+		defer keys.Wipe()
+
+		sig, _ := keys.Sign(nonce)
+		return sig, nil
+	}
+
+	opts := []nats.Option{
 		nats.Name(connName),
 		nats.Option(func(o *nats.Options) error {
 			o.Pedantic = true
@@ -176,6 +199,24 @@ func getNATSOptions(connName string) []nats.Option {
 
 		}),
 	}
+
+	if creds != nil {
+		opts = append(opts, nats.UserJWT(userCB, sigCB))
+	}
+
+	return opts
+}
+
+func getSecret(ctx context.Context, name string, sif coreV1Types.SecretInterface) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5 * time.Second)
+	defer cancel()
+
+	sec, err := sif.Get(ctx, name, k8smeta.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	return sec.Data[name], nil
 }
 
 func (c *Controller) processStream(ns, name string) (err error) {
@@ -192,9 +233,20 @@ func (c *Controller) processStream(ns, name string) (err error) {
 		return err
 	}
 
+	var creds []byte
+	if name := stream.Spec.Credentials; name != "" {
+		creds, err = getSecret(c.ctx, name, c.kc.CoreV1().Secrets(ns))
+		if err != nil {
+			return err
+		}
+	}
+
 	sif := c.ji.Streams(stream.Namespace)
 
-	err = c.sc.Connect(strings.Join(stream.Spec.Servers, ","), getNATSOptions(c.natsName)...)
+	err = c.sc.Connect(
+		strings.Join(stream.Spec.Servers, ","),
+		getNATSOptions(c.natsName, creds)...,
+	)
 	if err != nil {
 		if _, serr := setStreamErrored(c.ctx, stream, sif, err); serr != nil {
 			return fmt.Errorf("%s: %w", err, serr)

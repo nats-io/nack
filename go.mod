@@ -9,6 +9,7 @@ require (
 	github.com/googleapis/gnostic v0.5.1 // indirect
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
 	github.com/nats-io/jsm.go v0.0.18
+	github.com/nats-io/jwt v1.0.1
 	github.com/nats-io/nats.go v1.10.1-0.20200606002146-fc6fed82929a
 	github.com/sirupsen/logrus v1.6.0 // indirect
 	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a // indirect
@@ -18,7 +19,7 @@ require (
 	golang.org/x/time v0.0.0-20200630173020-3af7569d3a1e // indirect
 	gopkg.in/yaml.v2 v2.3.0 // indirect
 	k8s.io/api v0.19.1
-	k8s.io/apiextensions-apiserver v0.19.1
+	k8s.io/apiextensions-apiserver v0.19.1 // indirect
 	k8s.io/apimachinery v0.19.1
 	k8s.io/client-go v11.0.0+incompatible
 	k8s.io/code-generator v0.19.1

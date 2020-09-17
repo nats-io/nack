@@ -6,6 +6,7 @@ metadata:
 spec:
   servers:
   - nats://localhost:4222
+  #credentials: myncreds
   name: mystream
   subjects: ["orders.*"]
   storage: memory

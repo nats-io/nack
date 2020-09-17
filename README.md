@@ -2,9 +2,21 @@
 
 NATS Controllers for Kubernetes (NACK)
 
-## Local Development
+## Jetstream Controller
 
-### JetStream Controller
+### Normal usage
+
+For normal usage, you can install with Helm.
+
+```
+# Install
+helm install myjsc ./helm/jetstream-controller
+
+# Uninstall
+helm uninstall myjsc
+```
+
+### Local Development
 
 ```sh
 # First, build the jetstream controller.

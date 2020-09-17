@@ -67,6 +67,7 @@ type Controller struct {
 	ctx context.Context
 
 	// Clients
+	kc              kubernetes.Interface
 	informerFactory informers.SharedInformerFactory
 	ji              typed.JetstreamV1Interface
 
@@ -94,6 +95,7 @@ func NewController(opt Options) (*Controller, error) {
 
 	ctrl := &Controller{
 		ctx:             opt.Ctx,
+		kc:              opt.KubeIface,
 		ji:              opt.JetstreamIface.JetstreamV1(),
 		informerFactory: informerFactory,
 

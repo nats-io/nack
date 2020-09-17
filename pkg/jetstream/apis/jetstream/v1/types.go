@@ -19,11 +19,12 @@ type Stream struct {
 
 // StreamSpec is the spec for a Stream resource
 type StreamSpec struct {
-	Servers  []string `json:"servers"`
-	Name     string   `json:"name"`
-	Subjects []string `json:"subjects"`
-	Storage  string   `json:"storage"`
-	MaxAge   string   `json:"maxAge"`
+	Servers     []string `json:"servers"`
+	Credentials string   `json:"credentials"`
+	Name        string   `json:"name"`
+	Subjects    []string `json:"subjects"`
+	Storage     string   `json:"storage"`
+	MaxAge      string   `json:"maxAge"`
 }
 
 // StreamStatus is the status for a Stream resource
