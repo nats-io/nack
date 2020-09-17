@@ -26,12 +26,12 @@ import (
 	apis "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1"
 	typed "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/typed/jetstream/v1"
 
-	coreV1Types "k8s.io/client-go/kubernetes/typed/core/v1"
 	k8sapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	k8smeta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	coreV1Types "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 )
@@ -207,8 +207,8 @@ func getNATSOptions(connName string, creds []byte) []nats.Option {
 	return opts
 }
 
-func getSecret(ctx context.Context, name string, sif coreV1Types.SecretInterface) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(ctx, 5 * time.Second)
+func getSecret(ctx context.Context, name, key string, sif coreV1Types.SecretInterface) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	sec, err := sif.Get(ctx, name, k8smeta.GetOptions{})
@@ -216,7 +216,7 @@ func getSecret(ctx context.Context, name string, sif coreV1Types.SecretInterface
 		return nil, err
 	}
 
-	return sec.Data[name], nil
+	return sec.Data[key], nil
 }
 
 func (c *Controller) processStream(ns, name string) (err error) {
@@ -234,8 +234,15 @@ func (c *Controller) processStream(ns, name string) (err error) {
 	}
 
 	var creds []byte
-	if name := stream.Spec.Credentials; name != "" {
-		creds, err = getSecret(c.ctx, name, c.kc.CoreV1().Secrets(ns))
+	hasCredsSecret := stream.Spec.Credentials.SecretName != "" &&
+		stream.Spec.Credentials.SecretKey != ""
+	if hasCredsSecret {
+		creds, err = getSecret(
+			c.ctx,
+			stream.Spec.Credentials.SecretName,
+			stream.Spec.Credentials.SecretKey,
+			c.kc.CoreV1().Secrets(ns),
+		)
 		if err != nil {
 			return err
 		}

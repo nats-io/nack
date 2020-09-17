@@ -33,8 +33,15 @@ spec:
                   type: string
                   minLength: 1
               credentials:
-                description: Credentials for the given Jetstream server.
-                type: string
+                type: object
+                properties:
+                  secretName:
+                    description: Name of secret containing ncreds.
+                    type: string
+                  secretKey:
+                    description: Key within secret containing ncreds.
+                    pattern: 'nats-.*'
+                    type: string
               name:
                 description: A unique name for the Stream, empty for Stream Templates.
                 type: string
