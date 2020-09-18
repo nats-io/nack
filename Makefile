@@ -7,12 +7,16 @@ jetstreamGenOut := pkg/jetstream/generated pkg/jetstream/apis/jetstream/v1/zz_ge
 jetstreamGenIn:= $(shell grep -l -R -F "// +" pkg/jetstream/apis | grep -v "zz_generated.deepcopy.go")
 jetstreamSrc := $(shell find cmd/jetstream-controller pkg/jetstream controllers/jetstream -name "*.go")
 
+jetstreamTag := connecteverything/jetstream-controller:1.0.0
+
 now := $(shell date -u +%Y-%m-%dT%H:%M:%S%z)
 
 gitTag := $(shell git describe --tags --abbrev=0 2>/dev/null)
-gitBranch := $(shell git branch --show-current)
+gitBranch := $(shell git rev-parse --abbrev-ref HEAD)
 gitCommit := $(shell git rev-parse --short HEAD)
 repoDirty := $(shell git diff --quiet || echo "-dirty")
+
+linkerVars := -X main.BuildTime=$(now) -X main.Version=$(gitBranch)-$(gitCommit)$(repoDirty)
 
 vendor: go.mod go.sum
 	go mod vendor
@@ -27,11 +31,22 @@ $(jetstreamGenOut): vendor $(codeGenerator) $(jetstreamGenIn) pkg/k8scodegen/fil
 
 jetstream-controller: $(sort $(jetstreamSrc) $(jetstreamGenOut)) vendor
 	go build -race -o $@ \
-		-ldflags "-X main.BuildTime=$(now) -X main.Version=$(gitBranch)-$(gitCommit)$(repoDirty)" \
+		-ldflags "$(linkerVars)" \
+		github.com/nats-io/nack/cmd/jetstream-controller
+
+jetstream-controller.docker: $(sort $(jetstreamSrc) $(jetstreamGenOut)) vendor
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o $@ \
+		-ldflags "-s -w $(linkerVars)" \
+		-tags timetzdata \
 		github.com/nats-io/nack/cmd/jetstream-controller
 
 .PHONY: build
 build: jetstream-controller
+
+.PHONY: jetstream-controller-docker
+jetstream-controller-docker:
+	sudo docker build --tag $(jetstreamTag) \
+		--file docker/jetstream-controller/Dockerfile .
 
 .PHONY: test
 test:
