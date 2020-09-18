@@ -14,17 +14,13 @@ rules:
   - update
   - patch
 - apiGroups:
-  - apiextensions.k8s.io
+  - ''
   resources:
-  - customresourcedefinitions
+  - secrets
   verbs:
-  - create
   - get
-  - list
   - watch
-  - patch
-  - update
-  - delete
+  - list
 - apiGroups:
   - jetstream.nats.io
   resources:
