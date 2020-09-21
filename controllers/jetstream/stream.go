@@ -15,13 +15,9 @@ package jetstream
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
-
-	"github.com/nats-io/jwt"
-	"github.com/nats-io/nats.go"
 
 	apis "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1"
 	typed "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/typed/jetstream/v1"
@@ -31,7 +27,6 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	k8smeta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	coreV1Types "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 )
@@ -40,6 +35,13 @@ const (
 	streamFinalizerKey  = "streamfinalizer.jetstream.nats.io"
 	streamReadyCondType = "Ready"
 )
+
+func shouldEnqueueStream(prev, next *apis.Stream) bool {
+	delChanged := prev.DeletionTimestamp != next.DeletionTimestamp
+	specChanged := !equality.Semantic.DeepEqual(prev.Spec, next.Spec)
+
+	return delChanged || specChanged
+}
 
 func streamEventHandlers(ctx context.Context, q workqueue.RateLimitingInterface, jif typed.JetstreamV1Interface) cache.ResourceEventHandlerFuncs {
 	return cache.ResourceEventHandlerFuncs{
@@ -58,21 +60,12 @@ func streamEventHandlers(ctx context.Context, q workqueue.RateLimitingInterface,
 			if !ok {
 				return
 			}
-
 			next, ok := nextObj.(*apis.Stream)
 			if !ok {
 				return
 			}
 
-			if err := validateStreamUpdate(prev, next); errors.Is(err, errNothingToUpdate) {
-				return
-			} else if err != nil {
-				sif := jif.Streams(next.Namespace)
-				if _, serr := setStreamErrored(ctx, next, sif, err); serr != nil {
-					err = fmt.Errorf("%s: %w", err, serr)
-				}
-
-				utilruntime.HandleError(err)
+			if !shouldEnqueueStream(next, prev) {
 				return
 			}
 
@@ -100,31 +93,6 @@ func enqueueStreamWork(q workqueue.RateLimitingInterface, stream *apis.Stream) (
 	}
 
 	q.Add(key)
-	return nil
-}
-
-func validateStreamUpdate(prev, next *apis.Stream) (err error) {
-	defer func() {
-		if err != nil {
-			err = fmt.Errorf("failed to validate update: %w", err)
-		}
-	}()
-
-	if prev.DeletionTimestamp != next.DeletionTimestamp {
-		return nil
-	}
-
-	if prev.Spec.Name != next.Spec.Name {
-		return fmt.Errorf("updating stream name is not allowed, please recreate")
-	}
-	if prev.Spec.Storage != next.Spec.Storage {
-		return fmt.Errorf("updating stream storage is not allowed, please recreate")
-	}
-
-	if equality.Semantic.DeepEqual(prev.Spec, next.Spec) {
-		return errNothingToUpdate
-	}
-
 	return nil
 }
 
@@ -169,56 +137,6 @@ func (c *Controller) processNextQueueItem() {
 	c.streamQueue.Forget(item)
 }
 
-func wipeSlice(buf []byte) {
-	for i := range buf {
-		buf[i] = 'x'
-	}
-}
-
-func getNATSOptions(connName string, creds []byte) []nats.Option {
-	userCB := func() (string, error) {
-		return jwt.ParseDecoratedJWT(creds)
-	}
-	sigCB := func(nonce []byte) ([]byte, error) {
-		defer wipeSlice(creds)
-		keys, err := jwt.ParseDecoratedNKey(creds)
-		if err != nil {
-			return nil, err
-		}
-		defer keys.Wipe()
-
-		sig, _ := keys.Sign(nonce)
-		return sig, nil
-	}
-
-	opts := []nats.Option{
-		nats.Name(connName),
-		nats.Option(func(o *nats.Options) error {
-			o.Pedantic = true
-			return nil
-
-		}),
-	}
-
-	if creds != nil {
-		opts = append(opts, nats.UserJWT(userCB, sigCB))
-	}
-
-	return opts
-}
-
-func getSecret(ctx context.Context, name, key string, sif coreV1Types.SecretInterface) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	sec, err := sif.Get(ctx, name, k8smeta.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-
-	return sec.Data[key], nil
-}
-
 func (c *Controller) processStream(ns, name string) (err error) {
 	defer func() {
 		if err != nil {
@@ -233,23 +151,20 @@ func (c *Controller) processStream(ns, name string) (err error) {
 		return err
 	}
 
+	sif := c.ji.Streams(stream.Namespace)
+
 	var creds []byte
-	hasCredsSecret := stream.Spec.Credentials.SecretName != "" &&
-		stream.Spec.Credentials.SecretKey != ""
-	if hasCredsSecret {
-		creds, err = getSecret(
-			c.ctx,
-			stream.Spec.Credentials.SecretName,
-			stream.Spec.Credentials.SecretKey,
-			c.kc.CoreV1().Secrets(ns),
-		)
+	if sec := stream.Spec.CredentialsSecret; sec.Name != "" && sec.Key != "" {
+		creds, err = getSecret(c.ctx, sec.Name, sec.Key, c.ki.Secrets(ns))
 		if err != nil {
+			if _, serr := setStreamErrored(c.ctx, stream, sif, err); serr != nil {
+				return fmt.Errorf("%s: %w", err, serr)
+			}
 			return err
 		}
 	}
 
-	sif := c.ji.Streams(stream.Namespace)
-
+	c.normalEvent(stream, "Connecting", "Connecting to NATS Server")
 	err = c.sc.Connect(
 		strings.Join(stream.Spec.Servers, ","),
 		getNATSOptions(c.natsName, creds)...,
@@ -261,6 +176,7 @@ func (c *Controller) processStream(ns, name string) (err error) {
 		return err
 	}
 	defer c.sc.Close()
+	c.normalEvent(stream, "Connected", "Connected to NATS Server")
 
 	deleteOK := stream.GetDeletionTimestamp() != nil
 	newGeneration := stream.Generation != stream.Status.ObservedGeneration
@@ -357,7 +273,6 @@ func setStreamErrored(ctx context.Context, s *apis.Stream, sif typed.StreamInter
 		Reason:             "Errored",
 		Message:            err.Error(),
 	})
-	sc.Status.Conditions = pruneStreamConditions(sc.Status.Conditions)
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
@@ -381,7 +296,6 @@ func setStreamSynced(ctx context.Context, s *apis.Stream, i typed.StreamInterfac
 		Reason:             "Synced",
 		Message:            "Stream is synced with spec",
 	})
-	sc.Status.Conditions = pruneStreamConditions(sc.Status.Conditions)
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
@@ -407,23 +321,8 @@ func upsertStreamCondition(cs []apis.StreamCondition, next apis.StreamCondition)
 	return append(cs, next)
 }
 
-func pruneStreamConditions(cs []apis.StreamCondition) []apis.StreamCondition {
-	const maxCond = 10
-	if len(cs) < maxCond {
-		return cs
-	}
-
-	cs = cs[len(cs)-maxCond:]
-	return cs
-}
-
 func setStreamFinalizer(ctx context.Context, s *apis.Stream, sif typed.StreamInterface) (*apis.Stream, error) {
-	fs := s.GetFinalizers()
-	if hasFinalizerKey(fs, streamFinalizerKey) {
-		return s, nil
-	}
-	fs = append(fs, streamFinalizerKey)
-	s.SetFinalizers(fs)
+	s.SetFinalizers(addFinalizer(s.GetFinalizers(), streamFinalizerKey))
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
@@ -437,23 +336,7 @@ func setStreamFinalizer(ctx context.Context, s *apis.Stream, sif typed.StreamInt
 }
 
 func clearStreamFinalizer(ctx context.Context, s *apis.Stream, sif typed.StreamInterface) (*apis.Stream, error) {
-	if s.GetDeletionTimestamp() == nil {
-		// Already deleted.
-		return s, nil
-	}
-
-	fs := s.GetFinalizers()
-	if !hasFinalizerKey(fs, streamFinalizerKey) {
-		return s, nil
-	}
-	var filtered []string
-	for _, f := range fs {
-		if f == streamFinalizerKey {
-			continue
-		}
-		filtered = append(filtered, f)
-	}
-	s.SetFinalizers(filtered)
+	s.SetFinalizers(removeFinalizer(s.GetFinalizers(), streamFinalizerKey))
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()

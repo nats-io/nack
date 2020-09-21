@@ -15,13 +15,13 @@ package jetstream
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
 
-	"github.com/nats-io/jsm.go"
 	jsmapi "github.com/nats-io/jsm.go/api"
+	"github.com/nats-io/jwt"
+	"github.com/nats-io/nats.go"
 
 	clientset "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned"
 	scheme "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/scheme"
@@ -30,11 +30,13 @@ import (
 	listers "github.com/nats-io/nack/pkg/jetstream/generated/listers/jetstream/v1"
 
 	k8sapi "k8s.io/api/core/v1"
+	k8smeta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	k8sscheme "k8s.io/client-go/kubernetes/scheme"
+	corev1types "k8s.io/client-go/kubernetes/typed/core/v1"
 	k8styped "k8s.io/client-go/kubernetes/typed/core/v1"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"k8s.io/client-go/tools/cache"
@@ -50,10 +52,6 @@ const (
 	maxQueueRetries = 10
 )
 
-var (
-	errNothingToUpdate = errors.New("nothing to update")
-)
-
 type Options struct {
 	Ctx context.Context
 
@@ -66,16 +64,15 @@ type Options struct {
 type Controller struct {
 	ctx context.Context
 
-	// Clients
-	kc              kubernetes.Interface
-	informerFactory informers.SharedInformerFactory
-	ji              typed.JetstreamV1Interface
+	ki k8styped.CoreV1Interface
+	ji typed.JetstreamV1Interface
 
-	streamLister listers.StreamLister
-	streamSynced cache.InformerSynced
-	streamQueue  workqueue.RateLimitingInterface
-	streamMap    map[string]*jsm.Stream
-	rec          record.EventRecorder
+	informerFactory informers.SharedInformerFactory
+	streamLister    listers.StreamLister
+	streamSynced    cache.InformerSynced
+	streamQueue     workqueue.RateLimitingInterface
+
+	rec record.EventRecorder
 
 	natsName string
 	sc       streamClient
@@ -95,14 +92,13 @@ func NewController(opt Options) (*Controller, error) {
 
 	ctrl := &Controller{
 		ctx:             opt.Ctx,
-		kc:              opt.KubeIface,
+		ki:              opt.KubeIface.CoreV1(),
 		ji:              opt.JetstreamIface.JetstreamV1(),
 		informerFactory: informerFactory,
 
 		streamLister: streamInformer.Lister(),
 		streamSynced: streamInformer.Informer().HasSynced,
 		streamQueue:  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Streams"),
-		streamMap:    make(map[string]*jsm.Stream),
 
 		rec: eventBroadcaster.NewRecorder(k8sscheme.Scheme, k8sapi.EventSource{
 			Component: "jetstream-controller",
@@ -167,16 +163,6 @@ func splitNamespaceName(item interface{}) (ns string, name string, err error) {
 	return ns, name, nil
 }
 
-func hasFinalizerKey(finalizers []string, key string) bool {
-	for _, f := range finalizers {
-		if f == key {
-			return true
-		}
-	}
-
-	return false
-}
-
 func getStorageType(s string) (jsmapi.StorageType, error) {
 	switch s {
 	case strings.ToLower(jsmapi.FileStorage.String()):
@@ -186,4 +172,76 @@ func getStorageType(s string) (jsmapi.StorageType, error) {
 	default:
 		return 0, fmt.Errorf("invalid jetstream storage option: %s", s)
 	}
+}
+
+func wipeSlice(buf []byte) {
+	for i := range buf {
+		buf[i] = 'x'
+	}
+}
+
+func getNATSOptions(connName string, creds []byte) []nats.Option {
+	userCB := func() (string, error) {
+		return jwt.ParseDecoratedJWT(creds)
+	}
+	sigCB := func(nonce []byte) ([]byte, error) {
+		defer wipeSlice(creds)
+		keys, err := jwt.ParseDecoratedNKey(creds)
+		if err != nil {
+			return nil, err
+		}
+		defer keys.Wipe()
+
+		sig, _ := keys.Sign(nonce)
+		return sig, nil
+	}
+
+	opts := []nats.Option{
+		nats.Name(connName),
+		nats.Option(func(o *nats.Options) error {
+			o.Pedantic = true
+			return nil
+
+		}),
+	}
+
+	if creds != nil {
+		opts = append(opts, nats.UserJWT(userCB, sigCB))
+	}
+
+	return opts
+}
+
+func addFinalizer(fs []string, key string) []string {
+	for _, f := range fs {
+		if f == key {
+			return fs
+		}
+	}
+
+	return append(fs, key)
+}
+
+func removeFinalizer(fs []string, key string) []string {
+	var filtered []string
+	for _, f := range fs {
+		if f == key {
+			continue
+		}
+		filtered = append(filtered, f)
+	}
+
+	return filtered
+}
+
+func getSecret(ctx context.Context, name, key string, sif corev1types.SecretInterface) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	sec, err := sif.Get(ctx, name, k8smeta.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	return sec.Data[key], nil
 }

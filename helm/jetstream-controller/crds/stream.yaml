@@ -32,13 +32,13 @@ spec:
                 items:
                   type: string
                   minLength: 1
-              credentials:
+              credentialsSecret:
                 type: object
                 properties:
-                  secretName:
+                  name:
                     description: Name of secret containing ncreds.
                     type: string
-                  secretKey:
+                  key:
                     description: Key within secret containing ncreds.
                     pattern: 'nats-.*'
                     type: string
