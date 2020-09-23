@@ -15,6 +15,14 @@
 
 package v1
 
+// ConsumerListerExpansion allows custom methods to be added to
+// ConsumerLister.
+type ConsumerListerExpansion interface{}
+
+// ConsumerNamespaceListerExpansion allows custom methods to be added to
+// ConsumerNamespaceLister.
+type ConsumerNamespaceListerExpansion interface{}
+
 // StreamListerExpansion allows custom methods to be added to
 // StreamLister.
 type StreamListerExpansion interface{}

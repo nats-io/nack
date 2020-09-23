@@ -76,15 +76,12 @@ func run() error {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	ctrl, err := jetstream.NewController(jetstream.Options{
+	ctrl := jetstream.NewController(jetstream.Options{
 		Ctx: ctx,
 
 		KubeIface:      kc,
 		JetstreamIface: jc,
 	})
-	if err != nil {
-		return err
-	}
 
 	klog.Infof("Starting %s %s...", os.Args[0], Version)
 	go handleSignals(cancel)

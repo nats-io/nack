@@ -23,12 +23,17 @@ import (
 
 type JetstreamV1Interface interface {
 	RESTClient() rest.Interface
+	ConsumersGetter
 	StreamsGetter
 }
 
 // JetstreamV1Client is used to interact with features provided by the jetstream.nats.io group.
 type JetstreamV1Client struct {
 	restClient rest.Interface
+}
+
+func (c *JetstreamV1Client) Consumers(namespace string) ConsumerInterface {
+	return newConsumers(c, namespace)
 }
 
 func (c *JetstreamV1Client) Streams(namespace string) StreamInterface {

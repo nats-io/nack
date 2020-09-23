@@ -25,6 +25,10 @@ type FakeJetstreamV1 struct {
 	*testing.Fake
 }
 
+func (c *FakeJetstreamV1) Consumers(namespace string) v1.ConsumerInterface {
+	return &FakeConsumers{c, namespace}
+}
+
 func (c *FakeJetstreamV1) Streams(namespace string) v1.StreamInterface {
 	return &FakeStreams{c, namespace}
 }

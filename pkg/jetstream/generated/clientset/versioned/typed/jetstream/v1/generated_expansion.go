@@ -15,4 +15,6 @@
 
 package v1
 
+type ConsumerExpansion interface{}
+
 type StreamExpansion interface{}

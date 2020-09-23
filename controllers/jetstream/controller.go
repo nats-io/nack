@@ -23,6 +23,7 @@ import (
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nats.go"
 
+	apis "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1"
 	clientset "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned"
 	scheme "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/scheme"
 	typed "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/typed/jetstream/v1"
@@ -36,7 +37,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	k8sscheme "k8s.io/client-go/kubernetes/scheme"
-	corev1types "k8s.io/client-go/kubernetes/typed/core/v1"
 	k8styped "k8s.io/client-go/kubernetes/typed/core/v1"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"k8s.io/client-go/tools/cache"
@@ -50,6 +50,9 @@ const (
 	// be pulled maxQueueRetries+1 times from the queue. On pull number
 	// maxQueueRetries+1, if it fails again, it won't be retried.
 	maxQueueRetries = 10
+
+	// readyCondType is the Ready condition type.
+	readyCondType = "Ready"
 )
 
 type Options struct {
@@ -59,78 +62,105 @@ type Options struct {
 	JetstreamIface clientset.Interface
 
 	NATSClientName string
+
+	Recorder record.EventRecorder
 }
 
 type Controller struct {
 	ctx context.Context
 
-	ki k8styped.CoreV1Interface
-	ji typed.JetstreamV1Interface
-
+	ki              k8styped.CoreV1Interface
+	ji              typed.JetstreamV1Interface
 	informerFactory informers.SharedInformerFactory
-	streamLister    listers.StreamLister
-	streamSynced    cache.InformerSynced
-	streamQueue     workqueue.RateLimitingInterface
-
-	rec record.EventRecorder
+	rec             record.EventRecorder
 
 	natsName string
-	sc       streamClient
+
+	streamLister listers.StreamLister
+	streamSynced cache.InformerSynced
+	streamQueue  workqueue.RateLimitingInterface
+
+	consumerLister listers.ConsumerLister
+	consumerSynced cache.InformerSynced
+	consumerQueue  workqueue.RateLimitingInterface
 }
 
-func NewController(opt Options) (*Controller, error) {
+func NewController(opt Options) *Controller {
 	resyncPeriod := 30 * time.Second
 	informerFactory := informers.NewSharedInformerFactory(opt.JetstreamIface, resyncPeriod)
+
 	streamInformer := informerFactory.Jetstream().V1().Streams()
+	consumerInformer := informerFactory.Jetstream().V1().Consumers()
 
-	utilruntime.Must(scheme.AddToScheme(k8sscheme.Scheme))
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(klog.Infof)
-	eventBroadcaster.StartRecordingToSink(&k8styped.EventSinkImpl{
-		Interface: opt.KubeIface.CoreV1().Events(""),
-	})
+	if opt.Recorder == nil {
+		utilruntime.Must(scheme.AddToScheme(k8sscheme.Scheme))
+		eventBroadcaster := record.NewBroadcaster()
+		eventBroadcaster.StartLogging(klog.Infof)
+		eventBroadcaster.StartRecordingToSink(&k8styped.EventSinkImpl{
+			Interface: opt.KubeIface.CoreV1().Events(""),
+		})
 
-	ctrl := &Controller{
-		ctx:             opt.Ctx,
+		opt.Recorder = eventBroadcaster.NewRecorder(k8sscheme.Scheme, k8sapi.EventSource{
+			Component: "jetstream-controller",
+		})
+	}
+
+	if opt.NATSClientName == "" {
+		opt.NATSClientName = "jetstream-controller"
+	}
+
+	ji := opt.JetstreamIface.JetstreamV1()
+	streamQueue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Streams")
+	consumerQueue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Consumers")
+
+	streamInformer.Informer().AddEventHandler(streamEventHandlers(
+		opt.Ctx,
+		streamQueue,
+		ji,
+	))
+
+	consumerInformer.Informer().AddEventHandler(consumerEventHandlers(
+		opt.Ctx,
+		consumerQueue,
+		ji,
+	))
+
+	return &Controller{
+		ctx: opt.Ctx,
+
 		ki:              opt.KubeIface.CoreV1(),
-		ji:              opt.JetstreamIface.JetstreamV1(),
+		ji:              ji,
 		informerFactory: informerFactory,
+		rec:             opt.Recorder,
+
+		natsName: opt.NATSClientName,
 
 		streamLister: streamInformer.Lister(),
 		streamSynced: streamInformer.Informer().HasSynced,
-		streamQueue:  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Streams"),
+		streamQueue:  streamQueue,
 
-		rec: eventBroadcaster.NewRecorder(k8sscheme.Scheme, k8sapi.EventSource{
-			Component: "jetstream-controller",
-		}),
-
-		natsName: opt.NATSClientName,
-		sc:       &realStreamClient{},
+		consumerLister: consumerInformer.Lister(),
+		consumerSynced: consumerInformer.Informer().HasSynced,
+		consumerQueue:  consumerQueue,
 	}
-	if ctrl.natsName == "" {
-		ctrl.natsName = "jetstream-controller"
-	}
-
-	streamInformer.Informer().AddEventHandler(streamEventHandlers(
-		ctrl.ctx,
-		ctrl.streamQueue,
-		ctrl.ji,
-	))
-
-	return ctrl, nil
 }
 
 func (c *Controller) Run() error {
 	defer utilruntime.HandleCrash()
 	defer c.streamQueue.ShutDown()
+	defer c.consumerQueue.ShutDown()
 
 	c.informerFactory.Start(c.ctx.Done())
 
 	if !cache.WaitForCacheSync(c.ctx.Done(), c.streamSynced) {
-		return fmt.Errorf("failed to wait for cache sync")
+		return fmt.Errorf("failed to wait for stream cache sync")
+	}
+	if !cache.WaitForCacheSync(c.ctx.Done(), c.consumerSynced) {
+		return fmt.Errorf("failed to wait for consumer cache sync")
 	}
 
 	go wait.Until(c.runStreamQueue, time.Second, c.ctx.Done())
+	go wait.Until(c.runConsumerQueue, time.Second, c.ctx.Done())
 
 	<-c.ctx.Done()
 	// Gracefully shutdown.
@@ -140,6 +170,12 @@ func (c *Controller) Run() error {
 func (c *Controller) normalEvent(o runtime.Object, reason, message string) {
 	if c.rec != nil {
 		c.rec.Event(o, k8sapi.EventTypeNormal, reason, message)
+	}
+}
+
+func (c *Controller) warningEvent(o runtime.Object, reason, message string) {
+	if c.rec != nil {
+		c.rec.Event(o, k8sapi.EventTypeWarning, reason, message)
 	}
 }
 
@@ -234,7 +270,15 @@ func removeFinalizer(fs []string, key string) []string {
 	return filtered
 }
 
-func getSecret(ctx context.Context, name, key string, sif corev1types.SecretInterface) ([]byte, error) {
+func getCreds(ctx context.Context, sec apis.CredentialsSecret, sif k8styped.SecretInterface) ([]byte, error) {
+	if sec.Name == "" || sec.Key == "" {
+		return nil, nil
+	}
+
+	return getSecret(ctx, sec.Name, sec.Key, sif)
+}
+
+func getSecret(ctx context.Context, name, key string, sif k8styped.SecretInterface) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
@@ -244,4 +288,64 @@ func getSecret(ctx context.Context, name, key string, sif corev1types.SecretInte
 	}
 
 	return sec.Data[key], nil
+}
+
+func enqueueWork(q workqueue.RateLimitingInterface, item interface{}) (err error) {
+	key, err := cache.MetaNamespaceKeyFunc(item)
+	if err != nil {
+		return fmt.Errorf("failed to enqueue work: %w", err)
+	}
+
+	q.Add(key)
+	return nil
+}
+
+type processorFunc func(ns, name string, c jsmClient) error
+
+func processQueueNext(q workqueue.RateLimitingInterface, c jsmClient, process processorFunc) {
+	item, shutdown := q.Get()
+	if shutdown {
+		return
+	}
+	defer q.Done(item)
+
+	ns, name, err := splitNamespaceName(item)
+	if err != nil {
+		// Probably junk, clean it up.
+		utilruntime.HandleError(err)
+		q.Forget(item)
+		return
+	}
+
+	err = process(ns, name, c)
+	if err == nil {
+		// Item processed successfully, don't requeue.
+		q.Forget(item)
+		return
+	}
+
+	utilruntime.HandleError(err)
+
+	if q.NumRequeues(item) < maxQueueRetries {
+		// Failed to process item, try again.
+		q.AddRateLimited(item)
+		return
+	}
+
+	// If we haven't been able to recover by this point, then just stop.
+	// The user should have enough info in kubectl describe to debug.
+	q.Forget(item)
+}
+
+func upsertCondition(cs []apis.Condition, next apis.Condition) []apis.Condition {
+	for i := 0; i < len(cs); i++ {
+		if cs[i].Type != next.Type {
+			continue
+		}
+
+		cs[i] = next
+		return cs
+	}
+
+	return append(cs, next)
 }

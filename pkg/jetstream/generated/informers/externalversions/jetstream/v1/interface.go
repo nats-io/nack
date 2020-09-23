@@ -21,6 +21,8 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
+	// Consumers returns a ConsumerInformer.
+	Consumers() ConsumerInformer
 	// Streams returns a StreamInformer.
 	Streams() StreamInformer
 }
@@ -34,6 +36,11 @@ type version struct {
 // New returns a new Interface.
 func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
+}
+
+// Consumers returns a ConsumerInformer.
+func (v *version) Consumers() ConsumerInformer {
+	return &consumerInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // Streams returns a StreamInformer.

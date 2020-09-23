@@ -15,10 +15,12 @@ package jetstream
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
+	jsmapi "github.com/nats-io/jsm.go/api"
 	apis "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1"
 	typed "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/typed/jetstream/v1"
 
@@ -32,16 +34,8 @@ import (
 )
 
 const (
-	streamFinalizerKey  = "streamfinalizer.jetstream.nats.io"
-	streamReadyCondType = "Ready"
+	streamFinalizerKey = "streamfinalizer.jetstream.nats.io"
 )
-
-func shouldEnqueueStream(prev, next *apis.Stream) bool {
-	delChanged := prev.DeletionTimestamp != next.DeletionTimestamp
-	specChanged := !equality.Semantic.DeepEqual(prev.Spec, next.Spec)
-
-	return delChanged || specChanged
-}
 
 func streamEventHandlers(ctx context.Context, q workqueue.RateLimitingInterface, jif typed.JetstreamV1Interface) cache.ResourceEventHandlerFuncs {
 	return cache.ResourceEventHandlerFuncs{
@@ -51,7 +45,7 @@ func streamEventHandlers(ctx context.Context, q workqueue.RateLimitingInterface,
 				return
 			}
 
-			if err := enqueueStreamWork(q, stream); err != nil {
+			if err := enqueueWork(q, stream); err != nil {
 				utilruntime.HandleError(err)
 			}
 		},
@@ -69,7 +63,7 @@ func streamEventHandlers(ctx context.Context, q workqueue.RateLimitingInterface,
 				return
 			}
 
-			if err := enqueueStreamWork(q, next); err != nil {
+			if err := enqueueWork(q, next); err != nil {
 				utilruntime.HandleError(err)
 			}
 		},
@@ -79,65 +73,20 @@ func streamEventHandlers(ctx context.Context, q workqueue.RateLimitingInterface,
 				return
 			}
 
-			if err := enqueueStreamWork(q, stream); err != nil {
+			if err := enqueueWork(q, stream); err != nil {
 				utilruntime.HandleError(err)
 			}
 		},
 	}
 }
 
-func enqueueStreamWork(q workqueue.RateLimitingInterface, stream *apis.Stream) (err error) {
-	key, err := cache.MetaNamespaceKeyFunc(stream)
-	if err != nil {
-		return fmt.Errorf("failed to queue stream work: %w", err)
-	}
-
-	q.Add(key)
-	return nil
-}
-
 func (c *Controller) runStreamQueue() {
 	for {
-		c.processNextQueueItem()
+		processQueueNext(c.streamQueue, &realJsmClient{}, c.processStream)
 	}
 }
 
-func (c *Controller) processNextQueueItem() {
-	item, shutdown := c.streamQueue.Get()
-	if shutdown {
-		return
-	}
-	defer c.streamQueue.Done(item)
-
-	ns, name, err := splitNamespaceName(item)
-	if err != nil {
-		// Probably junk, clean it up.
-		utilruntime.HandleError(err)
-		c.streamQueue.Forget(item)
-		return
-	}
-
-	err = c.processStream(ns, name)
-	if err == nil {
-		// Item processed successfully, don't requeue.
-		c.streamQueue.Forget(item)
-		return
-	}
-
-	utilruntime.HandleError(err)
-
-	if c.streamQueue.NumRequeues(item) < maxQueueRetries {
-		// Failed to process item, try again.
-		c.streamQueue.AddRateLimited(item)
-		return
-	}
-
-	// If we haven't been able to recover by this point, then just stop.
-	// The user should have enough info in kubectl describe to debug.
-	c.streamQueue.Forget(item)
-}
-
-func (c *Controller) processStream(ns, name string) (err error) {
+func (c *Controller) processStream(ns, name string, jsmc jsmClient) (err error) {
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("failed to process stream: %w", err)
@@ -153,19 +102,16 @@ func (c *Controller) processStream(ns, name string) (err error) {
 
 	sif := c.ji.Streams(stream.Namespace)
 
-	var creds []byte
-	if sec := stream.Spec.CredentialsSecret; sec.Name != "" && sec.Key != "" {
-		creds, err = getSecret(c.ctx, sec.Name, sec.Key, c.ki.Secrets(ns))
-		if err != nil {
-			if _, serr := setStreamErrored(c.ctx, stream, sif, err); serr != nil {
-				return fmt.Errorf("%s: %w", err, serr)
-			}
-			return err
+	creds, err := getCreds(c.ctx, stream.Spec.CredentialsSecret, c.ki.Secrets(ns))
+	if err != nil {
+		if _, serr := setStreamErrored(c.ctx, stream, sif, err); serr != nil {
+			return fmt.Errorf("%s: %w", err, serr)
 		}
+		return err
 	}
 
 	c.normalEvent(stream, "Connecting", "Connecting to NATS Server")
-	err = c.sc.Connect(
+	err = jsmc.Connect(
 		strings.Join(stream.Spec.Servers, ","),
 		getNATSOptions(c.natsName, creds)...,
 	)
@@ -175,25 +121,25 @@ func (c *Controller) processStream(ns, name string) (err error) {
 		}
 		return err
 	}
-	defer c.sc.Close()
+	defer jsmc.Close()
 	c.normalEvent(stream, "Connected", "Connected to NATS Server")
 
 	deleteOK := stream.GetDeletionTimestamp() != nil
 	newGeneration := stream.Generation != stream.Status.ObservedGeneration
-	streamExists, err := c.sc.Exists(c.ctx, stream.Spec.Name)
+	streamOK, err := streamExists(c.ctx, jsmc, stream.Spec.Name)
 	if err != nil {
 		if _, serr := setStreamErrored(c.ctx, stream, sif, err); serr != nil {
 			return fmt.Errorf("%s: %w", err, serr)
 		}
 		return err
 	}
-	updateOK := (streamExists && !deleteOK && newGeneration)
-	createOK := (!streamExists && !deleteOK && newGeneration)
+	updateOK := (streamOK && !deleteOK && newGeneration)
+	createOK := (!streamOK && !deleteOK && newGeneration)
 
 	switch {
-	case updateOK:
-		c.normalEvent(stream, "Updating", fmt.Sprintf("Updating stream %q", stream.Spec.Name))
-		if err := c.sc.Update(c.ctx, stream); err != nil {
+	case createOK:
+		c.normalEvent(stream, "Creating", fmt.Sprintf("Creating stream %q", stream.Spec.Name))
+		if err := createStream(c.ctx, jsmc, stream); err != nil {
 			if _, serr := setStreamErrored(c.ctx, stream, sif, err); serr != nil {
 				return fmt.Errorf("%s: %w", err, serr)
 			}
@@ -209,37 +155,37 @@ func (c *Controller) processStream(ns, name string) (err error) {
 		}
 		stream = res
 
-		if _, err := setStreamSynced(c.ctx, stream, sif); err != nil {
+		if _, err := setStreamStatus(c.ctx, stream, sif); err != nil {
+			return err
+		}
+		c.normalEvent(stream, "Created", fmt.Sprintf("Created stream %q", stream.Spec.Name))
+		return nil
+	case updateOK:
+		c.normalEvent(stream, "Updating", fmt.Sprintf("Updating stream %q", stream.Spec.Name))
+		if err := updateStream(c.ctx, jsmc, stream); err != nil {
+			if _, serr := setStreamErrored(c.ctx, stream, sif, err); serr != nil {
+				return fmt.Errorf("%s: %w", err, serr)
+			}
+			return err
+		}
+
+		res, err := setStreamFinalizer(c.ctx, stream, sif)
+		if err != nil {
+			if _, serr := setStreamErrored(c.ctx, stream, sif, err); serr != nil {
+				return fmt.Errorf("%s: %w", err, serr)
+			}
+			return err
+		}
+		stream = res
+
+		if _, err := setStreamStatus(c.ctx, stream, sif); err != nil {
 			return err
 		}
 		c.normalEvent(stream, "Updated", fmt.Sprintf("Updated stream %q", stream.Spec.Name))
 		return nil
-	case createOK:
-		c.normalEvent(stream, "Creating", fmt.Sprintf("Creating stream %q", stream.Spec.Name))
-		if err := c.sc.Create(c.ctx, stream); err != nil {
-			if _, serr := setStreamErrored(c.ctx, stream, sif, err); serr != nil {
-				return fmt.Errorf("%s: %w", err, serr)
-			}
-			return err
-		}
-
-		res, err := setStreamFinalizer(c.ctx, stream, sif)
-		if err != nil {
-			if _, serr := setStreamErrored(c.ctx, stream, sif, err); serr != nil {
-				return fmt.Errorf("%s: %w", err, serr)
-			}
-			return err
-		}
-		stream = res
-
-		if _, err := setStreamSynced(c.ctx, stream, sif); err != nil {
-			return err
-		}
-		c.normalEvent(stream, "Created", fmt.Sprintf("Created stream %q", stream.Spec.Name))
-		return err
 	case deleteOK:
 		c.normalEvent(stream, "Deleting", fmt.Sprintf("Deleting stream %q", stream.Spec.Name))
-		if err := c.sc.Delete(c.ctx, stream.Spec.Name); err != nil {
+		if err := deleteStream(c.ctx, jsmc, stream.Spec.Name); err != nil {
 			if _, serr := setStreamErrored(c.ctx, stream, sif, err); serr != nil {
 				return fmt.Errorf("%s: %w", err, serr)
 			}
@@ -260,14 +206,106 @@ func (c *Controller) processStream(ns, name string) (err error) {
 	return nil
 }
 
+func shouldEnqueueStream(prev, next *apis.Stream) bool {
+	delChanged := prev.DeletionTimestamp != next.DeletionTimestamp
+	specChanged := !equality.Semantic.DeepEqual(prev.Spec, next.Spec)
+
+	return delChanged || specChanged
+}
+
+func createStream(ctx context.Context, c jsmClient, s *apis.Stream) (err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("failed to create stream %q: %w", s.Spec.Name, err)
+		}
+	}()
+
+	maxAge, err := time.ParseDuration(s.Spec.MaxAge)
+	if err != nil {
+		return err
+	}
+
+	storage, err := getStorageType(s.Spec.Storage)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.NewStream(ctx, jsmapi.StreamConfig{
+		Name:     s.Spec.Name,
+		Storage:  storage,
+		Subjects: s.Spec.Subjects,
+		MaxAge:   maxAge,
+	})
+	return err
+}
+
+func updateStream(ctx context.Context, c jsmClient, s *apis.Stream) (err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("failed to update stream %q: %w", s.Spec.Name, err)
+		}
+	}()
+
+	js, err := c.LoadStream(ctx, s.Spec.Name)
+	if err != nil {
+		return err
+	}
+
+	config := js.Configuration()
+
+	maxDur, err := time.ParseDuration(s.Spec.MaxAge)
+	if err != nil {
+		return err
+	}
+	config.MaxAge = maxDur
+
+	return js.UpdateConfiguration(config)
+}
+
+func deleteStream(ctx context.Context, c jsmClient, name string) (err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("failed to delete stream %q: %w", name, err)
+		}
+	}()
+
+	var apierr jsmapi.ApiError
+	str, err := c.LoadStream(ctx, name)
+	if errors.As(err, &apierr) && apierr.NotFoundError() {
+		return nil
+	} else if err != nil {
+		return err
+	}
+
+	return str.Delete()
+}
+
+func streamExists(ctx context.Context, c jsmClient, name string) (ok bool, err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("failed to check if stream exists: %w", err)
+		}
+	}()
+
+	var apierr jsmapi.ApiError
+	_, err = c.LoadStream(ctx, name)
+	if errors.As(err, &apierr) && apierr.NotFoundError() {
+		return false, nil
+	} else if err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
 func setStreamErrored(ctx context.Context, s *apis.Stream, sif typed.StreamInterface, err error) (*apis.Stream, error) {
 	if err == nil {
 		return s, nil
 	}
 
 	sc := s.DeepCopy()
-	sc.Status.Conditions = upsertStreamCondition(sc.Status.Conditions, apis.StreamCondition{
-		Type:               streamReadyCondType,
+	sc.Status.Conditions = upsertCondition(sc.Status.Conditions, apis.Condition{
+		Type:               readyCondType,
 		Status:             k8sapi.ConditionFalse,
 		LastTransitionTime: time.Now().UTC().Format(time.RFC3339Nano),
 		Reason:             "Errored",
@@ -285,16 +323,16 @@ func setStreamErrored(ctx context.Context, s *apis.Stream, sif typed.StreamInter
 	return res, nil
 }
 
-func setStreamSynced(ctx context.Context, s *apis.Stream, i typed.StreamInterface) (*apis.Stream, error) {
+func setStreamStatus(ctx context.Context, s *apis.Stream, i typed.StreamInterface) (*apis.Stream, error) {
 	sc := s.DeepCopy()
 
 	sc.Status.ObservedGeneration = s.Generation
-	sc.Status.Conditions = upsertStreamCondition(sc.Status.Conditions, apis.StreamCondition{
-		Type:               streamReadyCondType,
+	sc.Status.Conditions = upsertCondition(sc.Status.Conditions, apis.Condition{
+		Type:               readyCondType,
 		Status:             k8sapi.ConditionTrue,
 		LastTransitionTime: time.Now().UTC().Format(time.RFC3339Nano),
-		Reason:             "Synced",
-		Message:            "Stream is synced with spec",
+		Reason:             "Created",
+		Message:            "Stream successfully created",
 	})
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -302,48 +340,35 @@ func setStreamSynced(ctx context.Context, s *apis.Stream, i typed.StreamInterfac
 
 	res, err := i.UpdateStatus(ctx, sc, k8smeta.UpdateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to set %q stream synced status: %w", s.Spec.Name, err)
+		return nil, fmt.Errorf("failed to set stream %q status: %w", s.Spec.Name, err)
 	}
 
 	return res, nil
 }
 
-func upsertStreamCondition(cs []apis.StreamCondition, next apis.StreamCondition) []apis.StreamCondition {
-	for i := 0; i < len(cs); i++ {
-		if cs[i].Type != next.Type {
-			continue
-		}
-
-		cs[i] = next
-		return cs
-	}
-
-	return append(cs, next)
-}
-
-func setStreamFinalizer(ctx context.Context, s *apis.Stream, sif typed.StreamInterface) (*apis.Stream, error) {
-	s.SetFinalizers(addFinalizer(s.GetFinalizers(), streamFinalizerKey))
+func setStreamFinalizer(ctx context.Context, o *apis.Stream, i typed.StreamInterface) (*apis.Stream, error) {
+	o.SetFinalizers(addFinalizer(o.GetFinalizers(), streamFinalizerKey))
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	res, err := sif.Update(ctx, s, k8smeta.UpdateOptions{})
+	res, err := i.Update(ctx, o, k8smeta.UpdateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to set %q stream finalizers: %w", s.GetName(), err)
+		return nil, fmt.Errorf("failed to set %q stream finalizers: %w", o.GetName(), err)
 	}
 
 	return res, nil
 }
 
-func clearStreamFinalizer(ctx context.Context, s *apis.Stream, sif typed.StreamInterface) (*apis.Stream, error) {
-	s.SetFinalizers(removeFinalizer(s.GetFinalizers(), streamFinalizerKey))
+func clearStreamFinalizer(ctx context.Context, o *apis.Stream, i typed.StreamInterface) (*apis.Stream, error) {
+	o.SetFinalizers(removeFinalizer(o.GetFinalizers(), streamFinalizerKey))
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	res, err := sif.Update(ctx, s, k8smeta.UpdateOptions{})
+	res, err := i.Update(ctx, o, k8smeta.UpdateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to clear %q stream finalizers: %w", s.GetName(), err)
+		return nil, fmt.Errorf("failed to clear %q stream finalizers: %w", o.GetName(), err)
 	}
 
 	return res, nil

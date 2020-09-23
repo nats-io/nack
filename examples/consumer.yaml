@@ -1,15 +1,13 @@
 ---
 apiVersion: jetstream.nats.io/v1
-kind: Stream
+kind: Consumer
 metadata:
-  name: mystream
+  name: myconsumer
 spec:
   servers:
   - nats://localhost:4222
   credentialsSecret:
     name: myncreds
     key: nats-myusr
-  name: mystream
-  subjects: ["orders.*"]
-  storage: memory
-  maxAge: 1h
+  streamName: mystream
+  durableName: myconsumer

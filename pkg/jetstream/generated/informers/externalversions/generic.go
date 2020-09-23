@@ -50,6 +50,8 @@ func (f *genericInformer) Lister() cache.GenericLister {
 func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
 	// Group=jetstream.nats.io, Version=v1
+	case v1.SchemeGroupVersion.WithResource("consumers"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Jetstream().V1().Consumers().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("streams"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Jetstream().V1().Streams().Informer()}, nil
 
