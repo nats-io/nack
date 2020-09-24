@@ -12,11 +12,14 @@ type jsmClient interface {
 	Connect(servers string, opts ...nats.Option) error
 	Close()
 
-	LoadConsumer(ctx context.Context, stream, consumer string) (jsmConsumer, error)
-	NewConsumer(ctx context.Context, stream string, cnf jsmapi.ConsumerConfig) (jsmConsumer, error)
-
 	LoadStream(ctx context.Context, name string) (jsmStream, error)
 	NewStream(ctx context.Context, cnf jsmapi.StreamConfig) (jsmStream, error)
+
+	LoadStreamTemplate(ctx context.Context, name string) (jsmDeleter, error)
+	NewStreamTemplate(ctx context.Context, cnf jsmapi.StreamTemplateConfig) (jsmDeleter, error)
+
+	LoadConsumer(ctx context.Context, stream, consumer string) (jsmDeleter, error)
+	NewConsumer(ctx context.Context, stream string, cnf jsmapi.ConsumerConfig) (jsmDeleter, error)
 }
 
 type jsmStream interface {
@@ -25,7 +28,7 @@ type jsmStream interface {
 	Configuration() jsmapi.StreamConfig
 }
 
-type jsmConsumer interface {
+type jsmDeleter interface {
 	Delete() error
 }
 
@@ -65,11 +68,30 @@ func (c *realJsmClient) NewStream(ctx context.Context, cnf jsmapi.StreamConfig) 
 	return jsm.NewStream(cnf.Name, opts...)
 }
 
-func (c *realJsmClient) LoadConsumer(ctx context.Context, stream, consumer string) (jsmConsumer, error) {
+func (c *realJsmClient) LoadStreamTemplate(ctx context.Context, name string) (jsmDeleter, error) {
+	return jsm.LoadStreamTemplate(name, jsm.WithConnection(c.nc), jsm.WithContext(ctx))
+}
+
+func (c *realJsmClient) NewStreamTemplate(ctx context.Context, cnf jsmapi.StreamTemplateConfig) (jsmDeleter, error) {
+	opts := []jsm.StreamOption{
+		jsm.StreamConnection(jsm.WithConnection(c.nc), jsm.WithContext(ctx)),
+		jsm.Subjects(cnf.Config.Subjects...),
+		jsm.MaxAge(cnf.Config.MaxAge),
+	}
+	if cnf.Config.Storage == jsmapi.FileStorage {
+		opts = append(opts, jsm.FileStorage())
+	} else if cnf.Config.Storage == jsmapi.MemoryStorage {
+		opts = append(opts, jsm.MemoryStorage())
+	}
+
+	return jsm.NewStreamTemplate(cnf.Name, cnf.MaxStreams, *cnf.Config, opts...)
+}
+
+func (c *realJsmClient) LoadConsumer(ctx context.Context, stream, consumer string) (jsmDeleter, error) {
 	return jsm.LoadConsumer(stream, consumer, jsm.WithConnection(c.nc), jsm.WithContext(ctx))
 }
 
-func (c *realJsmClient) NewConsumer(ctx context.Context, stream string, cnf jsmapi.ConsumerConfig) (jsmConsumer, error) {
+func (c *realJsmClient) NewConsumer(ctx context.Context, stream string, cnf jsmapi.ConsumerConfig) (jsmDeleter, error) {
 	opts := []jsm.ConsumerOption{
 		jsm.ConsumerConnection(jsm.WithConnection(c.nc), jsm.WithContext(ctx)),
 		jsm.DurableName(cnf.Durable),
@@ -94,25 +116,30 @@ func (m *mockStream) Delete() error {
 	return m.deleteErr
 }
 
-type mockConsumer struct {
+type mockDeleter struct {
 	deleteErr error
 }
 
-func (m *mockConsumer) Delete() error {
+func (m *mockDeleter) Delete() error {
 	return m.deleteErr
 }
 
 type mockJsmClient struct {
 	connectErr error
 
-	loadStreamStream jsmStream
-	loadStreamErr    error
-	newStreamStream  jsmStream
-	newStreamErr     error
+	loadStream    jsmStream
+	loadStreamErr error
+	newStream     jsmStream
+	newStreamErr  error
 
-	loadConsumerConsumer jsmConsumer
+	loadStreamTemplate    jsmDeleter
+	loadStreamTemplateErr error
+	newStreamTemplate     jsmDeleter
+	newStreamTemplateErr  error
+
+	loadConsumer    jsmDeleter
 	loadConsumerErr error
-	newConsumerConsumer jsmConsumer
+	newConsumer     jsmDeleter
 	newConsumerErr  error
 }
 
@@ -123,17 +150,25 @@ func (c *mockJsmClient) Connect(servers string, opts ...nats.Option) error {
 func (c *mockJsmClient) Close() {}
 
 func (c *mockJsmClient) LoadStream(ctx context.Context, name string) (jsmStream, error) {
-	return c.loadStreamStream, c.loadStreamErr
+	return c.loadStream, c.loadStreamErr
 }
 
 func (c *mockJsmClient) NewStream(ctx context.Context, cnf jsmapi.StreamConfig) (jsmStream, error) {
-	return c.newStreamStream, c.newStreamErr
+	return c.newStream, c.newStreamErr
 }
 
-func (c *mockJsmClient) LoadConsumer(ctx context.Context, stream, consumer string) (jsmConsumer, error) {
-	return c.loadConsumerConsumer, c.loadConsumerErr
+func (c *mockJsmClient) LoadStreamTemplate(ctx context.Context, name string) (jsmDeleter, error) {
+	return c.loadStreamTemplate, c.loadStreamTemplateErr
 }
 
-func (c *mockJsmClient) NewConsumer(ctx context.Context, stream string, cnf jsmapi.ConsumerConfig) (jsmConsumer, error) {
-	return c.newConsumerConsumer, c.newConsumerErr
+func (c *mockJsmClient) NewStreamTemplate(ctx context.Context, cnf jsmapi.StreamTemplateConfig) (jsmDeleter, error) {
+	return c.newStreamTemplate, c.newStreamTemplateErr
+}
+
+func (c *mockJsmClient) LoadConsumer(ctx context.Context, stream, consumer string) (jsmDeleter, error) {
+	return c.loadConsumer, c.loadConsumerErr
+}
+
+func (c *mockJsmClient) NewConsumer(ctx context.Context, stream string, cnf jsmapi.ConsumerConfig) (jsmDeleter, error) {
+	return c.newConsumer, c.newConsumerErr
 }

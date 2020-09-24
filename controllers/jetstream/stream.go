@@ -25,64 +25,17 @@ import (
 	typed "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/typed/jetstream/v1"
 
 	k8sapi "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	k8smeta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/util/workqueue"
 )
 
 const (
 	streamFinalizerKey = "streamfinalizer.jetstream.nats.io"
 )
 
-func streamEventHandlers(ctx context.Context, q workqueue.RateLimitingInterface, jif typed.JetstreamV1Interface) cache.ResourceEventHandlerFuncs {
-	return cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			stream, ok := obj.(*apis.Stream)
-			if !ok {
-				return
-			}
-
-			if err := enqueueWork(q, stream); err != nil {
-				utilruntime.HandleError(err)
-			}
-		},
-		UpdateFunc: func(prevObj, nextObj interface{}) {
-			prev, ok := prevObj.(*apis.Stream)
-			if !ok {
-				return
-			}
-			next, ok := nextObj.(*apis.Stream)
-			if !ok {
-				return
-			}
-
-			if !shouldEnqueueStream(next, prev) {
-				return
-			}
-
-			if err := enqueueWork(q, next); err != nil {
-				utilruntime.HandleError(err)
-			}
-		},
-		DeleteFunc: func(obj interface{}) {
-			stream, ok := obj.(*apis.Stream)
-			if !ok {
-				return
-			}
-
-			if err := enqueueWork(q, stream); err != nil {
-				utilruntime.HandleError(err)
-			}
-		},
-	}
-}
-
 func (c *Controller) runStreamQueue() {
 	for {
-		processQueueNext(c.streamQueue, &realJsmClient{}, c.processStream)
+		processQueueNext(c.strQueue, &realJsmClient{}, c.processStream)
 	}
 }
 
@@ -93,167 +46,160 @@ func (c *Controller) processStream(ns, name string, jsmc jsmClient) (err error) 
 		}
 	}()
 
-	stream, err := c.streamLister.Streams(ns).Get(name)
+	str, err := c.strLister.Streams(ns).Get(name)
 	if err != nil && k8serrors.IsNotFound(err) {
 		return nil
 	} else if err != nil {
 		return err
 	}
 
-	sif := c.ji.Streams(stream.Namespace)
+	spec := str.Spec
+	ifc := c.ji.Streams(str.Namespace)
 
-	creds, err := getCreds(c.ctx, stream.Spec.CredentialsSecret, c.ki.Secrets(ns))
-	if err != nil {
-		if _, serr := setStreamErrored(c.ctx, stream, sif, err); serr != nil {
-			return fmt.Errorf("%s: %w", err, serr)
-		}
-		return err
-	}
-
-	c.normalEvent(stream, "Connecting", "Connecting to NATS Server")
-	err = jsmc.Connect(
-		strings.Join(stream.Spec.Servers, ","),
-		getNATSOptions(c.natsName, creds)...,
-	)
-	if err != nil {
-		if _, serr := setStreamErrored(c.ctx, stream, sif, err); serr != nil {
-			return fmt.Errorf("%s: %w", err, serr)
-		}
-		return err
-	}
-	defer jsmc.Close()
-	c.normalEvent(stream, "Connected", "Connected to NATS Server")
-
-	deleteOK := stream.GetDeletionTimestamp() != nil
-	newGeneration := stream.Generation != stream.Status.ObservedGeneration
-	streamOK, err := streamExists(c.ctx, jsmc, stream.Spec.Name)
-	if err != nil {
-		if _, serr := setStreamErrored(c.ctx, stream, sif, err); serr != nil {
-			return fmt.Errorf("%s: %w", err, serr)
-		}
-		return err
-	}
-	updateOK := (streamOK && !deleteOK && newGeneration)
-	createOK := (!streamOK && !deleteOK && newGeneration)
-
-	switch {
-	case createOK:
-		c.normalEvent(stream, "Creating", fmt.Sprintf("Creating stream %q", stream.Spec.Name))
-		if err := createStream(c.ctx, jsmc, stream); err != nil {
-			if _, serr := setStreamErrored(c.ctx, stream, sif, err); serr != nil {
-				return fmt.Errorf("%s: %w", err, serr)
-			}
-			return err
-		}
-
-		res, err := setStreamFinalizer(c.ctx, stream, sif)
-		if err != nil {
-			if _, serr := setStreamErrored(c.ctx, stream, sif, err); serr != nil {
-				return fmt.Errorf("%s: %w", err, serr)
-			}
-			return err
-		}
-		stream = res
-
-		if _, err := setStreamStatus(c.ctx, stream, sif); err != nil {
-			return err
-		}
-		c.normalEvent(stream, "Created", fmt.Sprintf("Created stream %q", stream.Spec.Name))
-		return nil
-	case updateOK:
-		c.normalEvent(stream, "Updating", fmt.Sprintf("Updating stream %q", stream.Spec.Name))
-		if err := updateStream(c.ctx, jsmc, stream); err != nil {
-			if _, serr := setStreamErrored(c.ctx, stream, sif, err); serr != nil {
-				return fmt.Errorf("%s: %w", err, serr)
-			}
-			return err
-		}
-
-		res, err := setStreamFinalizer(c.ctx, stream, sif)
-		if err != nil {
-			if _, serr := setStreamErrored(c.ctx, stream, sif, err); serr != nil {
-				return fmt.Errorf("%s: %w", err, serr)
-			}
-			return err
-		}
-		stream = res
-
-		if _, err := setStreamStatus(c.ctx, stream, sif); err != nil {
-			return err
-		}
-		c.normalEvent(stream, "Updated", fmt.Sprintf("Updated stream %q", stream.Spec.Name))
-		return nil
-	case deleteOK:
-		c.normalEvent(stream, "Deleting", fmt.Sprintf("Deleting stream %q", stream.Spec.Name))
-		if err := deleteStream(c.ctx, jsmc, stream.Spec.Name); err != nil {
-			if _, serr := setStreamErrored(c.ctx, stream, sif, err); serr != nil {
-				return fmt.Errorf("%s: %w", err, serr)
-			}
-			return err
-		}
-
-		if _, err := clearStreamFinalizer(c.ctx, stream, sif); err != nil {
-			if _, serr := setStreamErrored(c.ctx, stream, sif, err); serr != nil {
-				return fmt.Errorf("%s: %w", err, serr)
-			}
-			return err
-		}
-
-		return nil
-	}
-
-	// default: Nothing to do.
-	return nil
-}
-
-func shouldEnqueueStream(prev, next *apis.Stream) bool {
-	delChanged := prev.DeletionTimestamp != next.DeletionTimestamp
-	specChanged := !equality.Semantic.DeepEqual(prev.Spec, next.Spec)
-
-	return delChanged || specChanged
-}
-
-func createStream(ctx context.Context, c jsmClient, s *apis.Stream) (err error) {
 	defer func() {
-		if err != nil {
-			err = fmt.Errorf("failed to create stream %q: %w", s.Spec.Name, err)
+		if err == nil {
+			return
+		}
+
+		if _, serr := setStreamErrored(c.ctx, str, ifc, err); serr != nil {
+			err = fmt.Errorf("%s: %w", err, serr)
 		}
 	}()
 
-	maxAge, err := time.ParseDuration(s.Spec.MaxAge)
+	creds, err := getCreds(c.ctx, spec.CredentialsSecret, c.ki.Secrets(ns))
 	if err != nil {
 		return err
 	}
 
-	storage, err := getStorageType(s.Spec.Storage)
+	c.normalEvent(str, "Connecting", "Connecting to NATS Server")
+	err = jsmc.Connect(
+		strings.Join(spec.Servers, ","),
+		getNATSOptions(c.natsName, creds)...,
+	)
+	if err != nil {
+		return err
+	}
+	defer jsmc.Close()
+	c.normalEvent(str, "Connected", "Connected to NATS Server")
+
+	deleteOK := str.GetDeletionTimestamp() != nil
+	newGeneration := str.Generation != str.Status.ObservedGeneration
+	strOK, err := streamExists(c.ctx, jsmc, spec.Name)
+	if err != nil {
+		return err
+	}
+	updateOK := (strOK && !deleteOK && newGeneration)
+	createOK := (!strOK && !deleteOK && newGeneration)
+
+	switch {
+	case createOK:
+		c.normalEvent(str, "Creating", fmt.Sprintf("Creating stream %q", spec.Name))
+		if err := createStream(c.ctx, jsmc, spec); err != nil {
+			return err
+		}
+
+		res, err := setStreamFinalizer(c.ctx, str, ifc)
+		if err != nil {
+			return err
+		}
+		str = res
+
+		if _, err := setStreamOK(c.ctx, str, ifc); err != nil {
+			return err
+		}
+		c.normalEvent(str, "Created", fmt.Sprintf("Created stream %q", spec.Name))
+	case updateOK:
+		c.normalEvent(str, "Updating", fmt.Sprintf("Updating stream %q", spec.Name))
+		if err := updateStream(c.ctx, jsmc, spec); err != nil {
+			return err
+		}
+
+		res, err := setStreamFinalizer(c.ctx, str, ifc)
+		if err != nil {
+			return err
+		}
+		str = res
+
+		if _, err := setStreamOK(c.ctx, str, ifc); err != nil {
+			return err
+		}
+		c.normalEvent(str, "Updated", fmt.Sprintf("Updated stream %q", spec.Name))
+		return nil
+	case deleteOK:
+		c.normalEvent(str, "Deleting", fmt.Sprintf("Deleting stream %q", spec.Name))
+		if err := deleteStream(c.ctx, jsmc, spec.Name); err != nil {
+			return err
+		}
+
+		if _, err := clearStreamFinalizer(c.ctx, str, ifc); err != nil {
+			return err
+		}
+	default:
+		c.warningEvent(str, "Noop", fmt.Sprintf("Nothing done for stream %q", spec.Name))
+	}
+
+	return nil
+}
+
+func streamExists(ctx context.Context, c jsmClient, name string) (ok bool, err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("failed to check if stream exists: %w", err)
+		}
+	}()
+
+	var apierr jsmapi.ApiError
+	_, err = c.LoadStream(ctx, name)
+	if errors.As(err, &apierr) && apierr.NotFoundError() {
+		return false, nil
+	} else if err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
+func createStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("failed to create stream %q: %w", spec.Name, err)
+		}
+	}()
+
+	maxAge, err := time.ParseDuration(spec.MaxAge)
+	if err != nil {
+		return err
+	}
+
+	storage, err := getStorageType(spec.Storage)
 	if err != nil {
 		return err
 	}
 
 	_, err = c.NewStream(ctx, jsmapi.StreamConfig{
-		Name:     s.Spec.Name,
+		Name:     spec.Name,
 		Storage:  storage,
-		Subjects: s.Spec.Subjects,
+		Subjects: spec.Subjects,
 		MaxAge:   maxAge,
 	})
 	return err
 }
 
-func updateStream(ctx context.Context, c jsmClient, s *apis.Stream) (err error) {
+func updateStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err error) {
 	defer func() {
 		if err != nil {
-			err = fmt.Errorf("failed to update stream %q: %w", s.Spec.Name, err)
+			err = fmt.Errorf("failed to update stream %q: %w", spec.Name, err)
 		}
 	}()
 
-	js, err := c.LoadStream(ctx, s.Spec.Name)
+	js, err := c.LoadStream(ctx, spec.Name)
 	if err != nil {
 		return err
 	}
 
 	config := js.Configuration()
 
-	maxDur, err := time.ParseDuration(s.Spec.MaxAge)
+	maxDur, err := time.ParseDuration(spec.MaxAge)
 	if err != nil {
 		return err
 	}
@@ -278,24 +224,6 @@ func deleteStream(ctx context.Context, c jsmClient, name string) (err error) {
 	}
 
 	return str.Delete()
-}
-
-func streamExists(ctx context.Context, c jsmClient, name string) (ok bool, err error) {
-	defer func() {
-		if err != nil {
-			err = fmt.Errorf("failed to check if stream exists: %w", err)
-		}
-	}()
-
-	var apierr jsmapi.ApiError
-	_, err = c.LoadStream(ctx, name)
-	if errors.As(err, &apierr) && apierr.NotFoundError() {
-		return false, nil
-	} else if err != nil {
-		return false, err
-	}
-
-	return true, nil
 }
 
 func setStreamErrored(ctx context.Context, s *apis.Stream, sif typed.StreamInterface, err error) (*apis.Stream, error) {
@@ -323,7 +251,7 @@ func setStreamErrored(ctx context.Context, s *apis.Stream, sif typed.StreamInter
 	return res, nil
 }
 
-func setStreamStatus(ctx context.Context, s *apis.Stream, i typed.StreamInterface) (*apis.Stream, error) {
+func setStreamOK(ctx context.Context, s *apis.Stream, i typed.StreamInterface) (*apis.Stream, error) {
 	sc := s.DeepCopy()
 
 	sc.Status.ObservedGeneration = s.Generation

@@ -54,6 +54,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Jetstream().V1().Consumers().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("streams"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Jetstream().V1().Streams().Informer()}, nil
+	case v1.SchemeGroupVersion.WithResource("streamtemplates"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Jetstream().V1().StreamTemplates().Informer()}, nil
 
 	}
 

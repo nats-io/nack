@@ -25,6 +25,8 @@ type Interface interface {
 	Consumers() ConsumerInformer
 	// Streams returns a StreamInformer.
 	Streams() StreamInformer
+	// StreamTemplates returns a StreamTemplateInformer.
+	StreamTemplates() StreamTemplateInformer
 }
 
 type version struct {
@@ -46,4 +48,9 @@ func (v *version) Consumers() ConsumerInformer {
 // Streams returns a StreamInformer.
 func (v *version) Streams() StreamInformer {
 	return &streamInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// StreamTemplates returns a StreamTemplateInformer.
+func (v *version) StreamTemplates() StreamTemplateInformer {
+	return &streamTemplateInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

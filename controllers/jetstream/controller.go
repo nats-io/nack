@@ -31,6 +31,7 @@ import (
 	listers "github.com/nats-io/nack/pkg/jetstream/generated/listers/jetstream/v1"
 
 	k8sapi "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	k8smeta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -76,13 +77,17 @@ type Controller struct {
 
 	natsName string
 
-	streamLister listers.StreamLister
-	streamSynced cache.InformerSynced
-	streamQueue  workqueue.RateLimitingInterface
+	strLister listers.StreamLister
+	strSynced cache.InformerSynced
+	strQueue  workqueue.RateLimitingInterface
 
-	consumerLister listers.ConsumerLister
-	consumerSynced cache.InformerSynced
-	consumerQueue  workqueue.RateLimitingInterface
+	strTmplLister listers.StreamTemplateLister
+	strTmplSynced cache.InformerSynced
+	strTmplQueue  workqueue.RateLimitingInterface
+
+	cnsLister listers.ConsumerLister
+	cnsSynced cache.InformerSynced
+	cnsQueue  workqueue.RateLimitingInterface
 }
 
 func NewController(opt Options) *Controller {
@@ -90,6 +95,7 @@ func NewController(opt Options) *Controller {
 	informerFactory := informers.NewSharedInformerFactory(opt.JetstreamIface, resyncPeriod)
 
 	streamInformer := informerFactory.Jetstream().V1().Streams()
+	streamTmplInformer := informerFactory.Jetstream().V1().StreamTemplates()
 	consumerInformer := informerFactory.Jetstream().V1().Consumers()
 
 	if opt.Recorder == nil {
@@ -111,18 +117,22 @@ func NewController(opt Options) *Controller {
 
 	ji := opt.JetstreamIface.JetstreamV1()
 	streamQueue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Streams")
+	streamTmplQueue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Streams")
 	consumerQueue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Consumers")
 
-	streamInformer.Informer().AddEventHandler(streamEventHandlers(
+	streamInformer.Informer().AddEventHandler(eventHandlers(
 		opt.Ctx,
 		streamQueue,
-		ji,
 	))
 
-	consumerInformer.Informer().AddEventHandler(consumerEventHandlers(
+	streamTmplInformer.Informer().AddEventHandler(eventHandlers(
+		opt.Ctx,
+		streamTmplQueue,
+	))
+
+	consumerInformer.Informer().AddEventHandler(eventHandlers(
 		opt.Ctx,
 		consumerQueue,
-		ji,
 	))
 
 	return &Controller{
@@ -135,31 +145,41 @@ func NewController(opt Options) *Controller {
 
 		natsName: opt.NATSClientName,
 
-		streamLister: streamInformer.Lister(),
-		streamSynced: streamInformer.Informer().HasSynced,
-		streamQueue:  streamQueue,
+		strLister: streamInformer.Lister(),
+		strSynced: streamInformer.Informer().HasSynced,
+		strQueue:  streamQueue,
 
-		consumerLister: consumerInformer.Lister(),
-		consumerSynced: consumerInformer.Informer().HasSynced,
-		consumerQueue:  consumerQueue,
+		strTmplLister: streamTmplInformer.Lister(),
+		strTmplSynced: streamTmplInformer.Informer().HasSynced,
+		strTmplQueue:  streamTmplQueue,
+
+		cnsLister: consumerInformer.Lister(),
+		cnsSynced: consumerInformer.Informer().HasSynced,
+		cnsQueue:  consumerQueue,
 	}
 }
 
 func (c *Controller) Run() error {
 	defer utilruntime.HandleCrash()
-	defer c.streamQueue.ShutDown()
-	defer c.consumerQueue.ShutDown()
+
+	defer c.strQueue.ShutDown()
+	defer c.strTmplQueue.ShutDown()
+	defer c.cnsQueue.ShutDown()
 
 	c.informerFactory.Start(c.ctx.Done())
 
-	if !cache.WaitForCacheSync(c.ctx.Done(), c.streamSynced) {
+	if !cache.WaitForCacheSync(c.ctx.Done(), c.strSynced) {
 		return fmt.Errorf("failed to wait for stream cache sync")
 	}
-	if !cache.WaitForCacheSync(c.ctx.Done(), c.consumerSynced) {
+	if !cache.WaitForCacheSync(c.ctx.Done(), c.strTmplSynced) {
+		return fmt.Errorf("failed to wait for stream template cache sync")
+	}
+	if !cache.WaitForCacheSync(c.ctx.Done(), c.cnsSynced) {
 		return fmt.Errorf("failed to wait for consumer cache sync")
 	}
 
 	go wait.Until(c.runStreamQueue, time.Second, c.ctx.Done())
+	go wait.Until(c.runStreamTemplateQueue, time.Second, c.ctx.Done())
 	go wait.Until(c.runConsumerQueue, time.Second, c.ctx.Done())
 
 	<-c.ctx.Done()
@@ -348,4 +368,50 @@ func upsertCondition(cs []apis.Condition, next apis.Condition) []apis.Condition 
 	}
 
 	return append(cs, next)
+}
+
+func shouldEnqueue(prevObj, nextObj interface{}) bool {
+	type crd interface {
+		GetDeletionTimestamp() *k8smeta.Time
+		GetSpec() interface{}
+	}
+
+	prev, ok := prevObj.(crd)
+	if !ok {
+		return false
+	}
+
+	next, ok := nextObj.(crd)
+	if !ok {
+		return false
+	}
+
+	markedDelete := next.GetDeletionTimestamp() != nil
+	specChanged := !equality.Semantic.DeepEqual(prev.GetSpec(), next.GetSpec())
+
+	return markedDelete || specChanged
+}
+
+func eventHandlers(ctx context.Context, q workqueue.RateLimitingInterface) cache.ResourceEventHandlerFuncs {
+	return cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			if err := enqueueWork(q, obj); err != nil {
+				utilruntime.HandleError(err)
+			}
+		},
+		UpdateFunc: func(prev, next interface{}) {
+			if !shouldEnqueue(prev, next) {
+				return
+			}
+
+			if err := enqueueWork(q, next); err != nil {
+				utilruntime.HandleError(err)
+			}
+		},
+		DeleteFunc: func(obj interface{}) {
+			if err := enqueueWork(q, obj); err != nil {
+				utilruntime.HandleError(err)
+			}
+		},
+	}
 }

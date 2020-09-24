@@ -25,6 +25,7 @@ type JetstreamV1Interface interface {
 	RESTClient() rest.Interface
 	ConsumersGetter
 	StreamsGetter
+	StreamTemplatesGetter
 }
 
 // JetstreamV1Client is used to interact with features provided by the jetstream.nats.io group.
@@ -38,6 +39,10 @@ func (c *JetstreamV1Client) Consumers(namespace string) ConsumerInterface {
 
 func (c *JetstreamV1Client) Streams(namespace string) StreamInterface {
 	return newStreams(c, namespace)
+}
+
+func (c *JetstreamV1Client) StreamTemplates(namespace string) StreamTemplateInterface {
+	return newStreamTemplates(c, namespace)
 }
 
 // NewForConfig creates a new JetstreamV1Client for the given config.

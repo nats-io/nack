@@ -2,16 +2,16 @@
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: streams.jetstream.nats.io
+  name: streamtemplates.jetstream.nats.io
 spec:
   group: jetstream.nats.io
   scope: Namespaced
   names:
-    kind: Stream
-    singular: stream
-    plural: streams
+    kind: StreamTemplate
+    singular: streamtemplate
+    plural: streamtemplates
     shortNames:
-    - str
+    - strtmpl
   versions:
   - name: v1
     served: true
@@ -43,10 +43,20 @@ spec:
                     pattern: 'nats-.*'
                     type: string
               name:
-                description: A unique name for the Stream.
+                description: A unique name for the Stream Template.
                 type: string
                 pattern: '^[^.*>]*$'
                 minLength: 1
+              maxStreams:
+                description: The maximum number of Streams this Template can create, -1 for unlimited.
+                type: integer
+                minimum: -1
+                default: -1
+              replicas:
+                description: How many replicas to keep for each message.
+                type: integer
+                minimum: 1
+                default: 1
               subjects:
                 description: A list of subjects to consume, supports wildcards.
                 type: array
@@ -65,11 +75,6 @@ spec:
                 description: Maximum age of any message in the stream, expressed in Go's time.Duration format. Empty for unlimited.
                 type: string
                 default: ''
-              replicas:
-                description: How many replicas to keep for each message.
-                type: integer
-                minimum: 1
-                default: 1
           status:
             type: object
             properties:
@@ -95,11 +100,12 @@ spec:
       type: string
       description: The current state of the stream.
       jsonPath: .status.conditions[?(@.type == 'Ready')].reason
-    - name: Stream Name
+    - name: Stream Template Name
       type: string
-      description: The name of the Jetstream Stream.
+      description: The name of the Jetstream Stream Template.
       jsonPath: .spec.name
     - name: Subjects
       type: string
       description: The subjects this Stream produces.
       jsonPath: .spec.subjects
+

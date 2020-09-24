@@ -16,6 +16,10 @@ type Consumer struct {
 	Status Status       `json:"status"`
 }
 
+func (c *Consumer) GetSpec() interface{} {
+	return c.Spec
+}
+
 // ConsumerSpec is the spec for a Consumer resource
 type ConsumerSpec struct {
 	Servers           []string          `json:"servers"`

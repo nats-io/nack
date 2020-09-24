@@ -33,6 +33,10 @@ func (c *FakeJetstreamV1) Streams(namespace string) v1.StreamInterface {
 	return &FakeStreams{c, namespace}
 }
 
+func (c *FakeJetstreamV1) StreamTemplates(namespace string) v1.StreamTemplateInterface {
+	return &FakeStreamTemplates{c, namespace}
+}
+
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeJetstreamV1) RESTClient() rest.Interface {

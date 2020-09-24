@@ -13,8 +13,8 @@ import (
 
 	k8sapis "k8s.io/api/core/v1"
 	k8smeta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/util/workqueue"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/util/workqueue"
 )
 
 func TestMain(m *testing.M) {
@@ -62,6 +62,8 @@ func TestGetStorageType(t *testing.T) {
 }
 
 func TestWipeSlice(t *testing.T) {
+	t.Parallel()
+
 	bs := []byte("hello")
 	wipeSlice(bs)
 	if want := []byte("xxxxx"); !bytes.Equal(bs, want) {
@@ -71,6 +73,8 @@ func TestWipeSlice(t *testing.T) {
 }
 
 func TestAddFinalizer(t *testing.T) {
+	t.Parallel()
+
 	fs := []string{"foo", "bar"}
 	fs = addFinalizer(fs, "fizz")
 	fs = addFinalizer(fs, "fizz")
@@ -84,6 +88,8 @@ func TestAddFinalizer(t *testing.T) {
 }
 
 func TestRemoveFinalizer(t *testing.T) {
+	t.Parallel()
+
 	fs := []string{"foo", "bar"}
 	fs = removeFinalizer(fs, "bar")
 	fs = removeFinalizer(fs, "bar")
@@ -218,6 +224,8 @@ func TestProcessQueueNext(t *testing.T) {
 }
 
 func TestUpsertCondition(t *testing.T) {
+	t.Parallel()
+
 	var cs []apis.Condition
 
 	cs = upsertCondition(cs, apis.Condition{
@@ -266,5 +274,153 @@ func TestUpsertCondition(t *testing.T) {
 	if got, want := cs[1].Reason, "Bar"; got != want {
 		t.Error("unexpected reason")
 		t.Fatalf("got=%s; want=%s", got, want)
+	}
+}
+
+func TestShouldEnqueue(t *testing.T) {
+	t.Parallel()
+
+	ts := k8smeta.NewTime(time.Now())
+
+	cases := []struct {
+		name string
+		prev interface{}
+		next interface{}
+
+		want bool
+	}{
+		{
+			name: "stream deleted",
+			prev: &apis.Stream{
+				ObjectMeta: k8smeta.ObjectMeta{
+					Namespace: "default",
+					Name:      "obj-name",
+				},
+			},
+			next: &apis.Stream{
+				ObjectMeta: k8smeta.ObjectMeta{
+					Namespace:         "default",
+					Name:              "obj-name",
+					DeletionTimestamp: &ts,
+				},
+			},
+			want: true,
+		},
+		{
+			name: "stream spec changed",
+			prev: &apis.Stream{
+				ObjectMeta: k8smeta.ObjectMeta{
+					Namespace: "default",
+					Name:      "obj-name",
+				},
+				Spec: apis.StreamSpec{
+					Name: "foo",
+				},
+			},
+			next: &apis.Stream{
+				ObjectMeta: k8smeta.ObjectMeta{
+					Namespace: "default",
+					Name:      "obj-name",
+				},
+				Spec: apis.StreamSpec{
+					Name: "bar",
+				},
+			},
+			want: true,
+		},
+		{
+			name: "stream template deleted",
+			prev: &apis.StreamTemplate{
+				ObjectMeta: k8smeta.ObjectMeta{
+					Namespace: "default",
+					Name:      "obj-name",
+				},
+			},
+			next: &apis.StreamTemplate{
+				ObjectMeta: k8smeta.ObjectMeta{
+					Namespace:         "default",
+					Name:              "obj-name",
+					DeletionTimestamp: &ts,
+				},
+			},
+			want: true,
+		},
+		{
+			name: "stream template spec changed",
+			prev: &apis.StreamTemplate{
+				ObjectMeta: k8smeta.ObjectMeta{
+					Namespace: "default",
+					Name:      "obj-name",
+				},
+				Spec: apis.StreamTemplateSpec{
+					StreamSpec: apis.StreamSpec{
+						Name: "foo",
+					},
+				},
+			},
+			next: &apis.StreamTemplate{
+				ObjectMeta: k8smeta.ObjectMeta{
+					Namespace: "default",
+					Name:      "obj-name",
+				},
+				Spec: apis.StreamTemplateSpec{
+					StreamSpec: apis.StreamSpec{
+						Name: "bar",
+					},
+				},
+			},
+			want: true,
+		},
+		{
+			name: "consumer deleted",
+			prev: &apis.Consumer{
+				ObjectMeta: k8smeta.ObjectMeta{
+					Namespace: "default",
+					Name:      "obj-name",
+				},
+			},
+			next: &apis.Consumer{
+				ObjectMeta: k8smeta.ObjectMeta{
+					Namespace:         "default",
+					Name:              "obj-name",
+					DeletionTimestamp: &ts,
+				},
+			},
+			want: true,
+		},
+		{
+			name: "consumer spec changed",
+			prev: &apis.Consumer{
+				ObjectMeta: k8smeta.ObjectMeta{
+					Namespace: "default",
+					Name:      "obj-name",
+				},
+				Spec: apis.ConsumerSpec{
+					DurableName: "foo",
+				},
+			},
+			next: &apis.Consumer{
+				ObjectMeta: k8smeta.ObjectMeta{
+					Namespace: "default",
+					Name:      "obj-name",
+				},
+				Spec: apis.ConsumerSpec{
+					DurableName: "bar",
+				},
+			},
+			want: true,
+		},
+	}
+
+	for _, c := range cases {
+		c := c
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := shouldEnqueue(c.prev, c.next)
+			if got != c.want {
+				t.Fatalf("got=%t; want=%t", got, c.want)
+			}
+		})
 	}
 }

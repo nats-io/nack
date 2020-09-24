@@ -16,6 +16,10 @@ type Stream struct {
 	Status Status     `json:"status"`
 }
 
+func (s *Stream) GetSpec() interface{} {
+	return s.Spec
+}
+
 // StreamSpec is the spec for a Stream resource
 type StreamSpec struct {
 	Servers           []string          `json:"servers"`
@@ -25,6 +29,7 @@ type StreamSpec struct {
 	Subjects []string `json:"subjects"`
 	Storage  string   `json:"storage"`
 	MaxAge   string   `json:"maxAge"`
+	Replicas int      `json:"replicas"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

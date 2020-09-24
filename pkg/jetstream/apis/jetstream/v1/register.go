@@ -35,6 +35,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&StreamList{},
 		&Consumer{},
 		&ConsumerList{},
+		&StreamTemplate{},
+		&StreamTemplateList{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil

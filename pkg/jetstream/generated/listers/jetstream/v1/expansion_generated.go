@@ -30,3 +30,11 @@ type StreamListerExpansion interface{}
 // StreamNamespaceListerExpansion allows custom methods to be added to
 // StreamNamespaceLister.
 type StreamNamespaceListerExpansion interface{}
+
+// StreamTemplateListerExpansion allows custom methods to be added to
+// StreamTemplateLister.
+type StreamTemplateListerExpansion interface{}
+
+// StreamTemplateNamespaceListerExpansion allows custom methods to be added to
+// StreamTemplateNamespaceLister.
+type StreamTemplateNamespaceListerExpansion interface{}
