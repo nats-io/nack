@@ -213,7 +213,6 @@ func setConsumerErrored(ctx context.Context, s *apis.Consumer, sif typed.Consume
 	return res, nil
 }
 
-
 func setConsumerFinalizer(ctx context.Context, s *apis.Consumer, i typed.ConsumerInterface) (*apis.Consumer, error) {
 	s.SetFinalizers(addFinalizer(s.GetFinalizers(), streamFinalizerKey))
 
