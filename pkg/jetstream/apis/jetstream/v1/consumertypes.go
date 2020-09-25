@@ -27,7 +27,7 @@ type ConsumerSpec struct {
 
 	StreamName     string `json:"streamName"`
 	DeliverPolicy  string `json:"deliverPolicy"`
-	OptStartSeq    string `json:"optStartSeq"`
+	OptStartSeq    int    `json:"optStartSeq"`
 	OptStartTime   string `json:"optStartTime"`
 	DurableName    string `json:"durableName"`
 	DeliverSubject string `json:"deliverSubject"`

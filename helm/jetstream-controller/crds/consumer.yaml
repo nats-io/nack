@@ -60,6 +60,7 @@ spec:
                 type: integer
                 minimum: 0
               optStartTime:
+                description: Time format must be RFC3339.
                 type: string
               durableName:
                 description: The name of the Consumer.

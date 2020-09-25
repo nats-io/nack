@@ -141,8 +141,59 @@ func createConsumer(ctx context.Context, c jsmClient, spec apis.ConsumerSpec) (e
 		}
 	}()
 
+	var optStartTime *time.Time
+	deliverPolicy := jsmapi.DeliverAll
+	switch spec.DeliverPolicy {
+	case "last":
+		deliverPolicy = jsmapi.DeliverLast
+	case "new":
+		deliverPolicy = jsmapi.DeliverNew
+	case "byStartSequence":
+		deliverPolicy = jsmapi.DeliverByStartSequence
+	case "byStartTime":
+		deliverPolicy = jsmapi.DeliverByStartTime
+		t, err := time.Parse(spec.OptStartTime, time.RFC3339)
+		if err != nil {
+			return err
+		}
+		optStartTime = &t
+	}
+
+	ackPolicy := jsmapi.AckNone
+	switch spec.AckPolicy {
+	case "all":
+		ackPolicy = jsmapi.AckAll
+	case "explicit":
+		ackPolicy = jsmapi.AckExplicit
+	}
+
+	var ackWait time.Duration
+	if spec.AckWait != "" {
+		ackWait, err = time.ParseDuration(spec.AckWait)
+		if err != nil {
+			return err
+		}
+	}
+
+	replayPolicy := jsmapi.ReplayInstant
+	switch spec.ReplayPolicy {
+	case "original":
+		replayPolicy = jsmapi.ReplayOriginal
+	}
+
 	_, err = c.NewConsumer(ctx, spec.StreamName, jsmapi.ConsumerConfig{
-		Durable: spec.DurableName,
+		Durable:         spec.DurableName,
+		DeliverSubject:  spec.DeliverSubject,
+		DeliverPolicy:   deliverPolicy,
+		OptStartSeq:     uint64(spec.OptStartSeq),
+		OptStartTime:    optStartTime,
+		AckPolicy:       ackPolicy,
+		AckWait:         ackWait,
+		MaxDeliver:      spec.MaxDeliver,
+		FilterSubject:   spec.FilterSubject,
+		ReplayPolicy:    replayPolicy,
+		SampleFrequency: spec.SampleFreq,
+		RateLimit:       uint64(spec.RateLimitBps),
 	})
 	return err
 }
@@ -214,7 +265,7 @@ func setConsumerErrored(ctx context.Context, s *apis.Consumer, sif typed.Consume
 }
 
 func setConsumerFinalizer(ctx context.Context, s *apis.Consumer, i typed.ConsumerInterface) (*apis.Consumer, error) {
-	s.SetFinalizers(addFinalizer(s.GetFinalizers(), streamFinalizerKey))
+	s.SetFinalizers(addFinalizer(s.GetFinalizers(), consumerFinalizerKey))
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
@@ -228,7 +279,7 @@ func setConsumerFinalizer(ctx context.Context, s *apis.Consumer, i typed.Consume
 }
 
 func clearConsumerFinalizer(ctx context.Context, s *apis.Consumer, i typed.ConsumerInterface) (*apis.Consumer, error) {
-	s.SetFinalizers(removeFinalizer(s.GetFinalizers(), streamFinalizerKey))
+	s.SetFinalizers(removeFinalizer(s.GetFinalizers(), consumerFinalizerKey))
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
