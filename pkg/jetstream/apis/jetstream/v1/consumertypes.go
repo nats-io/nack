@@ -26,12 +26,18 @@ type ConsumerSpec struct {
 	CredentialsSecret CredentialsSecret `json:"credentialsSecret"`
 
 	StreamName     string `json:"streamName"`
+	DeliverPolicy  string `json:"deliverPolicy"`
+	OptStartSeq    string `json:"optStartSeq"`
+	OptStartTime   string `json:"optStartTime"`
 	DurableName    string `json:"durableName"`
 	DeliverSubject string `json:"deliverSubject"`
 	AckPolicy      string `json:"ackPolicy"`
+	AckWait        string `json:"ackWait"`
+	MaxDeliver     int    `json:"maxDeliver"`
 	FilterSubject  string `json:"filterSubject"`
 	ReplayPolicy   string `json:"replayPolicy"`
 	SampleFreq     string `json:"sampleFreq"`
+	RateLimitBps   int    `json:"rateLimitBps"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

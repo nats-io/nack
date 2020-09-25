@@ -25,11 +25,19 @@ type StreamSpec struct {
 	Servers           []string          `json:"servers"`
 	CredentialsSecret CredentialsSecret `json:"credentialsSecret"`
 
-	Name     string   `json:"name"`
-	Subjects []string `json:"subjects"`
-	Storage  string   `json:"storage"`
-	MaxAge   string   `json:"maxAge"`
-	Replicas int      `json:"replicas"`
+	Name            string   `json:"name"`
+	Subjects        []string `json:"subjects"`
+	Retention       string   `json:"retention"`
+	MaxConsumers    int      `json:"maxConsumers"`
+	MaxMsgs         int      `json:"maxMsgs"`
+	MaxBytes        int      `json:"maxBytes"`
+	MaxAge          string   `json:"maxAge"`
+	MaxMsgSize      int      `json:"maxMsgSize"`
+	Storage         string   `json:"storage"`
+	Replicas        int      `json:"replicas"`
+	NoAck           bool     `json:"noAck"`
+	Discard         string   `json:"discard"`
+	DuplicateWindow int      `json:"duplicateWindow"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

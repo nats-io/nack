@@ -54,6 +54,38 @@ spec:
                 items:
                   type: string
                   minLength: 1
+              retention:
+                description: How messages are retained in the Stream, once this is exceeded old messages are removed.
+                type: string
+                enum:
+                - limits
+                - interest
+                - workqueue
+                default: limits
+              maxConsumers:
+                description: How many Consumers can be defined for a given Stream. -1 for unlimited.
+                type: integer
+                minimum: -1
+                default: -1
+              maxMsgs:
+                description: How many messages may be in a Stream, oldest messages will be removed if the Stream exceeds this size. -1 for unlimited.
+                type: integer
+                minimum: -1
+                default: -1
+              maxBytes:
+                description: How big the Stream may be, when the combined stream size exceeds this old messages are removed. -1 for unlimited.
+                type: integer
+                minimum: -1
+                default: -1
+              maxAge:
+                description: Maximum age of any message in the stream, expressed in Go's time.Duration format. Empty for unlimited.
+                type: string
+                default: ''
+              maxMsgSize:
+                description: The largest message that will be accepted by the Stream. -1 for unlimited.
+                type: integer
+                minimum: -1
+                default: -1
               storage:
                 description: The storage backend to use for the Stream.
                 type: string
@@ -61,15 +93,27 @@ spec:
                 - file
                 - memory
                 default: memory
-              maxAge:
-                description: Maximum age of any message in the stream, expressed in Go's time.Duration format. Empty for unlimited.
-                type: string
-                default: ''
               replicas:
                 description: How many replicas to keep for each message.
                 type: integer
                 minimum: 1
                 default: 1
+              noAck:
+                description: Disables acknowledging messages that are received by the Stream.
+                type: boolean
+                default: false
+              discard:
+                description: When a Stream reach it's limits either old messages are deleted or new ones are denied.
+                type: string
+                enum:
+                - old
+                - new
+                default: old
+              duplicateWindow:
+                description: The time window to track duplicate messages for, expressed in microseconds. 0 for default.
+                type: integer
+                minimum: 0
+                default: 0
           status:
             type: object
             properties:

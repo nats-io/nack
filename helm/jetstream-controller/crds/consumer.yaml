@@ -45,6 +45,22 @@ spec:
               streamName:
                 description: The name of the Stream to create the Consumer in.
                 type: string
+              deliverPolicy:
+                type: string
+                enum:
+                - all
+                - last
+                - new
+                # Requires optStartSeq
+                - byStartSequence
+                # Requires optStartTime
+                - byStartTime
+                default: all
+              optStartSeq:
+                type: integer
+                minimum: 0
+              optStartTime:
+                type: string
               durableName:
                 description: The name of the Consumer.
                 type: string
@@ -61,6 +77,13 @@ spec:
                 - all
                 - explicit
                 default: none
+              ackWait:
+                description: How long to allow messages to remain un-acknowledged before attempting redelivery.
+                type: string
+                default: 1ns
+              maxDeliver:
+                type: integer
+                minimum: -1
               filterSubject:
                 description: Select only a specific incoming subjects, supports wildcards.
                 type: string
@@ -74,6 +97,9 @@ spec:
               sampleFreq:
                 description: What percentage of acknowledgements should be samples for observability.
                 type: string
+              rateLimitBps:
+                description: rate at which messages will be delivered to clients, expressed in bit per second.
+                type: integer
           status:
             type: object
             properties:
