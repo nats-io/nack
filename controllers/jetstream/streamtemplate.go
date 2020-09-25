@@ -139,18 +139,59 @@ func createStreamTemplate(ctx context.Context, c jsmClient, spec apis.StreamTemp
 		}
 	}()
 
-	maxAge, err := time.ParseDuration(spec.MaxAge)
-	if err != nil {
-		return err
+	var maxAge time.Duration
+	if spec.MaxAge != "" {
+		maxAge, err = time.ParseDuration(spec.MaxAge)
+		if err != nil {
+			return err
+		}
+	}
+
+	retention := jsmapi.LimitsPolicy
+	switch spec.Retention {
+	case "interest":
+		retention = jsmapi.InterestPolicy
+	case "workqueue":
+		retention = jsmapi.WorkQueuePolicy
+	}
+
+	storage := jsmapi.MemoryStorage
+	switch spec.Storage {
+	case "file":
+		storage = jsmapi.FileStorage
+	}
+
+	discard := jsmapi.DiscardOld
+	switch spec.Discard {
+	case "new":
+		discard = jsmapi.DiscardNew
+	}
+
+	var duplicates time.Duration
+	if spec.DuplicateWindow != "" {
+		duplicates, err = time.ParseDuration(spec.DuplicateWindow)
+		if err != nil {
+			return err
+		}
 	}
 
 	_, err = c.NewStreamTemplate(ctx, jsmapi.StreamTemplateConfig{
 		Name:       spec.Name,
 		MaxStreams: uint32(spec.MaxStreams),
 		Config: &jsmapi.StreamConfig{
-			Subjects: spec.Subjects,
-			MaxAge:   maxAge,
-			Replicas: spec.Replicas,
+			Retention:    retention,
+			Subjects:     spec.Subjects,
+			MaxConsumers: spec.MaxConsumers,
+			MaxMsgs:      int64(spec.MaxMsgs),
+			MaxBytes:     int64(spec.MaxBytes),
+			MaxAge:       maxAge,
+			MaxMsgSize:   int32(spec.MaxMsgSize),
+			Storage:      storage,
+			Discard:      discard,
+			Replicas:     spec.Replicas,
+			NoAck:        spec.NoAck,
+			Template:     spec.Name,
+			Duplicates:   duplicates,
 		},
 	})
 	return err

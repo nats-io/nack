@@ -37,7 +37,7 @@ type StreamSpec struct {
 	Replicas        int      `json:"replicas"`
 	NoAck           bool     `json:"noAck"`
 	Discard         string   `json:"discard"`
-	DuplicateWindow int      `json:"duplicateWindow"`
+	DuplicateWindow string   `json:"duplicateWindow"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
