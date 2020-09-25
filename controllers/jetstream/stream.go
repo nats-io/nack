@@ -166,21 +166,34 @@ func createStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 		}
 	}()
 
-	maxAge, err := time.ParseDuration(spec.MaxAge)
+	maxAge, err := getMaxAge(spec.MaxAge)
 	if err != nil {
 		return err
 	}
 
-	storage, err := getStorageType(spec.Storage)
+	retention := getRetention(spec.Retention)
+	storage := getStorage(spec.Storage)
+	discard := getDiscard(spec.Discard)
+
+	duplicates, err := getDuplicates(spec.DuplicateWindow)
 	if err != nil {
 		return err
 	}
 
 	_, err = c.NewStream(ctx, jsmapi.StreamConfig{
-		Name:     spec.Name,
-		Storage:  storage,
-		Subjects: spec.Subjects,
-		MaxAge:   maxAge,
+		Name:         spec.Name,
+		Retention:    retention,
+		Subjects:     spec.Subjects,
+		MaxConsumers: spec.MaxConsumers,
+		MaxMsgs:      int64(spec.MaxMsgs),
+		MaxBytes:     int64(spec.MaxBytes),
+		MaxAge:       maxAge,
+		MaxMsgSize:   int32(spec.MaxMsgSize),
+		Storage:      storage,
+		Discard:      discard,
+		Replicas:     spec.Replicas,
+		NoAck:        spec.NoAck,
+		Duplicates:   duplicates,
 	})
 	return err
 }
@@ -197,15 +210,35 @@ func updateStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 		return err
 	}
 
-	config := js.Configuration()
-
-	maxDur, err := time.ParseDuration(spec.MaxAge)
+	maxAge, err := getMaxAge(spec.MaxAge)
 	if err != nil {
 		return err
 	}
-	config.MaxAge = maxDur
 
-	return js.UpdateConfiguration(config)
+	retention := getRetention(spec.Retention)
+	storage := getStorage(spec.Storage)
+	discard := getDiscard(spec.Discard)
+
+	duplicates, err := getDuplicates(spec.DuplicateWindow)
+	if err != nil {
+		return err
+	}
+
+	return js.UpdateConfiguration(jsmapi.StreamConfig{
+		Name:         spec.Name,
+		Retention:    retention,
+		Subjects:     spec.Subjects,
+		MaxConsumers: spec.MaxConsumers,
+		MaxMsgs:      int64(spec.MaxMsgs),
+		MaxBytes:     int64(spec.MaxBytes),
+		MaxAge:       maxAge,
+		MaxMsgSize:   int32(spec.MaxMsgSize),
+		Storage:      storage,
+		Discard:      discard,
+		Replicas:     spec.Replicas,
+		NoAck:        spec.NoAck,
+		Duplicates:   duplicates,
+	})
 }
 
 func deleteStream(ctx context.Context, c jsmClient, name string) (err error) {
@@ -300,4 +333,49 @@ func clearStreamFinalizer(ctx context.Context, o *apis.Stream, i typed.StreamInt
 	}
 
 	return res, nil
+}
+
+func getMaxAge(v string) (time.Duration, error) {
+	if v == "" {
+		return time.Duration(0), nil
+	}
+
+	return time.ParseDuration(v)
+}
+
+func getRetention(v string) jsmapi.RetentionPolicy {
+	retention := jsmapi.LimitsPolicy
+	switch v {
+	case "interest":
+		retention = jsmapi.InterestPolicy
+	case "workqueue":
+		retention = jsmapi.WorkQueuePolicy
+	}
+	return retention
+}
+
+func getStorage(v string) jsmapi.StorageType {
+	storage := jsmapi.MemoryStorage
+	switch v {
+	case "file":
+		storage = jsmapi.FileStorage
+	}
+	return storage
+}
+
+func getDiscard(v string) jsmapi.DiscardPolicy {
+	discard := jsmapi.DiscardOld
+	switch v {
+	case "new":
+		discard = jsmapi.DiscardNew
+	}
+	return discard
+}
+
+func getDuplicates(v string) (time.Duration, error) {
+	if v == "" {
+		return time.Duration(0), nil
+	}
+
+	return time.ParseDuration(v)
 }

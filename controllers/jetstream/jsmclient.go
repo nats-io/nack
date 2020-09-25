@@ -25,7 +25,6 @@ type jsmClient interface {
 type jsmStream interface {
 	UpdateConfiguration(cnf jsmapi.StreamConfig, opts ...jsm.StreamOption) error
 	Delete() error
-	Configuration() jsmapi.StreamConfig
 }
 
 type jsmDeleter interface {
@@ -102,10 +101,6 @@ func (c *realJsmClient) NewConsumer(ctx context.Context, stream string, cnf jsma
 
 type mockStream struct {
 	deleteErr error
-}
-
-func (m *mockStream) Configuration() jsmapi.StreamConfig {
-	return jsmapi.StreamConfig{}
 }
 
 func (m *mockStream) UpdateConfiguration(cnf jsmapi.StreamConfig, opts ...jsm.StreamOption) error {

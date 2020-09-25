@@ -139,40 +139,18 @@ func createStreamTemplate(ctx context.Context, c jsmClient, spec apis.StreamTemp
 		}
 	}()
 
-	var maxAge time.Duration
-	if spec.MaxAge != "" {
-		maxAge, err = time.ParseDuration(spec.MaxAge)
-		if err != nil {
-			return err
-		}
+	maxAge, err := getMaxAge(spec.MaxAge)
+	if err != nil {
+		return err
 	}
 
-	retention := jsmapi.LimitsPolicy
-	switch spec.Retention {
-	case "interest":
-		retention = jsmapi.InterestPolicy
-	case "workqueue":
-		retention = jsmapi.WorkQueuePolicy
-	}
+	retention := getRetention(spec.Retention)
+	storage := getStorage(spec.Storage)
+	discard := getDiscard(spec.Discard)
 
-	storage := jsmapi.MemoryStorage
-	switch spec.Storage {
-	case "file":
-		storage = jsmapi.FileStorage
-	}
-
-	discard := jsmapi.DiscardOld
-	switch spec.Discard {
-	case "new":
-		discard = jsmapi.DiscardNew
-	}
-
-	var duplicates time.Duration
-	if spec.DuplicateWindow != "" {
-		duplicates, err = time.ParseDuration(spec.DuplicateWindow)
-		if err != nil {
-			return err
-		}
+	duplicates, err := getDuplicates(spec.DuplicateWindow)
+	if err != nil {
+		return err
 	}
 
 	_, err = c.NewStreamTemplate(ctx, jsmapi.StreamTemplateConfig{

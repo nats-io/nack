@@ -110,10 +110,8 @@ spec:
                 - new
                 default: old
               duplicateWindow:
-                description: The time window to track duplicate messages for, expressed in microseconds. 0 for default.
-                type: integer
-                minimum: 0
-                default: 0
+                description: The duration window to track duplicate messages for.
+                type: string
           status:
             type: object
             properties:
