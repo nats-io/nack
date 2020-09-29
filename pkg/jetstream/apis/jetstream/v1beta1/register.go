@@ -1,4 +1,4 @@
-package v1
+package v1beta1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -10,7 +10,7 @@ import (
 
 var (
 	// SchemeGroupVersion is group version used to register these objects
-	SchemeGroupVersion = schema.GroupVersion{Group: jetstream.GroupName, Version: "v1"}
+	SchemeGroupVersion = schema.GroupVersion{Group: jetstream.GroupName, Version: "v1beta1"}
 
 	// SchemeBuilder initializes a scheme builder
 	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)

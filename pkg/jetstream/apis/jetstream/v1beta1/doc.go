@@ -2,4 +2,4 @@
 // +groupName=jetstream.nats.io
 
 // Package v1 is the v1 version of the API.
-package v1
+package v1beta1

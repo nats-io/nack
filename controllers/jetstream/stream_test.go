@@ -8,7 +8,7 @@ import (
 
 	jsmapi "github.com/nats-io/jsm.go/api"
 
-	apis "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1"
+	apis "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta1"
 	clientsetfake "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/fake"
 
 	k8sapis "k8s.io/api/core/v1"
@@ -47,7 +47,7 @@ func TestProcessStream(t *testing.T) {
 
 		ns, name := "default", "my-stream"
 
-		informer := ctrl.informerFactory.Jetstream().V1().Streams()
+		informer := ctrl.informerFactory.Jetstream().V1beta1().Streams()
 		err := informer.Informer().GetStore().Add(&apis.Stream{
 			ObjectMeta: k8smeta.ObjectMeta{
 				Namespace:  ns,
@@ -123,7 +123,7 @@ func TestProcessStream(t *testing.T) {
 
 		ns, name := "default", "my-stream"
 
-		informer := ctrl.informerFactory.Jetstream().V1().Streams()
+		informer := ctrl.informerFactory.Jetstream().V1beta1().Streams()
 		err := informer.Informer().GetStore().Add(&apis.Stream{
 			ObjectMeta: k8smeta.ObjectMeta{
 				Namespace:  ns,
@@ -186,7 +186,7 @@ func TestProcessStream(t *testing.T) {
 
 		ns, name := "default", "my-stream"
 
-		informer := ctrl.informerFactory.Jetstream().V1().Streams()
+		informer := ctrl.informerFactory.Jetstream().V1beta1().Streams()
 		err := informer.Informer().GetStore().Add(&apis.Stream{
 			ObjectMeta: k8smeta.ObjectMeta{
 				Namespace:  ns,
@@ -248,7 +248,7 @@ func TestProcessStream(t *testing.T) {
 		ts := k8smeta.Unix(1600216923, 0)
 		ns, name := "default", "my-stream"
 
-		informer := ctrl.informerFactory.Jetstream().V1().Streams()
+		informer := ctrl.informerFactory.Jetstream().V1beta1().Streams()
 		err := informer.Informer().GetStore().Add(&apis.Stream{
 			ObjectMeta: k8smeta.ObjectMeta{
 				Namespace:         ns,
@@ -311,7 +311,7 @@ func TestProcessStream(t *testing.T) {
 
 		ns, name := "default", "my-stream"
 
-		informer := ctrl.informerFactory.Jetstream().V1().Streams()
+		informer := ctrl.informerFactory.Jetstream().V1beta1().Streams()
 		err := informer.Informer().GetStore().Add(&apis.Stream{
 			ObjectMeta: k8smeta.ObjectMeta{
 				Namespace:  ns,

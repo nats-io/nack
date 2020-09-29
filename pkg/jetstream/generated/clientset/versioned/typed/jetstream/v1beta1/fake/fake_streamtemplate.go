@@ -18,7 +18,7 @@ package fake
 import (
 	"context"
 
-	jetstreamv1 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1"
+	v1beta1 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -29,29 +29,29 @@ import (
 
 // FakeStreamTemplates implements StreamTemplateInterface
 type FakeStreamTemplates struct {
-	Fake *FakeJetstreamV1
+	Fake *FakeJetstreamV1beta1
 	ns   string
 }
 
-var streamtemplatesResource = schema.GroupVersionResource{Group: "jetstream.nats.io", Version: "v1", Resource: "streamtemplates"}
+var streamtemplatesResource = schema.GroupVersionResource{Group: "jetstream.nats.io", Version: "v1beta1", Resource: "streamtemplates"}
 
-var streamtemplatesKind = schema.GroupVersionKind{Group: "jetstream.nats.io", Version: "v1", Kind: "StreamTemplate"}
+var streamtemplatesKind = schema.GroupVersionKind{Group: "jetstream.nats.io", Version: "v1beta1", Kind: "StreamTemplate"}
 
 // Get takes name of the streamTemplate, and returns the corresponding streamTemplate object, and an error if there is any.
-func (c *FakeStreamTemplates) Get(ctx context.Context, name string, options v1.GetOptions) (result *jetstreamv1.StreamTemplate, err error) {
+func (c *FakeStreamTemplates) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.StreamTemplate, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(streamtemplatesResource, c.ns, name), &jetstreamv1.StreamTemplate{})
+		Invokes(testing.NewGetAction(streamtemplatesResource, c.ns, name), &v1beta1.StreamTemplate{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*jetstreamv1.StreamTemplate), err
+	return obj.(*v1beta1.StreamTemplate), err
 }
 
 // List takes label and field selectors, and returns the list of StreamTemplates that match those selectors.
-func (c *FakeStreamTemplates) List(ctx context.Context, opts v1.ListOptions) (result *jetstreamv1.StreamTemplateList, err error) {
+func (c *FakeStreamTemplates) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.StreamTemplateList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(streamtemplatesResource, streamtemplatesKind, c.ns, opts), &jetstreamv1.StreamTemplateList{})
+		Invokes(testing.NewListAction(streamtemplatesResource, streamtemplatesKind, c.ns, opts), &v1beta1.StreamTemplateList{})
 
 	if obj == nil {
 		return nil, err
@@ -61,8 +61,8 @@ func (c *FakeStreamTemplates) List(ctx context.Context, opts v1.ListOptions) (re
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &jetstreamv1.StreamTemplateList{ListMeta: obj.(*jetstreamv1.StreamTemplateList).ListMeta}
-	for _, item := range obj.(*jetstreamv1.StreamTemplateList).Items {
+	list := &v1beta1.StreamTemplateList{ListMeta: obj.(*v1beta1.StreamTemplateList).ListMeta}
+	for _, item := range obj.(*v1beta1.StreamTemplateList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -78,43 +78,43 @@ func (c *FakeStreamTemplates) Watch(ctx context.Context, opts v1.ListOptions) (w
 }
 
 // Create takes the representation of a streamTemplate and creates it.  Returns the server's representation of the streamTemplate, and an error, if there is any.
-func (c *FakeStreamTemplates) Create(ctx context.Context, streamTemplate *jetstreamv1.StreamTemplate, opts v1.CreateOptions) (result *jetstreamv1.StreamTemplate, err error) {
+func (c *FakeStreamTemplates) Create(ctx context.Context, streamTemplate *v1beta1.StreamTemplate, opts v1.CreateOptions) (result *v1beta1.StreamTemplate, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(streamtemplatesResource, c.ns, streamTemplate), &jetstreamv1.StreamTemplate{})
+		Invokes(testing.NewCreateAction(streamtemplatesResource, c.ns, streamTemplate), &v1beta1.StreamTemplate{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*jetstreamv1.StreamTemplate), err
+	return obj.(*v1beta1.StreamTemplate), err
 }
 
 // Update takes the representation of a streamTemplate and updates it. Returns the server's representation of the streamTemplate, and an error, if there is any.
-func (c *FakeStreamTemplates) Update(ctx context.Context, streamTemplate *jetstreamv1.StreamTemplate, opts v1.UpdateOptions) (result *jetstreamv1.StreamTemplate, err error) {
+func (c *FakeStreamTemplates) Update(ctx context.Context, streamTemplate *v1beta1.StreamTemplate, opts v1.UpdateOptions) (result *v1beta1.StreamTemplate, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(streamtemplatesResource, c.ns, streamTemplate), &jetstreamv1.StreamTemplate{})
+		Invokes(testing.NewUpdateAction(streamtemplatesResource, c.ns, streamTemplate), &v1beta1.StreamTemplate{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*jetstreamv1.StreamTemplate), err
+	return obj.(*v1beta1.StreamTemplate), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeStreamTemplates) UpdateStatus(ctx context.Context, streamTemplate *jetstreamv1.StreamTemplate, opts v1.UpdateOptions) (*jetstreamv1.StreamTemplate, error) {
+func (c *FakeStreamTemplates) UpdateStatus(ctx context.Context, streamTemplate *v1beta1.StreamTemplate, opts v1.UpdateOptions) (*v1beta1.StreamTemplate, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(streamtemplatesResource, "status", c.ns, streamTemplate), &jetstreamv1.StreamTemplate{})
+		Invokes(testing.NewUpdateSubresourceAction(streamtemplatesResource, "status", c.ns, streamTemplate), &v1beta1.StreamTemplate{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*jetstreamv1.StreamTemplate), err
+	return obj.(*v1beta1.StreamTemplate), err
 }
 
 // Delete takes name of the streamTemplate and deletes it. Returns an error if one occurs.
 func (c *FakeStreamTemplates) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(streamtemplatesResource, c.ns, name), &jetstreamv1.StreamTemplate{})
+		Invokes(testing.NewDeleteAction(streamtemplatesResource, c.ns, name), &v1beta1.StreamTemplate{})
 
 	return err
 }
@@ -123,17 +123,17 @@ func (c *FakeStreamTemplates) Delete(ctx context.Context, name string, opts v1.D
 func (c *FakeStreamTemplates) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(streamtemplatesResource, c.ns, listOpts)
 
-	_, err := c.Fake.Invokes(action, &jetstreamv1.StreamTemplateList{})
+	_, err := c.Fake.Invokes(action, &v1beta1.StreamTemplateList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched streamTemplate.
-func (c *FakeStreamTemplates) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *jetstreamv1.StreamTemplate, err error) {
+func (c *FakeStreamTemplates) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.StreamTemplate, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(streamtemplatesResource, c.ns, name, pt, data, subresources...), &jetstreamv1.StreamTemplate{})
+		Invokes(testing.NewPatchSubresourceAction(streamtemplatesResource, c.ns, name, pt, data, subresources...), &v1beta1.StreamTemplate{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*jetstreamv1.StreamTemplate), err
+	return obj.(*v1beta1.StreamTemplate), err
 }

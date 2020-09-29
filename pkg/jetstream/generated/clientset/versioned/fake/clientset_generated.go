@@ -17,8 +17,8 @@ package fake
 
 import (
 	clientset "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned"
-	jetstreamv1 "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/typed/jetstream/v1"
-	fakejetstreamv1 "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/typed/jetstream/v1/fake"
+	jetstreamv1beta1 "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/typed/jetstream/v1beta1"
+	fakejetstreamv1beta1 "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/typed/jetstream/v1beta1/fake"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
@@ -73,7 +73,7 @@ func (c *Clientset) Tracker() testing.ObjectTracker {
 
 var _ clientset.Interface = &Clientset{}
 
-// JetstreamV1 retrieves the JetstreamV1Client
-func (c *Clientset) JetstreamV1() jetstreamv1.JetstreamV1Interface {
-	return &fakejetstreamv1.FakeJetstreamV1{Fake: &c.Fake}
+// JetstreamV1beta1 retrieves the JetstreamV1beta1Client
+func (c *Clientset) JetstreamV1beta1() jetstreamv1beta1.JetstreamV1beta1Interface {
+	return &fakejetstreamv1beta1.FakeJetstreamV1beta1{Fake: &c.Fake}
 }

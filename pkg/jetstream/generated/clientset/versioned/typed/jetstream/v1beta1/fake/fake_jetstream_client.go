@@ -16,30 +16,30 @@
 package fake
 
 import (
-	v1 "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/typed/jetstream/v1"
+	v1beta1 "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/typed/jetstream/v1beta1"
 	rest "k8s.io/client-go/rest"
 	testing "k8s.io/client-go/testing"
 )
 
-type FakeJetstreamV1 struct {
+type FakeJetstreamV1beta1 struct {
 	*testing.Fake
 }
 
-func (c *FakeJetstreamV1) Consumers(namespace string) v1.ConsumerInterface {
+func (c *FakeJetstreamV1beta1) Consumers(namespace string) v1beta1.ConsumerInterface {
 	return &FakeConsumers{c, namespace}
 }
 
-func (c *FakeJetstreamV1) Streams(namespace string) v1.StreamInterface {
+func (c *FakeJetstreamV1beta1) Streams(namespace string) v1beta1.StreamInterface {
 	return &FakeStreams{c, namespace}
 }
 
-func (c *FakeJetstreamV1) StreamTemplates(namespace string) v1.StreamTemplateInterface {
+func (c *FakeJetstreamV1beta1) StreamTemplates(namespace string) v1beta1.StreamTemplateInterface {
 	return &FakeStreamTemplates{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeJetstreamV1) RESTClient() rest.Interface {
+func (c *FakeJetstreamV1beta1) RESTClient() rest.Interface {
 	var ret *rest.RESTClient
 	return ret
 }

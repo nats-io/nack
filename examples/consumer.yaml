@@ -1,5 +1,5 @@
 ---
-apiVersion: jetstream.nats.io/v1
+apiVersion: jetstream.nats.io/v1beta1
 kind: Consumer
 metadata:
   name: myconsumer

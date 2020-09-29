@@ -18,7 +18,7 @@ package fake
 import (
 	"context"
 
-	jetstreamv1 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1"
+	v1beta1 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -29,29 +29,29 @@ import (
 
 // FakeStreams implements StreamInterface
 type FakeStreams struct {
-	Fake *FakeJetstreamV1
+	Fake *FakeJetstreamV1beta1
 	ns   string
 }
 
-var streamsResource = schema.GroupVersionResource{Group: "jetstream.nats.io", Version: "v1", Resource: "streams"}
+var streamsResource = schema.GroupVersionResource{Group: "jetstream.nats.io", Version: "v1beta1", Resource: "streams"}
 
-var streamsKind = schema.GroupVersionKind{Group: "jetstream.nats.io", Version: "v1", Kind: "Stream"}
+var streamsKind = schema.GroupVersionKind{Group: "jetstream.nats.io", Version: "v1beta1", Kind: "Stream"}
 
 // Get takes name of the stream, and returns the corresponding stream object, and an error if there is any.
-func (c *FakeStreams) Get(ctx context.Context, name string, options v1.GetOptions) (result *jetstreamv1.Stream, err error) {
+func (c *FakeStreams) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.Stream, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(streamsResource, c.ns, name), &jetstreamv1.Stream{})
+		Invokes(testing.NewGetAction(streamsResource, c.ns, name), &v1beta1.Stream{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*jetstreamv1.Stream), err
+	return obj.(*v1beta1.Stream), err
 }
 
 // List takes label and field selectors, and returns the list of Streams that match those selectors.
-func (c *FakeStreams) List(ctx context.Context, opts v1.ListOptions) (result *jetstreamv1.StreamList, err error) {
+func (c *FakeStreams) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.StreamList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(streamsResource, streamsKind, c.ns, opts), &jetstreamv1.StreamList{})
+		Invokes(testing.NewListAction(streamsResource, streamsKind, c.ns, opts), &v1beta1.StreamList{})
 
 	if obj == nil {
 		return nil, err
@@ -61,8 +61,8 @@ func (c *FakeStreams) List(ctx context.Context, opts v1.ListOptions) (result *je
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &jetstreamv1.StreamList{ListMeta: obj.(*jetstreamv1.StreamList).ListMeta}
-	for _, item := range obj.(*jetstreamv1.StreamList).Items {
+	list := &v1beta1.StreamList{ListMeta: obj.(*v1beta1.StreamList).ListMeta}
+	for _, item := range obj.(*v1beta1.StreamList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -78,43 +78,43 @@ func (c *FakeStreams) Watch(ctx context.Context, opts v1.ListOptions) (watch.Int
 }
 
 // Create takes the representation of a stream and creates it.  Returns the server's representation of the stream, and an error, if there is any.
-func (c *FakeStreams) Create(ctx context.Context, stream *jetstreamv1.Stream, opts v1.CreateOptions) (result *jetstreamv1.Stream, err error) {
+func (c *FakeStreams) Create(ctx context.Context, stream *v1beta1.Stream, opts v1.CreateOptions) (result *v1beta1.Stream, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(streamsResource, c.ns, stream), &jetstreamv1.Stream{})
+		Invokes(testing.NewCreateAction(streamsResource, c.ns, stream), &v1beta1.Stream{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*jetstreamv1.Stream), err
+	return obj.(*v1beta1.Stream), err
 }
 
 // Update takes the representation of a stream and updates it. Returns the server's representation of the stream, and an error, if there is any.
-func (c *FakeStreams) Update(ctx context.Context, stream *jetstreamv1.Stream, opts v1.UpdateOptions) (result *jetstreamv1.Stream, err error) {
+func (c *FakeStreams) Update(ctx context.Context, stream *v1beta1.Stream, opts v1.UpdateOptions) (result *v1beta1.Stream, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(streamsResource, c.ns, stream), &jetstreamv1.Stream{})
+		Invokes(testing.NewUpdateAction(streamsResource, c.ns, stream), &v1beta1.Stream{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*jetstreamv1.Stream), err
+	return obj.(*v1beta1.Stream), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeStreams) UpdateStatus(ctx context.Context, stream *jetstreamv1.Stream, opts v1.UpdateOptions) (*jetstreamv1.Stream, error) {
+func (c *FakeStreams) UpdateStatus(ctx context.Context, stream *v1beta1.Stream, opts v1.UpdateOptions) (*v1beta1.Stream, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(streamsResource, "status", c.ns, stream), &jetstreamv1.Stream{})
+		Invokes(testing.NewUpdateSubresourceAction(streamsResource, "status", c.ns, stream), &v1beta1.Stream{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*jetstreamv1.Stream), err
+	return obj.(*v1beta1.Stream), err
 }
 
 // Delete takes name of the stream and deletes it. Returns an error if one occurs.
 func (c *FakeStreams) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(streamsResource, c.ns, name), &jetstreamv1.Stream{})
+		Invokes(testing.NewDeleteAction(streamsResource, c.ns, name), &v1beta1.Stream{})
 
 	return err
 }
@@ -123,17 +123,17 @@ func (c *FakeStreams) Delete(ctx context.Context, name string, opts v1.DeleteOpt
 func (c *FakeStreams) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(streamsResource, c.ns, listOpts)
 
-	_, err := c.Fake.Invokes(action, &jetstreamv1.StreamList{})
+	_, err := c.Fake.Invokes(action, &v1beta1.StreamList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched stream.
-func (c *FakeStreams) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *jetstreamv1.Stream, err error) {
+func (c *FakeStreams) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.Stream, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(streamsResource, c.ns, name, pt, data, subresources...), &jetstreamv1.Stream{})
+		Invokes(testing.NewPatchSubresourceAction(streamsResource, c.ns, name, pt, data, subresources...), &v1beta1.Stream{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*jetstreamv1.Stream), err
+	return obj.(*v1beta1.Stream), err
 }

@@ -23,12 +23,12 @@ import (
 	"github.com/nats-io/jwt"
 	"github.com/nats-io/nats.go"
 
-	apis "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1"
+	apis "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta1"
 	clientset "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned"
 	scheme "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/scheme"
-	typed "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/typed/jetstream/v1"
+	typed "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/typed/jetstream/v1beta1"
 	informers "github.com/nats-io/nack/pkg/jetstream/generated/informers/externalversions"
-	listers "github.com/nats-io/nack/pkg/jetstream/generated/listers/jetstream/v1"
+	listers "github.com/nats-io/nack/pkg/jetstream/generated/listers/jetstream/v1beta1"
 
 	k8sapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -71,7 +71,7 @@ type Controller struct {
 	ctx context.Context
 
 	ki              k8styped.CoreV1Interface
-	ji              typed.JetstreamV1Interface
+	ji              typed.JetstreamV1beta1Interface
 	informerFactory informers.SharedInformerFactory
 	rec             record.EventRecorder
 
@@ -94,9 +94,9 @@ func NewController(opt Options) *Controller {
 	resyncPeriod := 30 * time.Second
 	informerFactory := informers.NewSharedInformerFactory(opt.JetstreamIface, resyncPeriod)
 
-	streamInformer := informerFactory.Jetstream().V1().Streams()
-	streamTmplInformer := informerFactory.Jetstream().V1().StreamTemplates()
-	consumerInformer := informerFactory.Jetstream().V1().Consumers()
+	streamInformer := informerFactory.Jetstream().V1beta1().Streams()
+	streamTmplInformer := informerFactory.Jetstream().V1beta1().StreamTemplates()
+	consumerInformer := informerFactory.Jetstream().V1beta1().Consumers()
 
 	if opt.Recorder == nil {
 		utilruntime.Must(scheme.AddToScheme(k8sscheme.Scheme))
@@ -115,7 +115,7 @@ func NewController(opt Options) *Controller {
 		opt.NATSClientName = "jetstream-controller"
 	}
 
-	ji := opt.JetstreamIface.JetstreamV1()
+	ji := opt.JetstreamIface.JetstreamV1beta1()
 	streamQueue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Streams")
 	streamTmplQueue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Streams")
 	consumerQueue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Consumers")

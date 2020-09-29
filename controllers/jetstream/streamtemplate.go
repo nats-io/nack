@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	apis "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1"
-	typed "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/typed/jetstream/v1"
+	apis "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta1"
+	typed "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/typed/jetstream/v1beta1"
 
 	jsmapi "github.com/nats-io/jsm.go/api"
 

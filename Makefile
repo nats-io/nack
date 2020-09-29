@@ -3,7 +3,7 @@ export GO111MODULE := on
 
 codeGenerator := vendor/k8s.io/code-generator/generate-groups.sh
 
-jetstreamGenOut := pkg/jetstream/generated pkg/jetstream/apis/jetstream/v1/zz_generated.deepcopy.go
+jetstreamGenOut := pkg/jetstream/generated pkg/jetstream/apis/jetstream/v1beta1/zz_generated.deepcopy.go
 jetstreamGenIn:= $(shell grep -l -R -F "// +" pkg/jetstream/apis | grep -v "zz_generated.deepcopy.go")
 jetstreamSrc := $(shell find cmd/jetstream-controller pkg/jetstream controllers/jetstream -name "*.go")
 
@@ -25,7 +25,7 @@ $(jetstreamGenOut): vendor $(codeGenerator) $(jetstreamGenIn) pkg/k8scodegen/fil
 	GOFLAGS='' bash $(codeGenerator) all \
 		github.com/nats-io/nack/pkg/jetstream/generated \
 		github.com/nats-io/nack/pkg/jetstream/apis \
-		"jetstream:v1" \
+		"jetstream:v1beta1" \
 		--go-header-file pkg/k8scodegen/file-header.txt
 	touch pkg/jetstream/generated
 

@@ -18,7 +18,7 @@ package fake
 import (
 	"context"
 
-	jetstreamv1 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1"
+	v1beta1 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -29,29 +29,29 @@ import (
 
 // FakeConsumers implements ConsumerInterface
 type FakeConsumers struct {
-	Fake *FakeJetstreamV1
+	Fake *FakeJetstreamV1beta1
 	ns   string
 }
 
-var consumersResource = schema.GroupVersionResource{Group: "jetstream.nats.io", Version: "v1", Resource: "consumers"}
+var consumersResource = schema.GroupVersionResource{Group: "jetstream.nats.io", Version: "v1beta1", Resource: "consumers"}
 
-var consumersKind = schema.GroupVersionKind{Group: "jetstream.nats.io", Version: "v1", Kind: "Consumer"}
+var consumersKind = schema.GroupVersionKind{Group: "jetstream.nats.io", Version: "v1beta1", Kind: "Consumer"}
 
 // Get takes name of the consumer, and returns the corresponding consumer object, and an error if there is any.
-func (c *FakeConsumers) Get(ctx context.Context, name string, options v1.GetOptions) (result *jetstreamv1.Consumer, err error) {
+func (c *FakeConsumers) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.Consumer, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(consumersResource, c.ns, name), &jetstreamv1.Consumer{})
+		Invokes(testing.NewGetAction(consumersResource, c.ns, name), &v1beta1.Consumer{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*jetstreamv1.Consumer), err
+	return obj.(*v1beta1.Consumer), err
 }
 
 // List takes label and field selectors, and returns the list of Consumers that match those selectors.
-func (c *FakeConsumers) List(ctx context.Context, opts v1.ListOptions) (result *jetstreamv1.ConsumerList, err error) {
+func (c *FakeConsumers) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.ConsumerList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(consumersResource, consumersKind, c.ns, opts), &jetstreamv1.ConsumerList{})
+		Invokes(testing.NewListAction(consumersResource, consumersKind, c.ns, opts), &v1beta1.ConsumerList{})
 
 	if obj == nil {
 		return nil, err
@@ -61,8 +61,8 @@ func (c *FakeConsumers) List(ctx context.Context, opts v1.ListOptions) (result *
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &jetstreamv1.ConsumerList{ListMeta: obj.(*jetstreamv1.ConsumerList).ListMeta}
-	for _, item := range obj.(*jetstreamv1.ConsumerList).Items {
+	list := &v1beta1.ConsumerList{ListMeta: obj.(*v1beta1.ConsumerList).ListMeta}
+	for _, item := range obj.(*v1beta1.ConsumerList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -78,43 +78,43 @@ func (c *FakeConsumers) Watch(ctx context.Context, opts v1.ListOptions) (watch.I
 }
 
 // Create takes the representation of a consumer and creates it.  Returns the server's representation of the consumer, and an error, if there is any.
-func (c *FakeConsumers) Create(ctx context.Context, consumer *jetstreamv1.Consumer, opts v1.CreateOptions) (result *jetstreamv1.Consumer, err error) {
+func (c *FakeConsumers) Create(ctx context.Context, consumer *v1beta1.Consumer, opts v1.CreateOptions) (result *v1beta1.Consumer, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(consumersResource, c.ns, consumer), &jetstreamv1.Consumer{})
+		Invokes(testing.NewCreateAction(consumersResource, c.ns, consumer), &v1beta1.Consumer{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*jetstreamv1.Consumer), err
+	return obj.(*v1beta1.Consumer), err
 }
 
 // Update takes the representation of a consumer and updates it. Returns the server's representation of the consumer, and an error, if there is any.
-func (c *FakeConsumers) Update(ctx context.Context, consumer *jetstreamv1.Consumer, opts v1.UpdateOptions) (result *jetstreamv1.Consumer, err error) {
+func (c *FakeConsumers) Update(ctx context.Context, consumer *v1beta1.Consumer, opts v1.UpdateOptions) (result *v1beta1.Consumer, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(consumersResource, c.ns, consumer), &jetstreamv1.Consumer{})
+		Invokes(testing.NewUpdateAction(consumersResource, c.ns, consumer), &v1beta1.Consumer{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*jetstreamv1.Consumer), err
+	return obj.(*v1beta1.Consumer), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeConsumers) UpdateStatus(ctx context.Context, consumer *jetstreamv1.Consumer, opts v1.UpdateOptions) (*jetstreamv1.Consumer, error) {
+func (c *FakeConsumers) UpdateStatus(ctx context.Context, consumer *v1beta1.Consumer, opts v1.UpdateOptions) (*v1beta1.Consumer, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(consumersResource, "status", c.ns, consumer), &jetstreamv1.Consumer{})
+		Invokes(testing.NewUpdateSubresourceAction(consumersResource, "status", c.ns, consumer), &v1beta1.Consumer{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*jetstreamv1.Consumer), err
+	return obj.(*v1beta1.Consumer), err
 }
 
 // Delete takes name of the consumer and deletes it. Returns an error if one occurs.
 func (c *FakeConsumers) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(consumersResource, c.ns, name), &jetstreamv1.Consumer{})
+		Invokes(testing.NewDeleteAction(consumersResource, c.ns, name), &v1beta1.Consumer{})
 
 	return err
 }
@@ -123,17 +123,17 @@ func (c *FakeConsumers) Delete(ctx context.Context, name string, opts v1.DeleteO
 func (c *FakeConsumers) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(consumersResource, c.ns, listOpts)
 
-	_, err := c.Fake.Invokes(action, &jetstreamv1.ConsumerList{})
+	_, err := c.Fake.Invokes(action, &v1beta1.ConsumerList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched consumer.
-func (c *FakeConsumers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *jetstreamv1.Consumer, err error) {
+func (c *FakeConsumers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.Consumer, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(consumersResource, c.ns, name, pt, data, subresources...), &jetstreamv1.Consumer{})
+		Invokes(testing.NewPatchSubresourceAction(consumersResource, c.ns, name, pt, data, subresources...), &v1beta1.Consumer{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*jetstreamv1.Consumer), err
+	return obj.(*v1beta1.Consumer), err
 }

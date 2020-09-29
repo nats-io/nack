@@ -18,7 +18,7 @@ package externalversions
 import (
 	"fmt"
 
-	v1 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1"
+	v1beta1 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta1"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
 )
@@ -49,13 +49,13 @@ func (f *genericInformer) Lister() cache.GenericLister {
 // TODO extend this to unknown resources with a client pool
 func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
-	// Group=jetstream.nats.io, Version=v1
-	case v1.SchemeGroupVersion.WithResource("consumers"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Jetstream().V1().Consumers().Informer()}, nil
-	case v1.SchemeGroupVersion.WithResource("streams"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Jetstream().V1().Streams().Informer()}, nil
-	case v1.SchemeGroupVersion.WithResource("streamtemplates"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Jetstream().V1().StreamTemplates().Informer()}, nil
+	// Group=jetstream.nats.io, Version=v1beta1
+	case v1beta1.SchemeGroupVersion.WithResource("consumers"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Jetstream().V1beta1().Consumers().Informer()}, nil
+	case v1beta1.SchemeGroupVersion.WithResource("streams"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Jetstream().V1beta1().Streams().Informer()}, nil
+	case v1beta1.SchemeGroupVersion.WithResource("streamtemplates"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Jetstream().V1beta1().StreamTemplates().Informer()}, nil
 
 	}
 

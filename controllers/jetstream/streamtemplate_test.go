@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	apis "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1"
+	apis "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta1"
 	clientsetfake "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/fake"
 
 	jsmapi "github.com/nats-io/jsm.go/api"
@@ -47,7 +47,7 @@ func TestProcessStreamTemplate(t *testing.T) {
 
 		ns, name := "default", "my-stream-template"
 
-		informer := ctrl.informerFactory.Jetstream().V1().StreamTemplates()
+		informer := ctrl.informerFactory.Jetstream().V1beta1().StreamTemplates()
 		err := informer.Informer().GetStore().Add(&apis.StreamTemplate{
 			ObjectMeta: k8smeta.ObjectMeta{
 				Namespace:  ns,
@@ -126,7 +126,7 @@ func TestProcessStreamTemplate(t *testing.T) {
 
 		ns, name := "default", "my-stream-template"
 
-		informer := ctrl.informerFactory.Jetstream().V1().StreamTemplates()
+		informer := ctrl.informerFactory.Jetstream().V1beta1().StreamTemplates()
 		err := informer.Informer().GetStore().Add(&apis.StreamTemplate{
 			ObjectMeta: k8smeta.ObjectMeta{
 				Namespace:  ns,
@@ -188,7 +188,7 @@ func TestProcessStreamTemplate(t *testing.T) {
 
 		ns, name := "default", "my-stream-template"
 
-		informer := ctrl.informerFactory.Jetstream().V1().StreamTemplates()
+		informer := ctrl.informerFactory.Jetstream().V1beta1().StreamTemplates()
 		err := informer.Informer().GetStore().Add(&apis.StreamTemplate{
 			ObjectMeta: k8smeta.ObjectMeta{
 				Namespace:  ns,
@@ -248,7 +248,7 @@ func TestProcessStreamTemplate(t *testing.T) {
 		ts := k8smeta.Unix(1600216923, 0)
 		ns, name := "default", "my-stream-template"
 
-		informer := ctrl.informerFactory.Jetstream().V1().StreamTemplates()
+		informer := ctrl.informerFactory.Jetstream().V1beta1().StreamTemplates()
 		err := informer.Informer().GetStore().Add(&apis.StreamTemplate{
 			ObjectMeta: k8smeta.ObjectMeta{
 				Namespace:         ns,
@@ -308,7 +308,7 @@ func TestProcessStreamTemplate(t *testing.T) {
 
 		ns, name := "default", "my-stream-template"
 
-		informer := ctrl.informerFactory.Jetstream().V1().StreamTemplates()
+		informer := ctrl.informerFactory.Jetstream().V1beta1().StreamTemplates()
 		err := informer.Informer().GetStore().Add(&apis.StreamTemplate{
 			ObjectMeta: k8smeta.ObjectMeta{
 				Namespace:  ns,

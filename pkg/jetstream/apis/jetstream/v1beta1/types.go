@@ -1,4 +1,4 @@
-package v1
+package v1beta1
 
 import (
 	k8sapi "k8s.io/api/core/v1"

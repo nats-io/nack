@@ -9,7 +9,7 @@ import (
 	"time"
 
 	jsmapi "github.com/nats-io/jsm.go/api"
-	apis "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1"
+	apis "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta1"
 
 	k8sapis "k8s.io/api/core/v1"
 	k8smeta "k8s.io/apimachinery/pkg/apis/meta/v1"
