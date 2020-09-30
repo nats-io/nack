@@ -40,7 +40,6 @@ spec:
                     type: string
                   key:
                     description: Key within secret containing ncreds.
-                    pattern: 'nats-.*'
                     type: string
               streamName:
                 description: The name of the Stream to create the Consumer in.

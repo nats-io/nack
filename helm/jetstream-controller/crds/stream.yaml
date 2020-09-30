@@ -40,7 +40,6 @@ spec:
                     type: string
                   key:
                     description: Key within secret containing ncreds.
-                    pattern: 'nats-.*'
                     type: string
               name:
                 description: A unique name for the Stream.
