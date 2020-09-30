@@ -2,7 +2,7 @@
 apiVersion: jetstream.nats.io/v1beta1
 kind: Consumer
 metadata:
-  name: myconsumer
+  name: my-pull-consumer
 spec:
   servers:
   - nats://localhost:4222
@@ -10,4 +10,8 @@ spec:
     name: myncreds
     key: nats-myusr
   streamName: mystream
-  durableName: myconsumer
+  durableName: my-pull-consumer
+  deliverPolicy: all
+  filterSubject: orders.received
+  maxDeliver: 20
+  ackPolicy: explicit
