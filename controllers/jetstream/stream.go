@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	jsm "github.com/nats-io/jsm.go"
 	jsmapi "github.com/nats-io/jsm.go/api"
 	apis "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta1"
 	typed "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/typed/jetstream/v1beta1"
@@ -171,30 +172,49 @@ func createStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 		return err
 	}
 
-	retention := getRetention(spec.Retention)
-	storage := getStorage(spec.Storage)
-	discard := getDiscard(spec.Discard)
-
 	duplicates, err := getDuplicates(spec.DuplicateWindow)
 	if err != nil {
 		return err
 	}
 
-	_, err = c.NewStream(ctx, jsmapi.StreamConfig{
-		Name:         spec.Name,
-		Retention:    retention,
-		Subjects:     spec.Subjects,
-		MaxConsumers: spec.MaxConsumers,
-		MaxMsgs:      int64(spec.MaxMsgs),
-		MaxBytes:     int64(spec.MaxBytes),
-		MaxAge:       maxAge,
-		MaxMsgSize:   int32(spec.MaxMsgSize),
-		Storage:      storage,
-		Discard:      discard,
-		Replicas:     spec.Replicas,
-		NoAck:        spec.NoAck,
-		Duplicates:   duplicates,
-	})
+	opts := []jsm.StreamOption{
+		jsm.Subjects(spec.Subjects...),
+		jsm.MaxConsumers(spec.MaxConsumers),
+		jsm.MaxMessageSize(int32(spec.MaxMsgSize)),
+		jsm.MaxMessages(int64(spec.MaxMsgs)),
+		jsm.Replicas(spec.Replicas),
+		jsm.DuplicateWindow(duplicates),
+		jsm.MaxAge(maxAge),
+	}
+
+	switch spec.Retention {
+	case "limits":
+		opts = append(opts, jsm.LimitsRetention())
+	case "interest":
+		opts = append(opts, jsm.InterestRetention())
+	case "workqueue":
+		opts = append(opts, jsm.WorkQueueRetention())
+	}
+
+	switch spec.Storage {
+	case "file":
+		opts = append(opts, jsm.MemoryStorage())
+	case "memory":
+		opts = append(opts, jsm.FileStorage())
+	}
+
+	switch spec.Discard {
+	case "old":
+		opts = append(opts, jsm.DiscardOld())
+	case "new":
+		opts = append(opts, jsm.DiscardNew())
+	}
+
+	if spec.NoAck {
+		opts = append(opts, jsm.NoAck())
+	}
+
+	_, err = c.NewStream(ctx, spec.Name, opts)
 	return err
 }
 

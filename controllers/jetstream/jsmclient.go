@@ -13,13 +13,13 @@ type jsmClient interface {
 	Close()
 
 	LoadStream(ctx context.Context, name string) (jsmStream, error)
-	NewStream(ctx context.Context, cnf jsmapi.StreamConfig) (jsmStream, error)
+	NewStream(ctx context.Context, name string, opts []jsm.StreamOption) (jsmStream, error)
 
 	LoadStreamTemplate(ctx context.Context, name string) (jsmDeleter, error)
 	NewStreamTemplate(ctx context.Context, cnf jsmapi.StreamTemplateConfig) (jsmDeleter, error)
 
 	LoadConsumer(ctx context.Context, stream, consumer string) (jsmDeleter, error)
-	NewConsumer(ctx context.Context, stream string, cnf jsmapi.ConsumerConfig) (jsmDeleter, error)
+	NewConsumer(ctx context.Context, stream string, opts []jsm.ConsumerOption) (jsmDeleter, error)
 }
 
 type jsmStream interface {
@@ -52,19 +52,9 @@ func (c *realJsmClient) LoadStream(ctx context.Context, name string) (jsmStream,
 	return jsm.LoadStream(name, jsm.WithConnection(c.nc), jsm.WithContext(ctx))
 }
 
-func (c *realJsmClient) NewStream(ctx context.Context, cnf jsmapi.StreamConfig) (jsmStream, error) {
-	opts := []jsm.StreamOption{
-		jsm.StreamConnection(jsm.WithConnection(c.nc), jsm.WithContext(ctx)),
-		jsm.Subjects(cnf.Subjects...),
-		jsm.MaxAge(cnf.MaxAge),
-	}
-	if cnf.Storage == jsmapi.FileStorage {
-		opts = append(opts, jsm.FileStorage())
-	} else if cnf.Storage == jsmapi.MemoryStorage {
-		opts = append(opts, jsm.MemoryStorage())
-	}
-
-	return jsm.NewStream(cnf.Name, opts...)
+func (c *realJsmClient) NewStream(ctx context.Context, name string, opts []jsm.StreamOption) (jsmStream, error) {
+	opts = append(opts, jsm.StreamConnection(jsm.WithConnection(c.nc), jsm.WithContext(ctx)))
+	return jsm.NewStream(name, opts...)
 }
 
 func (c *realJsmClient) LoadStreamTemplate(ctx context.Context, name string) (jsmDeleter, error) {
@@ -72,17 +62,7 @@ func (c *realJsmClient) LoadStreamTemplate(ctx context.Context, name string) (js
 }
 
 func (c *realJsmClient) NewStreamTemplate(ctx context.Context, cnf jsmapi.StreamTemplateConfig) (jsmDeleter, error) {
-	opts := []jsm.StreamOption{
-		jsm.StreamConnection(jsm.WithConnection(c.nc), jsm.WithContext(ctx)),
-		jsm.Subjects(cnf.Config.Subjects...),
-		jsm.MaxAge(cnf.Config.MaxAge),
-	}
-	if cnf.Config.Storage == jsmapi.FileStorage {
-		opts = append(opts, jsm.FileStorage())
-	} else if cnf.Config.Storage == jsmapi.MemoryStorage {
-		opts = append(opts, jsm.MemoryStorage())
-	}
-
+	opts := []jsm.StreamOption{jsm.StreamConnection(jsm.WithConnection(c.nc), jsm.WithContext(ctx))}
 	return jsm.NewStreamTemplate(cnf.Name, cnf.MaxStreams, *cnf.Config, opts...)
 }
 
@@ -90,12 +70,8 @@ func (c *realJsmClient) LoadConsumer(ctx context.Context, stream, consumer strin
 	return jsm.LoadConsumer(stream, consumer, jsm.WithConnection(c.nc), jsm.WithContext(ctx))
 }
 
-func (c *realJsmClient) NewConsumer(ctx context.Context, stream string, cnf jsmapi.ConsumerConfig) (jsmDeleter, error) {
-	opts := []jsm.ConsumerOption{
-		jsm.ConsumerConnection(jsm.WithConnection(c.nc), jsm.WithContext(ctx)),
-		jsm.DurableName(cnf.Durable),
-	}
-
+func (c *realJsmClient) NewConsumer(ctx context.Context, stream string, opts []jsm.ConsumerOption) (jsmDeleter, error) {
+	opts = append(opts, jsm.ConsumerConnection(jsm.WithConnection(c.nc), jsm.WithContext(ctx)))
 	return jsm.NewConsumer(stream, opts...)
 }
 
@@ -148,7 +124,7 @@ func (c *mockJsmClient) LoadStream(ctx context.Context, name string) (jsmStream,
 	return c.loadStream, c.loadStreamErr
 }
 
-func (c *mockJsmClient) NewStream(ctx context.Context, cnf jsmapi.StreamConfig) (jsmStream, error) {
+func (c *mockJsmClient) NewStream(ctx context.Context, name string, opt []jsm.StreamOption) (jsmStream, error) {
 	return c.newStream, c.newStreamErr
 }
 
@@ -164,6 +140,6 @@ func (c *mockJsmClient) LoadConsumer(ctx context.Context, stream, consumer strin
 	return c.loadConsumer, c.loadConsumerErr
 }
 
-func (c *mockJsmClient) NewConsumer(ctx context.Context, stream string, cnf jsmapi.ConsumerConfig) (jsmDeleter, error) {
+func (c *mockJsmClient) NewConsumer(ctx context.Context, stream string, opts []jsm.ConsumerOption) (jsmDeleter, error) {
 	return c.newConsumer, c.newConsumerErr
 }

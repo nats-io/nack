@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/nats-io/jsm.go"
 	jsmapi "github.com/nats-io/jsm.go/api"
 	apis "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta1"
 	typed "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/typed/jetstream/v1beta1"
@@ -141,60 +143,67 @@ func createConsumer(ctx context.Context, c jsmClient, spec apis.ConsumerSpec) (e
 		}
 	}()
 
-	var optStartTime *time.Time
-	deliverPolicy := jsmapi.DeliverAll
+	opts := []jsm.ConsumerOption{
+		jsm.DurableName(spec.DurableName),
+		jsm.DeliverySubject(spec.DeliverSubject),
+		jsm.FilterStreamBySubject(spec.FilterSubject),
+		jsm.RateLimitBitsPerSecond(uint64(spec.RateLimitBps)),
+	}
+
+	if spec.MaxDeliver != 0 {
+		opts = append(opts, jsm.MaxDeliveryAttempts(spec.MaxDeliver))
+	}
+
 	switch spec.DeliverPolicy {
+	case "all":
+		opts = append(opts, jsm.DeliverAllAvailable())
 	case "last":
-		deliverPolicy = jsmapi.DeliverLast
+		opts = append(opts, jsm.StartWithLastReceived())
 	case "new":
-		deliverPolicy = jsmapi.DeliverNew
+		opts = append(opts, jsm.StartWithNextReceived())
 	case "byStartSequence":
-		deliverPolicy = jsmapi.DeliverByStartSequence
+		opts = append(opts, jsm.StartAtSequence(uint64(spec.OptStartSeq)))
 	case "byStartTime":
-		deliverPolicy = jsmapi.DeliverByStartTime
 		t, err := time.Parse(spec.OptStartTime, time.RFC3339)
 		if err != nil {
 			return err
 		}
-		optStartTime = &t
+		opts = append(opts, jsm.StartAtTime(t))
 	}
 
-	ackPolicy := jsmapi.AckNone
 	switch spec.AckPolicy {
+	case "none":
+		opts = append(opts, jsm.AcknowledgeNone())
 	case "all":
-		ackPolicy = jsmapi.AckAll
+		opts = append(opts, jsm.AcknowledgeAll())
 	case "explicit":
-		ackPolicy = jsmapi.AckExplicit
+		opts = append(opts, jsm.AcknowledgeExplicit())
 	}
 
-	var ackWait time.Duration
 	if spec.AckWait != "" {
-		ackWait, err = time.ParseDuration(spec.AckWait)
+		d, err := time.ParseDuration(spec.AckWait)
 		if err != nil {
 			return err
 		}
+		opts = append(opts, jsm.AckWait(d))
 	}
 
-	replayPolicy := jsmapi.ReplayInstant
 	switch spec.ReplayPolicy {
+	case "instant":
+		opts = append(opts, jsm.ReplayInstantly())
 	case "original":
-		replayPolicy = jsmapi.ReplayOriginal
+		opts = append(opts, jsm.ReplayAsReceived())
 	}
 
-	_, err = c.NewConsumer(ctx, spec.StreamName, jsmapi.ConsumerConfig{
-		Durable:         spec.DurableName,
-		DeliverSubject:  spec.DeliverSubject,
-		DeliverPolicy:   deliverPolicy,
-		OptStartSeq:     uint64(spec.OptStartSeq),
-		OptStartTime:    optStartTime,
-		AckPolicy:       ackPolicy,
-		AckWait:         ackWait,
-		MaxDeliver:      spec.MaxDeliver,
-		FilterSubject:   spec.FilterSubject,
-		ReplayPolicy:    replayPolicy,
-		SampleFrequency: spec.SampleFreq,
-		RateLimit:       uint64(spec.RateLimitBps),
-	})
+	if spec.SampleFreq != "" {
+		n, err := strconv.Atoi(spec.SampleFreq)
+		if err != nil {
+			return err
+		}
+		opts = append(opts, jsm.SamplePercent(n))
+	}
+
+	_, err = c.NewConsumer(ctx, spec.StreamName, opts)
 	return err
 }
 
