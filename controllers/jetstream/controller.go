@@ -62,7 +62,9 @@ type Options struct {
 	KubeIface      kubernetes.Interface
 	JetstreamIface clientset.Interface
 
-	NATSClientName string
+	NATSClientName  string
+	NATSCredentials string
+	NATSServerURL   string
 
 	Recorder record.EventRecorder
 }
