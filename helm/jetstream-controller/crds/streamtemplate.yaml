@@ -25,22 +25,6 @@ spec:
           spec:
             type: object
             properties:
-              servers:
-                description: A list of Jetstream servers to connect to.
-                type: array
-                minLength: 1
-                items:
-                  type: string
-                  minLength: 1
-              credentialsSecret:
-                type: object
-                properties:
-                  name:
-                    description: Name of secret containing ncreds.
-                    type: string
-                  key:
-                    description: Key within secret containing ncreds.
-                    type: string
               name:
                 description: A unique name for the Stream Template.
                 type: string
