@@ -2,6 +2,7 @@ package jetstream
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -10,11 +11,9 @@ import (
 
 	jsmapi "github.com/nats-io/jsm.go/api"
 
-	k8sapis "k8s.io/api/core/v1"
 	k8smeta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	k8sclientsetfake "k8s.io/client-go/kubernetes/fake"
-	k8stypedfake "k8s.io/client-go/kubernetes/typed/core/v1/fake"
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 )
@@ -35,7 +34,7 @@ func TestProcessStreamTemplate(t *testing.T) {
 		t.Parallel()
 
 		jc := clientsetfake.NewSimpleClientset()
-		wantEvents := 4
+		wantEvents := 2
 		rec := record.NewFakeRecorder(wantEvents)
 		ctrl := NewController(Options{
 			Ctx:            context.Background(),
@@ -81,88 +80,6 @@ func TestProcessStreamTemplate(t *testing.T) {
 			t.Fatalf("got=%d; want=%d", got, wantEvents)
 		}
 
-		<-rec.Events
-		<-rec.Events
-		for i := 0; i < len(rec.Events); i++ {
-			gotEvent := <-rec.Events
-			if !strings.Contains(gotEvent, "Creat") {
-				t.Error("unexpected event")
-				t.Fatalf("got=%s; want=%s", gotEvent, "Creating/Created...")
-			}
-		}
-	})
-
-	t.Run("create stream template with credentials", func(t *testing.T) {
-		t.Parallel()
-
-		const secretName, secretKey = "mysecret", "nats-creds"
-		getSecret := func(a k8stesting.Action) (handled bool, o runtime.Object, err error) {
-			ga, ok := a.(k8stesting.GetAction)
-			if !ok {
-				return false, nil, nil
-			}
-			if ga.GetName() != secretName {
-				return false, nil, nil
-			}
-
-			return true, &k8sapis.Secret{
-				Data: map[string][]byte{
-					secretKey: []byte("... creds..."),
-				},
-			}, nil
-		}
-
-		jc := clientsetfake.NewSimpleClientset()
-		kc := k8sclientsetfake.NewSimpleClientset()
-		wantEvents := 4
-		rec := record.NewFakeRecorder(wantEvents)
-		ctrl := NewController(Options{
-			Ctx:            context.Background(),
-			KubeIface:      kc,
-			JetstreamIface: jc,
-			Recorder:       rec,
-		})
-
-		ns, name := "default", "my-stream-template"
-
-		informer := ctrl.informerFactory.Jetstream().V1beta1().StreamTemplates()
-		err := informer.Informer().GetStore().Add(&apis.StreamTemplate{
-			ObjectMeta: k8smeta.ObjectMeta{
-				Namespace:  ns,
-				Name:       name,
-				Generation: 1,
-			},
-			Spec: apis.StreamTemplateSpec{
-				StreamSpec: apis.StreamSpec{
-					Name:   name,
-					MaxAge: "1h",
-				},
-			},
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		jc.PrependReactor("update", "streamtemplates", updateObject)
-		kc.CoreV1().(*k8stypedfake.FakeCoreV1).PrependReactor("get", "secrets", getSecret)
-
-		notFoundErr := jsmapi.ApiError{Code: 404}
-		jsmc := &mockJsmClient{
-			loadStreamTemplateErr: notFoundErr,
-			newStreamTemplateErr:  nil,
-			newStreamTemplate:     &mockDeleter{},
-		}
-		if err := ctrl.processStreamTemplate(ns, name, jsmc); err != nil {
-			t.Fatal(err)
-		}
-
-		if got := len(rec.Events); got != wantEvents {
-			t.Error("unexpected number of events")
-			t.Fatalf("got=%d; want=%d", got, wantEvents)
-		}
-
-		<-rec.Events
-		<-rec.Events
 		for i := 0; i < len(rec.Events); i++ {
 			gotEvent := <-rec.Events
 			if !strings.Contains(gotEvent, "Creat") {
@@ -176,7 +93,7 @@ func TestProcessStreamTemplate(t *testing.T) {
 		t.Parallel()
 
 		jc := clientsetfake.NewSimpleClientset()
-		wantEvents := 3
+		wantEvents := 1
 		rec := record.NewFakeRecorder(wantEvents)
 		ctrl := NewController(Options{
 			Ctx:            context.Background(),
@@ -220,8 +137,6 @@ func TestProcessStreamTemplate(t *testing.T) {
 			t.Fatalf("got=%d; want=%d", got, wantEvents)
 		}
 
-		<-rec.Events
-		<-rec.Events
 		for i := 0; i < len(rec.Events); i++ {
 			gotEvent := <-rec.Events
 			if !strings.Contains(gotEvent, "Updating") {
@@ -235,7 +150,7 @@ func TestProcessStreamTemplate(t *testing.T) {
 		t.Parallel()
 
 		jc := clientsetfake.NewSimpleClientset()
-		wantEvents := 3
+		wantEvents := 1
 		rec := record.NewFakeRecorder(wantEvents)
 		ctrl := NewController(Options{
 			Ctx:            context.Background(),
@@ -281,8 +196,6 @@ func TestProcessStreamTemplate(t *testing.T) {
 			t.Fatalf("got=%d; want=%d", got, wantEvents)
 		}
 
-		<-rec.Events
-		<-rec.Events
 		for i := 0; i < len(rec.Events); i++ {
 			gotEvent := <-rec.Events
 			if !strings.Contains(gotEvent, "Deleting") {
@@ -350,11 +263,11 @@ func TestProcessStreamTemplate(t *testing.T) {
 			return true, obj, nil
 		})
 
-		// jsmc := &mockJsmClient{
-		// 	connectErr: errors.New("nats connect failed"),
-		// }
-		// if err := ctrl.processStreamTemplate(ns, name, jsmc); err == nil {
-		// 	t.Fatal("unexpected success")
-		// }
+		jsmc := &mockJsmClient{
+			loadStreamTemplateErr: errors.New("failed to load stream template"),
+		}
+		if err := ctrl.processStreamTemplate(ns, name, jsmc); err == nil {
+			t.Fatal("unexpected success")
+		}
 	})
 }
