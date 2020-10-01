@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/nats-io/jsm.go"
@@ -24,7 +23,7 @@ const (
 
 func (c *Controller) runConsumerQueue() {
 	for {
-		processQueueNext(c.cnsQueue, &realJsmClient{}, c.processConsumer)
+		processQueueNext(c.cnsQueue, &realJsmClient{c.nc}, c.processConsumer)
 	}
 }
 
@@ -54,22 +53,6 @@ func (c *Controller) processConsumer(ns, name string, jsmc jsmClient) (err error
 			err = fmt.Errorf("%s: %w", err, serr)
 		}
 	}()
-
-	creds, err := getCreds(c.ctx, spec.CredentialsSecret, c.ki.Secrets(ns))
-	if err != nil {
-		return err
-	}
-
-	c.normalEvent(cns, "Connecting", "Connecting to NATS Server")
-	err = jsmc.Connect(
-		strings.Join(spec.Servers, ","),
-		getNATSOptions(c.natsName, creds)...,
-	)
-	if err != nil {
-		return err
-	}
-	defer jsmc.Close()
-	c.normalEvent(cns, "Connected", "Connected to NATS Server")
 
 	deleteOK := cns.GetDeletionTimestamp() != nil
 	newGeneration := cns.Generation != cns.Status.ObservedGeneration

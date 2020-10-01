@@ -20,7 +20,6 @@ import (
 	"time"
 
 	jsmapi "github.com/nats-io/jsm.go/api"
-	"github.com/nats-io/jwt"
 	"github.com/nats-io/nats.go"
 
 	apis "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta1"
@@ -70,7 +69,9 @@ type Options struct {
 }
 
 type Controller struct {
-	ctx context.Context
+	ctx  context.Context
+	opts Options
+	nc   *nats.Conn
 
 	ki              k8styped.CoreV1Interface
 	ji              typed.JetstreamV1beta1Interface
@@ -138,14 +139,13 @@ func NewController(opt Options) *Controller {
 	))
 
 	return &Controller{
-		ctx: opt.Ctx,
+		ctx:  opt.Ctx,
+		opts: opt,
 
 		ki:              opt.KubeIface.CoreV1(),
 		ji:              ji,
 		informerFactory: informerFactory,
 		rec:             opt.Recorder,
-
-		natsName: opt.NATSClientName,
 
 		strLister: streamInformer.Lister(),
 		strSynced: streamInformer.Informer().HasSynced,
@@ -162,6 +162,25 @@ func NewController(opt Options) *Controller {
 }
 
 func (c *Controller) Run() error {
+	// Connect to NATS.
+	opts := make([]nats.Option, 0)
+
+	opts = append(opts, nats.Name(c.opts.NATSClientName))
+
+	// Use JWT/NKEYS based credentials if present.
+	if c.opts.NATSCredentials != "" {
+		opts = append(opts, nats.UserCredentials(c.opts.NATSCredentials))
+	}
+
+	// Always attempt to have a connection to NATS.
+	opts = append(opts, nats.MaxReconnects(-1))
+
+	nc, err := nats.Connect(c.opts.NATSServerURL, opts...)
+	if err != nil {
+		return err
+	}
+	c.nc = nc
+
 	defer utilruntime.HandleCrash()
 
 	defer c.strQueue.ShutDown()
@@ -185,6 +204,7 @@ func (c *Controller) Run() error {
 	go wait.Until(c.runConsumerQueue, time.Second, c.ctx.Done())
 
 	<-c.ctx.Done()
+
 	// Gracefully shutdown.
 	return nil
 }
@@ -232,44 +252,6 @@ func getStorageType(s string) (jsmapi.StorageType, error) {
 	}
 }
 
-func wipeSlice(buf []byte) {
-	for i := range buf {
-		buf[i] = 'x'
-	}
-}
-
-func getNATSOptions(connName string, creds []byte) []nats.Option {
-	userCB := func() (string, error) {
-		return jwt.ParseDecoratedJWT(creds)
-	}
-	sigCB := func(nonce []byte) ([]byte, error) {
-		defer wipeSlice(creds)
-		keys, err := jwt.ParseDecoratedNKey(creds)
-		if err != nil {
-			return nil, err
-		}
-		defer keys.Wipe()
-
-		sig, _ := keys.Sign(nonce)
-		return sig, nil
-	}
-
-	opts := []nats.Option{
-		nats.Name(connName),
-		nats.Option(func(o *nats.Options) error {
-			o.Pedantic = true
-			return nil
-
-		}),
-	}
-
-	if creds != nil {
-		opts = append(opts, nats.UserJWT(userCB, sigCB))
-	}
-
-	return opts
-}
-
 func addFinalizer(fs []string, key string) []string {
 	for _, f := range fs {
 		if f == key {
@@ -290,26 +272,6 @@ func removeFinalizer(fs []string, key string) []string {
 	}
 
 	return filtered
-}
-
-func getCreds(ctx context.Context, sec apis.CredentialsSecret, sif k8styped.SecretInterface) ([]byte, error) {
-	if sec.Name == "" || sec.Key == "" {
-		return nil, nil
-	}
-
-	return getSecret(ctx, sec.Name, sec.Key, sif)
-}
-
-func getSecret(ctx context.Context, name, key string, sif k8styped.SecretInterface) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	sec, err := sif.Get(ctx, name, k8smeta.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-
-	return sec.Data[key], nil
 }
 
 func enqueueWork(q workqueue.RateLimitingInterface, item interface{}) (err error) {

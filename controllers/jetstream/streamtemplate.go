@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	apis "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta1"
@@ -23,7 +22,7 @@ const (
 
 func (c *Controller) runStreamTemplateQueue() {
 	for {
-		processQueueNext(c.strTmplQueue, &realJsmClient{}, c.processStreamTemplate)
+		processQueueNext(c.strTmplQueue, &realJsmClient{c.nc}, c.processStreamTemplate)
 	}
 }
 
@@ -53,22 +52,6 @@ func (c *Controller) processStreamTemplate(ns, name string, jsmc jsmClient) (err
 			err = fmt.Errorf("%s: %w", err, serr)
 		}
 	}()
-
-	creds, err := getCreds(c.ctx, spec.CredentialsSecret, c.ki.Secrets(ns))
-	if err != nil {
-		return err
-	}
-
-	c.normalEvent(strTmpl, "Connecting", "Connecting to NATS Server")
-	err = jsmc.Connect(
-		strings.Join(spec.Servers, ","),
-		getNATSOptions(c.natsName, creds)...,
-	)
-	if err != nil {
-		return err
-	}
-	defer jsmc.Close()
-	c.normalEvent(strTmpl, "Connected", "Connected to NATS Server")
 
 	deleteOK := strTmpl.GetDeletionTimestamp() != nil
 	newGeneration := strTmpl.Generation != strTmpl.Status.ObservedGeneration
