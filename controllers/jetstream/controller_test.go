@@ -1,7 +1,6 @@
 package jetstream
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"reflect"
@@ -58,17 +57,6 @@ func TestGetStorageType(t *testing.T) {
 				t.Fatalf("got=%v; want=%v", got, c.wantType)
 			}
 		})
-	}
-}
-
-func TestWipeSlice(t *testing.T) {
-	t.Parallel()
-
-	bs := []byte("hello")
-	wipeSlice(bs)
-	if want := []byte("xxxxx"); !bytes.Equal(bs, want) {
-		t.Error("unexpected slice wipe")
-		t.Fatalf("got=%s; want=%s", bs, want)
 	}
 }
 

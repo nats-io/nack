@@ -2,7 +2,6 @@ package jetstream
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"testing"
 
@@ -351,11 +350,11 @@ func TestProcessStreamTemplate(t *testing.T) {
 			return true, obj, nil
 		})
 
-		jsmc := &mockJsmClient{
-			connectErr: errors.New("nats connect failed"),
-		}
-		if err := ctrl.processStreamTemplate(ns, name, jsmc); err == nil {
-			t.Fatal("unexpected success")
-		}
+		// jsmc := &mockJsmClient{
+		// 	connectErr: errors.New("nats connect failed"),
+		// }
+		// if err := ctrl.processStreamTemplate(ns, name, jsmc); err == nil {
+		// 	t.Fatal("unexpected success")
+		// }
 	})
 }
