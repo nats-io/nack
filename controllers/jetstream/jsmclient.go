@@ -45,7 +45,7 @@ func (c *realJsmClient) Connect(servers string, opts ...nats.Option) error {
 }
 
 func (c *realJsmClient) Close() {
-	c.nc.Close()
+	c.nc.Drain()
 }
 
 func (c *realJsmClient) LoadStream(ctx context.Context, name string) (jsmStream, error) {

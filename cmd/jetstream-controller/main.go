@@ -15,6 +15,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -37,7 +38,8 @@ var (
 
 func main() {
 	if err := run(); err != nil {
-		klog.Fatal(err)
+		fmt.Fprintf(os.Stderr, "Error: %s\n", err)
+		os.Exit(1)
 	}
 }
 
@@ -45,11 +47,17 @@ func run() error {
 	klog.InitFlags(nil)
 	kubeConfig := flag.String("kubeconfig", "", "Path to kubeconfig")
 	version := flag.Bool("version", false, "Print the version and exit")
+	creds := flag.String("creds", "", "NATS Credentials")
+	server := flag.String("s", "", "NATS Server URL") // required
 	flag.Parse()
 
 	if *version {
 		fmt.Printf("%s version %s, built %s\n", os.Args[0], Version, BuildTime)
 		return nil
+	}
+
+	if *server == "" {
+		return errors.New("NATS Server URL is required")
 	}
 
 	if *kubeConfig == "" {
@@ -77,10 +85,11 @@ func run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ctrl := jetstream.NewController(jetstream.Options{
-		Ctx: ctx,
-
-		KubeIface:      kc,
-		JetstreamIface: jc,
+		Ctx:             ctx,
+		NATSCredentials: *creds,
+		NATSServerURL:   *server,
+		KubeIface:       kc,
+		JetstreamIface:  jc,
 	})
 
 	klog.Infof("Starting %s %s...", os.Args[0], Version)
