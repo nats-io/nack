@@ -4,11 +4,6 @@ kind: Stream
 metadata:
   name: mystream
 spec:
-  servers:
-  - nats://localhost:4222
-  credentialsSecret:
-    name: myncreds
-    key: nats-myusr
   name: mystream
   subjects: ["orders.*"]
   storage: memory

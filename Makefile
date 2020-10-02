@@ -7,7 +7,7 @@ jetstreamGenOut := pkg/jetstream/generated pkg/jetstream/apis/jetstream/v1beta1/
 jetstreamGenIn:= $(shell grep -l -R -F "// +" pkg/jetstream/apis | grep -v "zz_generated.deepcopy.go")
 jetstreamSrc := $(shell find cmd/jetstream-controller pkg/jetstream controllers/jetstream -name "*.go")
 
-jetstreamTag := connecteverything/jetstream-controller:1.0.0
+jetstreamTag := connecteverything/jetstream-controller:0.1.0
 
 now := $(shell date -u +%Y-%m-%dT%H:%M:%S%z)
 
@@ -45,7 +45,7 @@ build: jetstream-controller
 
 .PHONY: jetstream-controller-docker
 jetstream-controller-docker:
-	sudo docker build --tag $(jetstreamTag) \
+	docker build --tag $(jetstreamTag) \
 		--file docker/jetstream-controller/Dockerfile .
 
 .PHONY: test

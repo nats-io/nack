@@ -1,33 +1,55 @@
 <img width="800" alt="nack-large" src="https://user-images.githubusercontent.com/26195/92535603-71ad9a80-f1ec-11ea-8959-cdc22b31b84a.png">
 
-NATS Controllers for Kubernetes (NACK)
+[![License][License-Image]][License-Url]
+[![Version](https://d25lcipzij17d.cloudfront.net/badge.svg?id=go&type=5&v=0.1.0)](https://github.com/nats-io/nack/releases/tag/v0.1.0)
 
-## Jetstream Controller
+[License-Url]: https://www.apache.org/licenses/LICENSE-2.0
+[License-Image]: https://img.shields.io/badge/License-Apache2-blue.svg
 
-### Usage Walkthrough
+[NATS](https://nats.io) Controllers for Kubernetes (NACK)
 
-First, we'll need to install the Jetstream Controller with Helm.
+## JetStream Controller
+
+The JetStream controllers allows you to manage [NATS JetStream](https://github.com/nats-io/jetstream) [Streams](https://github.com/nats-io/jetstream#streams-1) and [Consumers](https://github.com/nats-io/jetstream#consumers-1) via K8S CRDs.
+
+### Getting started
+
+First, we'll need to NATS cluster that has enabled JetStream.  You can install one as follows:
 
 ```sh
-# First, install with Helm.
-$ helm install myjsc ./helm/jetstream-controller
+# Creates cluster of NATS Servers that are not JetStream enabled
+$ kubectl apply -f https://raw.githubusercontent.com/nats-io/k8s/master/nats-server/simple-nats.yml
 
-# This is how you uninstall, if you need to.
-# helm uninstall myjsc
+# Creates NATS Server with JetStream enabled as a leafnode connection
+$ kubectl apply -f https://raw.githubusercontent.com/nats-io/k8s/master/nats-server/nats-js-leaf.yml
+```
+
+Now install the JetStream CRDs and Controller:
+
+```sh
+$ kubectl apply -f deploy/crds.yml
+customresourcedefinition.apiextensions.k8s.io/streams.jetstream.nats.io configured
+customresourcedefinition.apiextensions.k8s.io/consumers.jetstream.nats.io configured
+customresourcedefinition.apiextensions.k8s.io/streamtemplates.jetstream.nats.io configured
+
+$ kubectl apply -f deploy/rbac.yml
+$ kubectl apply -f deploy/deployment.yml
 ```
 
 Now we can create some Streams and Consumers.
 
 ```sh
 # Create a stream.
-$ kubectl apply -f examples/stream.yaml
+$ kubectl apply -f deploy/examples/stream.yml
+
 # Check if it was successfully created.
 $ kubectl get streams
 NAME       STATE     STREAM NAME   SUBJECTS
 mystream   Created   mystream      [orders.*]
 
 # Create two consumers, one push-based, and the other pull-based.
-$ kubectl apply -f examples/consumer_push.yaml -f examples/consumer_pull.yaml
+$ kubectl apply -f deploy/examples/consumer_push.yml -f deploy/examples/consumer_pull.yml
+
 # Check if they were successfully created.
 $ kubectl get consumers
 NAME               STATE     STREAM     CONSUMER           ACK POLICY
@@ -43,13 +65,26 @@ Now we're ready to use Streams and Consumers. Let's start off with writing some
 data into `mystream`.
 
 ```sh
+# Run nats-box that includes the NATS management utilities.
+$ kubectl apply -f https://nats-io.github.io/k8s/tools/nats-box.yml
+$ kubectl exec -it nats-box -- /bin/sh -l
+
+# Publish a couple of messages
+$ nats context save jetstream -s nats://nats:4222
+$ nats context select jetstream
+
 $ nats pub orders.received "order 1"
 $ nats pub orders.received "order 2"
 ```
 
-First, we'll read the data using a pull-based consumer. In `consumer_pull.yaml`
-we set `filterSubject: orders.received`, so that's the subject
-`my-pull-consumer` will pull messages from.
+First, we'll read the data using a pull-based consumer. In `consumer_pull.yml`
+we set:
+
+```yaml
+filterSubject: orders.received
+```
+
+so that's the subject my-pull-consumer` will pull messages from.
 
 ```sh
 # Pull first message.
@@ -69,11 +104,15 @@ order 2
 Acknowledged message
 ```
 
-Next, let's read data using a push-based consumer. In `consumer_push.yaml` we
-set `deliverSubject: my-push-consumer.orders`, so pushed messages will arrive
-on that subject. This time all messages arrive automatically.
+Next, let's read data using a push-based consumer. In `consumer_push.yml` we set:
 
+```yaml
+deliverSubject: my-push-consumer.orders
 ```
+
+so pushed messages will arrive on that subject. This time all messages arrive automatically.
+
+```sh
 $ nats sub my-push-consumer.orders
 17:57:24 Subscribing on my-push-consumer.orders
 [#1] Received JetStream message: consumer: mystream > my-push-consumer / subject: orders.received /
@@ -90,10 +129,9 @@ order 2
 ```sh
 # First, build the jetstream controller.
 make jetstream-controller
+
 # Next, run the controller like this
-./jetstream-controller -kubeconfig ~/.kube/config
-# or this.
-KUBECONFIG=~/.kube/config ./jetstream-controller
+./jetstream-controller -kubeconfig ~/.kube/config -s nats://localhost:4222
 
 # Pro tip: jetstream-controller uses klog just like kubectl or kube-apiserver.
 # This means you can change the verbosity of logs with the -v flag.
@@ -101,18 +139,7 @@ KUBECONFIG=~/.kube/config ./jetstream-controller
 # For example, this prints raw HTTP requests and responses.
 #     ./jetstream-controller -v=10
 
-
-# You can install the YAML like this
-kubectl apply -f helm/jetstream-controller/crds/stream.yaml
-# And uninstall like this.
-kubectl delete -f helm/jetstream-controller/crds/stream.yaml
-
-
 # You'll probably want to start a local Jetstream-enabled NATS server, unless
 # you use a public one.
 nats-server -DV -js
-
-
-# Finally, create an example stream.
-kubectl apply -f examples/stream.yaml
 ```
