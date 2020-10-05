@@ -60,23 +60,27 @@ func run() error {
 		return errors.New("NATS Server URL is required")
 	}
 
+	var config *rest.Config
+	var err error
 	if *kubeConfig == "" {
-		flag.Set("kubeconfig", os.Getenv("KUBECONFIG"))
-	}
-
-	config, err := clientcmd.BuildConfigFromFlags("", *kubeConfig)
-	if err != nil {
-		var cerr error
-		config, cerr = rest.InClusterConfig()
-		if cerr != nil {
-			return fmt.Errorf("%s: %w", err, cerr)
+		config, err = rest.InClusterConfig()
+		if err != nil {
+			return err
+		}
+	} else {
+		config, err = clientcmd.BuildConfigFromFlags("", *kubeConfig)
+		if err != nil {
+			return err
 		}
 	}
 
+	// K8S API Client.
 	kc, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		return err
 	}
+
+	// JetStream CRDs client.
 	jc, err := clientset.NewForConfig(config)
 	if err != nil {
 		return err
@@ -84,7 +88,10 @@ func run() error {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
 	ctrl := jetstream.NewController(jetstream.Options{
+		// FIXME: Move context to be param from Run
+		// to avoid keeping state in options.
 		Ctx:             ctx,
 		NATSCredentials: *creds,
 		NATSServerURL:   *server,

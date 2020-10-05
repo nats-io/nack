@@ -1,4 +1,10 @@
 ---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: jetstream-controller
+  namespace: default
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -14,18 +20,14 @@ rules:
   - update
   - patch
 - apiGroups:
-  - ''
-  resources:
-  - secrets
-  verbs:
-  - get
-  - watch
-  - list
-- apiGroups:
   - jetstream.nats.io
   resources:
   - streams
   - streams/status
+  - consumers
+  - consumers/status
+  - streamtemplates
+  - streamtemplates/status
   verbs:
   - create
   - get
@@ -34,14 +36,6 @@ rules:
   - patch
   - update
   - delete
-
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: jetstream-controller-service-account
-  namespace: default
-
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -50,7 +44,7 @@ metadata:
   namespace: default
 subjects:
 - kind: ServiceAccount
-  name: jetstream-controller-service-account
+  name: jetstream-controller
   namespace: default
 roleRef:
   kind: ClusterRole

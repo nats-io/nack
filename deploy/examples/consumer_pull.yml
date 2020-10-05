@@ -4,11 +4,6 @@ kind: Consumer
 metadata:
   name: my-pull-consumer
 spec:
-  servers:
-  - nats://localhost:4222
-  credentialsSecret:
-    name: myncreds
-    key: nats-myusr
   streamName: mystream
   durableName: my-pull-consumer
   deliverPolicy: all
