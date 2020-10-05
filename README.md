@@ -27,28 +27,31 @@ $ kubectl apply -f https://raw.githubusercontent.com/nats-io/k8s/master/nats-ser
 Now install the JetStream CRDs and Controller:
 
 ```sh
-$ kubectl apply -f deploy/crds.yml
+$ kubectl apply -f https://raw.githubusercontent.com/nats-io/nack/main/deploy/crds.yml
 customresourcedefinition.apiextensions.k8s.io/streams.jetstream.nats.io configured
 customresourcedefinition.apiextensions.k8s.io/consumers.jetstream.nats.io configured
 customresourcedefinition.apiextensions.k8s.io/streamtemplates.jetstream.nats.io configured
 
-$ kubectl apply -f deploy/rbac.yml
-$ kubectl apply -f deploy/deployment.yml
+$ kubectl apply -f https://raw.githubusercontent.com/nats-io/nack/main/deploy/rbac.yml
+$ kubectl apply -f https://raw.githubusercontent.com/nats-io/nack/main/deploy/deployment.yml
 ```
 
 Now we can create some Streams and Consumers.
 
 ```sh
 # Create a stream.
-$ kubectl apply -f deploy/examples/stream.yml
+$ kubectl apply -f https://raw.githubusercontent.com/nats-io/nack/main/deploy/examples/stream.yml
 
 # Check if it was successfully created.
 $ kubectl get streams
 NAME       STATE     STREAM NAME   SUBJECTS
 mystream   Created   mystream      [orders.*]
 
-# Create two consumers, one push-based, and the other pull-based.
-$ kubectl apply -f deploy/examples/consumer_push.yml -f deploy/examples/consumer_pull.yml
+# Create a push-based consumer
+$ kubectl apply -f https://raw.githubusercontent.com/nats-io/nack/main/deploy/examples/consumer_push.yml
+
+# Create a pull based consumer
+$ kubectl apply -f https://raw.githubusercontent.com/nats-io/nack/main/deploy/examples/consumer_pull.yml
 
 # Check if they were successfully created.
 $ kubectl get consumers
