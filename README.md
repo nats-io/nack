@@ -36,7 +36,46 @@ $ kubectl apply -f https://raw.githubusercontent.com/nats-io/nack/main/deploy/rb
 $ kubectl apply -f https://raw.githubusercontent.com/nats-io/nack/main/deploy/deployment.yml
 ```
 
-Now we can create some Streams and Consumers.
+#### Creating Streams and Consumers
+
+Let's create a a stream and a couple of consumers:
+
+```yaml
+---
+apiVersion: jetstream.nats.io/v1beta1
+kind: Stream
+metadata:
+  name: mystream
+spec:
+  name: mystream
+  subjects: ["orders.*"]
+  storage: memory
+  maxAge: 1h
+---
+apiVersion: jetstream.nats.io/v1beta1
+kind: Consumer
+metadata:
+  name: my-push-consumer
+spec:
+  streamName: mystream
+  durableName: my-push-consumer
+  deliverSubject: my-push-consumer.orders
+  deliverPolicy: last
+  ackPolicy: none
+  replayPolicy: instant
+---
+apiVersion: jetstream.nats.io/v1beta1
+kind: Consumer
+metadata:
+  name: my-pull-consumer
+spec:
+  streamName: mystream
+  durableName: my-pull-consumer
+  deliverPolicy: all
+  filterSubject: orders.received
+  maxDeliver: 20
+  ackPolicy: explicit
+```
 
 ```sh
 # Create a stream.
