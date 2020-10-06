@@ -107,30 +107,33 @@ Now we're ready to use Streams and Consumers. Let's start off with writing some
 data into `mystream`.
 
 ```sh
-# Run nats-box that includes the NATS management utilities.
+# Run nats-box that includes the NATS management utilities, and exec into it.
 $ kubectl apply -f https://nats-io.github.io/k8s/tools/nats-box.yml
 $ kubectl exec -it nats-box -- /bin/sh -l
 
-# Publish a couple of messages
-$ nats context save jetstream -s nats://nats:4222
-$ nats context select jetstream
+# Publish a couple of messages from nats-box
+nats-box:~$ nats context save jetstream -s nats://nats:4222
+nats-box:~$ nats context select jetstream
 
-$ nats pub orders.received "order 1"
-$ nats pub orders.received "order 2"
+nats-box:~$ nats pub orders.received "order 1"
+nats-box:~$ nats pub orders.received "order 2"
 ```
 
-First, we'll read the data using a pull-based consumer. In `consumer_pull.yml`
-we set:
+First, we'll read the data using a pull-based consumer. 
 
-```yaml
-filterSubject: orders.received
+From the above `my-pull-consumer` Consumer CRD, we have set the filterSubject 
+of `orders.received`. You can double check with the following command:
+
+```sh
+$ kubectl get consumer my-pull-consumer -o jsonpath={.spec.filterSubject}
+orders.received
 ```
 
-so that's the subject my-pull-consumer` will pull messages from.
+So that's the subject my-pull-consumer will pull messages from.
 
 ```sh
 # Pull first message.
-$ nats consumer next mystream my-pull-consumer
+nats-box:~$ nats consumer next mystream my-pull-consumer
 --- subject: orders.received / delivered: 1 / stream seq: 1 / consumer seq: 1
 
 order 1
@@ -138,7 +141,7 @@ order 1
 Acknowledged message
 
 # Pull next message.
-$ nats consumer next mystream my-pull-consumer
+nats-box:~$ nats consumer next mystream my-pull-consumer
 --- subject: orders.received / delivered: 1 / stream seq: 2 / consumer seq: 2
 
 order 2
@@ -146,16 +149,20 @@ order 2
 Acknowledged message
 ```
 
-Next, let's read data using a push-based consumer. In `consumer_push.yml` we set:
+Next, let's read data using a push-based consumer.
+
+From the above `my-push-consumer` Consumer CRD, we have set the deliverSubject
+of `my-push-consumer.orders`, as you can confirm with the following command:
 
 ```yaml
-deliverSubject: my-push-consumer.orders
+$ kubectl get consumer my-push-consumer -o jsonpath={.spec.deliverSubject}
+my-push-consumer.orders
 ```
 
-so pushed messages will arrive on that subject. This time all messages arrive automatically.
+So pushed messages will arrive on that subject. This time all messages arrive automatically.
 
 ```sh
-$ nats sub my-push-consumer.orders
+nats-box:~$ nats sub my-push-consumer.orders
 17:57:24 Subscribing on my-push-consumer.orders
 [#1] Received JetStream message: consumer: mystream > my-push-consumer / subject: orders.received /
 delivered: 1 / consumer seq: 1 / stream seq: 1 / ack: false
