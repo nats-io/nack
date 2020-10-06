@@ -154,7 +154,7 @@ Next, let's read data using a push-based consumer.
 From the above `my-push-consumer` Consumer CRD, we have set the deliverSubject
 of `my-push-consumer.orders`, as you can confirm with the following command:
 
-```yaml
+```sh
 $ kubectl get consumer my-push-consumer -o jsonpath={.spec.deliverSubject}
 my-push-consumer.orders
 ```
