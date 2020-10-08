@@ -36,6 +36,16 @@ $ kubectl apply -f https://raw.githubusercontent.com/nats-io/nack/main/deploy/rb
 $ kubectl apply -f https://raw.githubusercontent.com/nats-io/nack/main/deploy/deployment.yml
 ```
 
+#### Installing with Helm
+
+You can also use Helm to install:
+
+```
+helm repo add nats https://nats-io.github.io/k8s/helm/charts/
+helm install nats nats/nats --set nats.image=synadia/nats-server:nightly --set=nats.jetstream.enabled=true
+helm install nack nats/nack --set=jetstream.nats.url=nats://nats:4222
+```
+
 #### Creating Streams and Consumers
 
 Let's create a a stream and a couple of consumers:
