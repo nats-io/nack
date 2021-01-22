@@ -64,3 +64,8 @@ type StreamTemplateInfo struct {
 	Config  *StreamTemplateConfig `json:"config"`
 	Streams []string              `json:"streams"`
 }
+
+// io.nats.jetstream.api.v1.stream_template_create_request
+type JSApiStreamTemplateCreateRequest struct {
+	StreamTemplateConfig
+}

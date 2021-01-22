@@ -52,24 +52,19 @@ var DefaultWorkQueue = api.StreamConfig{
 var DefaultStreamConfiguration = DefaultStream
 
 // StreamOption configures a stream
-type StreamOption func(o *StreamConfig) error
+type StreamOption func(o *api.StreamConfig) error
 
 // Stream represents a JetStream Stream
 type Stream struct {
-	cfg      *StreamConfig
+	cfg      *api.StreamConfig
 	lastInfo *api.StreamInfo
+	mgr      *Manager
+
 	sync.Mutex
 }
 
-type StreamConfig struct {
-	api.StreamConfig
-
-	conn  *reqoptions
-	ropts []RequestOption
-}
-
 // NewStreamFromDefault creates a new stream based on a supplied template and options
-func NewStreamFromDefault(name string, dflt api.StreamConfig, opts ...StreamOption) (stream *Stream, err error) {
+func (m *Manager) NewStreamFromDefault(name string, dflt api.StreamConfig, opts ...StreamOption) (stream *Stream, err error) {
 	if !IsValidName(name) {
 		return nil, fmt.Errorf("%q is not a valid stream name", name)
 	}
@@ -81,24 +76,22 @@ func NewStreamFromDefault(name string, dflt api.StreamConfig, opts ...StreamOpti
 
 	cfg.Name = name
 
-	valid, errs := cfg.Validate()
+	valid, errs := cfg.Validate(m.validator)
 	if !valid {
 		return nil, fmt.Errorf("configuration validation failed: %s", strings.Join(errs, ", "))
 	}
 
 	var resp api.JSApiStreamCreateResponse
-	err = jsonRequest(fmt.Sprintf(api.JSApiStreamCreateT, name), &cfg, &resp, cfg.conn)
+	err = m.jsonRequest(fmt.Sprintf(api.JSApiStreamCreateT, name), &cfg, &resp)
 	if err != nil {
 		return nil, err
 	}
 
-	cfg.StreamConfig = resp.Config
-
-	return streamFromConfig(cfg, resp.StreamInfo), nil
+	return m.streamFromConfig(&resp.Config, resp.StreamInfo), nil
 }
 
-func streamFromConfig(cfg *StreamConfig, info *api.StreamInfo) (stream *Stream) {
-	s := &Stream{cfg: cfg}
+func (m *Manager) streamFromConfig(cfg *api.StreamConfig, info *api.StreamInfo) (stream *Stream) {
+	s := &Stream{cfg: cfg, mgr: m}
 	if info != nil {
 		s.lastInfo = info
 	}
@@ -107,52 +100,44 @@ func streamFromConfig(cfg *StreamConfig, info *api.StreamInfo) (stream *Stream) 
 }
 
 // LoadOrNewStreamFromDefault loads an existing stream or creates a new one matching opts and template
-func LoadOrNewStreamFromDefault(name string, dflt api.StreamConfig, opts ...StreamOption) (stream *Stream, err error) {
+func (m *Manager) LoadOrNewStreamFromDefault(name string, dflt api.StreamConfig, opts ...StreamOption) (stream *Stream, err error) {
 	if !IsValidName(name) {
 		return nil, fmt.Errorf("%q is not a valid stream name", name)
 	}
 
-	cfg, err := NewStreamConfiguration(DefaultStream, opts...)
-	if err != nil {
-		return nil, err
+	for _, o := range opts {
+		o(&dflt)
 	}
-
-	s, err := LoadStream(name, cfg.ropts...)
+	s, err := m.LoadStream(name)
 	if s == nil || err != nil {
-		return NewStreamFromDefault(name, dflt, opts...)
+		return m.NewStreamFromDefault(name, dflt)
 	}
 
 	return s, err
 }
 
 // NewStream creates a new stream using DefaultStream as a starting template allowing adjustments to be made using options
-func NewStream(name string, opts ...StreamOption) (stream *Stream, err error) {
-	return NewStreamFromDefault(name, DefaultStream, opts...)
+func (m *Manager) NewStream(name string, opts ...StreamOption) (stream *Stream, err error) {
+	return m.NewStreamFromDefault(name, DefaultStream, opts...)
 }
 
 // LoadOrNewStreamFromDefault loads an existing stream or creates a new one matching opts
-func LoadOrNewStream(name string, opts ...StreamOption) (stream *Stream, err error) {
-	return LoadOrNewStreamFromDefault(name, DefaultStream, opts...)
+func (m *Manager) LoadOrNewStream(name string, opts ...StreamOption) (stream *Stream, err error) {
+	return m.LoadOrNewStreamFromDefault(name, DefaultStream, opts...)
 }
 
 // LoadStream loads a stream by name
-func LoadStream(name string, opts ...RequestOption) (stream *Stream, err error) {
+func (m *Manager) LoadStream(name string) (stream *Stream, err error) {
 	if !IsValidName(name) {
 		return nil, fmt.Errorf("%q is not a valid stream name", name)
 	}
 
-	conn, err := newreqoptions(opts...)
-	if err != nil {
-		return nil, err
+	stream = &Stream{
+		mgr: m,
+		cfg: &api.StreamConfig{Name: name},
 	}
 
-	stream = &Stream{cfg: &StreamConfig{
-		StreamConfig: api.StreamConfig{Name: name},
-		conn:         conn,
-		ropts:        opts,
-	}}
-
-	err = loadConfigForStream(stream)
+	err = m.loadConfigForStream(stream)
 	if err != nil {
 		return nil, err
 	}
@@ -161,11 +146,13 @@ func LoadStream(name string, opts ...RequestOption) (stream *Stream, err error) 
 }
 
 // NewStreamConfiguration generates a new configuration based on template modified by opts
-func NewStreamConfiguration(template api.StreamConfig, opts ...StreamOption) (*StreamConfig, error) {
-	cfg := &StreamConfig{
-		StreamConfig: template,
-		conn:         dfltreqoptions(),
-	}
+func (m *Manager) NewStreamConfiguration(template api.StreamConfig, opts ...StreamOption) (*api.StreamConfig, error) {
+	return NewStreamConfiguration(template, opts...)
+}
+
+// NewStreamConfiguration generates a new configuration based on template modified by opts
+func NewStreamConfiguration(template api.StreamConfig, opts ...StreamOption) (*api.StreamConfig, error) {
+	cfg := &template
 
 	for _, o := range opts {
 		err := o(cfg)
@@ -177,23 +164,23 @@ func NewStreamConfiguration(template api.StreamConfig, opts ...StreamOption) (*S
 	return cfg, nil
 }
 
-func loadConfigForStream(stream *Stream) (err error) {
-	info, err := loadStreamInfo(stream.cfg.Name, stream.cfg.conn)
+func (m *Manager) loadConfigForStream(stream *Stream) (err error) {
+	info, err := m.loadStreamInfo(stream.cfg.Name)
 	if err != nil {
 		return err
 	}
 
 	stream.Lock()
-	stream.cfg.StreamConfig = info.Config
+	stream.cfg = &info.Config
 	stream.lastInfo = info
 	stream.Unlock()
 
 	return nil
 }
 
-func loadStreamInfo(stream string, conn *reqoptions) (info *api.StreamInfo, err error) {
+func (m *Manager) loadStreamInfo(stream string) (info *api.StreamInfo, err error) {
 	var resp api.JSApiStreamInfoResponse
-	err = jsonRequest(fmt.Sprintf(api.JSApiStreamInfoT, stream), nil, &resp, conn)
+	err = m.jsonRequest(fmt.Sprintf(api.JSApiStreamInfoT, stream), nil, &resp)
 	if err != nil {
 		return nil, err
 	}
@@ -202,127 +189,127 @@ func loadStreamInfo(stream string, conn *reqoptions) (info *api.StreamInfo, err 
 }
 
 func Subjects(s ...string) StreamOption {
-	return func(o *StreamConfig) error {
-		o.StreamConfig.Subjects = s
+	return func(o *api.StreamConfig) error {
+		o.Subjects = s
 		return nil
 	}
 }
 
 func LimitsRetention() StreamOption {
-	return func(o *StreamConfig) error {
-		o.StreamConfig.Retention = api.LimitsPolicy
+	return func(o *api.StreamConfig) error {
+		o.Retention = api.LimitsPolicy
 		return nil
 	}
 }
 
 func InterestRetention() StreamOption {
-	return func(o *StreamConfig) error {
-		o.StreamConfig.Retention = api.InterestPolicy
+	return func(o *api.StreamConfig) error {
+		o.Retention = api.InterestPolicy
 		return nil
 	}
 }
 
 func WorkQueueRetention() StreamOption {
-	return func(o *StreamConfig) error {
-		o.StreamConfig.Retention = api.WorkQueuePolicy
+	return func(o *api.StreamConfig) error {
+		o.Retention = api.WorkQueuePolicy
 		return nil
 	}
 }
 
 func MaxConsumers(m int) StreamOption {
-	return func(o *StreamConfig) error {
-		o.StreamConfig.MaxConsumers = m
+	return func(o *api.StreamConfig) error {
+		o.MaxConsumers = m
 		return nil
 	}
 }
 
 func MaxMessages(m int64) StreamOption {
-	return func(o *StreamConfig) error {
-		o.StreamConfig.MaxMsgs = m
+	return func(o *api.StreamConfig) error {
+		o.MaxMsgs = m
 		return nil
 	}
 }
 
 func MaxBytes(m int64) StreamOption {
-	return func(o *StreamConfig) error {
-		o.StreamConfig.MaxBytes = m
+	return func(o *api.StreamConfig) error {
+		o.MaxBytes = m
 		return nil
 	}
 }
 
 func MaxAge(m time.Duration) StreamOption {
-	return func(o *StreamConfig) error {
-		o.StreamConfig.MaxAge = m
+	return func(o *api.StreamConfig) error {
+		o.MaxAge = m
 		return nil
 	}
 }
 
 func MaxMessageSize(m int32) StreamOption {
-	return func(o *StreamConfig) error {
-		o.StreamConfig.MaxMsgSize = m
+	return func(o *api.StreamConfig) error {
+		o.MaxMsgSize = m
 		return nil
 	}
 }
 
 func FileStorage() StreamOption {
-	return func(o *StreamConfig) error {
-		o.StreamConfig.Storage = api.FileStorage
+	return func(o *api.StreamConfig) error {
+		o.Storage = api.FileStorage
 		return nil
 	}
 }
 
 func MemoryStorage() StreamOption {
-	return func(o *StreamConfig) error {
-		o.StreamConfig.Storage = api.MemoryStorage
+	return func(o *api.StreamConfig) error {
+		o.Storage = api.MemoryStorage
 		return nil
 	}
 }
 
 func Replicas(r int) StreamOption {
-	return func(o *StreamConfig) error {
-		o.StreamConfig.Replicas = r
+	return func(o *api.StreamConfig) error {
+		o.Replicas = r
 		return nil
 	}
 }
 
 func NoAck() StreamOption {
-	return func(o *StreamConfig) error {
-		o.StreamConfig.NoAck = true
+	return func(o *api.StreamConfig) error {
+		o.NoAck = true
 		return nil
 	}
 }
 
 func DiscardNew() StreamOption {
-	return func(o *StreamConfig) error {
+	return func(o *api.StreamConfig) error {
 		o.Discard = api.DiscardNew
 		return nil
 	}
 }
 
 func DiscardOld() StreamOption {
-	return func(o *StreamConfig) error {
+	return func(o *api.StreamConfig) error {
 		o.Discard = api.DiscardOld
 		return nil
 	}
 }
 
 func DuplicateWindow(d time.Duration) StreamOption {
-	return func(o *StreamConfig) error {
+	return func(o *api.StreamConfig) error {
 		o.Duplicates = d
 		return nil
 	}
 }
 
-func StreamConnection(opts ...RequestOption) StreamOption {
-	return func(o *StreamConfig) error {
-		for _, opt := range opts {
-			opt(o.conn)
-		}
-
-		o.ropts = append(o.ropts, opts...)
-
-		return nil
+// PageContents creates a StreamPager used to traverse the contents of the stream,
+// Close() should be called to dispose of the background consumer and resources
+func (s *Stream) PageContents(opts ...PagerOption) (*StreamPager, error) {
+	pgr := &StreamPager{}
+	err := pgr.start(s.Name(), s.mgr, opts...)
+	if err != nil {
+		return nil, err
 	}
+
+	return pgr, err
 }
 
 // UpdateConfiguration updates the stream using cfg modified by opts, reloads configuration from the server post update
@@ -333,7 +320,7 @@ func (s *Stream) UpdateConfiguration(cfg api.StreamConfig, opts ...StreamOption)
 	}
 
 	var resp api.JSApiStreamUpdateResponse
-	err = jsonRequest(fmt.Sprintf(api.JSApiStreamUpdateT, s.Name()), ncfg, &resp, s.cfg.conn)
+	err = s.mgr.jsonRequest(fmt.Sprintf(api.JSApiStreamUpdateT, s.Name()), ncfg, &resp)
 	if err != nil {
 		return err
 	}
@@ -343,47 +330,42 @@ func (s *Stream) UpdateConfiguration(cfg api.StreamConfig, opts ...StreamOption)
 
 // Reset reloads the Stream configuration from the JetStream server
 func (s *Stream) Reset() error {
-	return loadConfigForStream(s)
+	return s.mgr.loadConfigForStream(s)
 }
 
 // LoadConsumer loads a named consumer related to this Stream
 func (s *Stream) LoadConsumer(name string) (*Consumer, error) {
-	return LoadConsumer(s.cfg.Name, name, s.cfg.ropts...)
-}
-
-// pass our connection info into the descendant consumers but allows opts to override it
-func (s *Stream) consumerOpts(opts ...ConsumerOption) []ConsumerOption {
-	return append([]ConsumerOption{ConsumerConnection(s.cfg.ropts...)}, opts...)
+	return s.mgr.LoadConsumer(s.cfg.Name, name)
 }
 
 // NewConsumer creates a new consumer in this Stream based on DefaultConsumer
 func (s *Stream) NewConsumer(opts ...ConsumerOption) (consumer *Consumer, err error) {
-	return NewConsumer(s.Name(), s.consumerOpts(opts...)...)
+	return s.mgr.NewConsumer(s.Name(), opts...)
 }
 
 // LoadOrNewConsumer loads or creates a consumer based on these options
 func (s *Stream) LoadOrNewConsumer(name string, opts ...ConsumerOption) (consumer *Consumer, err error) {
-	return LoadOrNewConsumer(s.Name(), name, s.consumerOpts(opts...)...)
+	return s.mgr.LoadOrNewConsumer(s.Name(), name, opts...)
 }
 
 // NewConsumerFromDefault creates a new consumer in this Stream based on a supplied template config
 func (s *Stream) NewConsumerFromDefault(dflt api.ConsumerConfig, opts ...ConsumerOption) (consumer *Consumer, err error) {
-	return NewConsumerFromDefault(s.Name(), dflt, s.consumerOpts(opts...)...)
+	return s.mgr.NewConsumerFromDefault(s.Name(), dflt, opts...)
 }
 
 // LoadOrNewConsumer loads or creates a consumer based on these options that adjust supplied template
 func (s *Stream) LoadOrNewConsumerFromDefault(name string, deflt api.ConsumerConfig, opts ...ConsumerOption) (consumer *Consumer, err error) {
-	return LoadOrNewConsumerFromDefault(s.Name(), name, deflt, s.consumerOpts(opts...)...)
+	return s.mgr.LoadOrNewConsumerFromDefault(s.Name(), name, deflt, opts...)
 }
 
 // ConsumerNames is a list of all known consumers for this Stream
 func (s *Stream) ConsumerNames() (names []string, err error) {
-	return ConsumerNames(s.Name())
+	return s.mgr.ConsumerNames(s.Name())
 }
 
 // EachConsumer calls cb with each known consumer for this stream, error on any error to load consumers
 func (s *Stream) EachConsumer(cb func(consumer *Consumer)) error {
-	consumers, err := Consumers(s.Name())
+	consumers, err := s.mgr.Consumers(s.Name())
 	if err != nil {
 		return err
 	}
@@ -410,7 +392,7 @@ func (s *Stream) LatestInformation() (info *api.StreamInfo, err error) {
 
 // Information loads the current stream information
 func (s *Stream) Information() (info *api.StreamInfo, err error) {
-	info, err = loadStreamInfo(s.Name(), s.cfg.conn)
+	info, err = s.mgr.loadStreamInfo(s.Name())
 	if err != nil {
 		return nil, err
 	}
@@ -434,7 +416,7 @@ func (s *Stream) LatestState() (state api.StreamState, err error) {
 
 // State retrieves the Stream State
 func (s *Stream) State() (stats api.StreamState, err error) {
-	info, err := loadStreamInfo(s.Name(), s.cfg.conn)
+	info, err := s.mgr.loadStreamInfo(s.Name())
 	if err != nil {
 		return stats, err
 	}
@@ -449,7 +431,7 @@ func (s *Stream) State() (stats api.StreamState, err error) {
 // Delete deletes the Stream, after this the Stream object should be disposed
 func (s *Stream) Delete() error {
 	var resp api.JSApiStreamDeleteResponse
-	err := jsonRequest(fmt.Sprintf(api.JSApiStreamDeleteT, s.Name()), nil, &resp, s.cfg.conn)
+	err := s.mgr.jsonRequest(fmt.Sprintf(api.JSApiStreamDeleteT, s.Name()), nil, &resp)
 	if err != nil {
 		return err
 	}
@@ -464,7 +446,7 @@ func (s *Stream) Delete() error {
 // Purge deletes all messages from the Stream
 func (s *Stream) Purge() error {
 	var resp api.JSApiStreamPurgeResponse
-	err := jsonRequest(fmt.Sprintf(api.JSApiStreamPurgeT, s.Name()), nil, &resp, s.cfg.conn)
+	err := s.mgr.jsonRequest(fmt.Sprintf(api.JSApiStreamPurgeT, s.Name()), nil, &resp)
 	if err != nil {
 		return err
 	}
@@ -479,7 +461,7 @@ func (s *Stream) Purge() error {
 // ReadMessage loads a message from the stream by its sequence number
 func (s *Stream) ReadMessage(seq int) (msg *api.StoredMsg, err error) {
 	var resp api.JSApiMsgGetResponse
-	err = jsonRequest(fmt.Sprintf(api.JSApiMsgGetT, s.Name()), api.JSApiMsgGetRequest{Seq: uint64(seq)}, &resp, s.cfg.conn)
+	err = s.mgr.jsonRequest(fmt.Sprintf(api.JSApiMsgGetT, s.Name()), api.JSApiMsgGetRequest{Seq: uint64(seq)}, &resp)
 	if err != nil {
 		return nil, err
 	}
@@ -490,7 +472,7 @@ func (s *Stream) ReadMessage(seq int) (msg *api.StoredMsg, err error) {
 // DeleteMessage deletes a specific message from the Stream by overwriting it with random data
 func (s *Stream) DeleteMessage(seq int) (err error) {
 	var resp api.JSApiMsgDeleteResponse
-	err = jsonRequest(fmt.Sprintf(api.JSApiMsgDeleteT, s.Name()), api.JSApiMsgDeleteRequest{Seq: uint64(seq)}, &resp, s.cfg.conn)
+	err = s.mgr.jsonRequest(fmt.Sprintf(api.JSApiMsgDeleteT, s.Name()), api.JSApiMsgDeleteRequest{Seq: uint64(seq)}, &resp)
 	if err != nil {
 		return err
 	}
@@ -516,7 +498,7 @@ func (s *Stream) MetricSubject() string {
 // IsTemplateManaged determines if this stream is managed by a template
 func (s *Stream) IsTemplateManaged() bool { return s.Template() != "" }
 
-func (s *Stream) Configuration() api.StreamConfig { return s.cfg.StreamConfig }
+func (s *Stream) Configuration() api.StreamConfig { return *s.cfg }
 func (s *Stream) Name() string                    { return s.cfg.Name }
 func (s *Stream) Subjects() []string              { return s.cfg.Subjects }
 func (s *Stream) Retention() api.RetentionPolicy  { return s.cfg.Retention }

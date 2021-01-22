@@ -1,6 +1,7 @@
 package metric
 
 import (
+	"net/http"
 	"time"
 
 	"github.com/nats-io/jsm.go/api/event"
@@ -17,6 +18,7 @@ type ServiceLatencyV1 struct {
 	Error          string          `json:"description,omitempty"`
 	Requestor      LatencyClientV1 `json:"requestor,omitempty"`
 	Responder      LatencyClientV1 `json:"responder,omitempty"`
+	RequestHeader  http.Header     `json:"header,omitempty"`
 	RequestStart   time.Time       `json:"start"`
 	ServiceLatency time.Duration   `json:"service"`
 	SystemLatency  time.Duration   `json:"system"`

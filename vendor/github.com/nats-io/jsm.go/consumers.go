@@ -14,6 +14,8 @@
 package jsm
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -42,24 +44,18 @@ var SampledDefaultConsumer = api.ConsumerConfig{
 }
 
 // ConsumerOptions configures consumers
-type ConsumerOption func(o *ConsumerCfg) error
+type ConsumerOption func(o *api.ConsumerConfig) error
 
 // Consumer represents a JetStream consumer
 type Consumer struct {
 	name   string
 	stream string
-	cfg    *ConsumerCfg
-}
-
-type ConsumerCfg struct {
-	api.ConsumerConfig
-
-	conn  *reqoptions
-	ropts []RequestOption
+	cfg    *api.ConsumerConfig
+	mgr    *Manager
 }
 
 // NewConsumerFromDefault creates a new consumer based on a template config that gets modified by opts
-func NewConsumerFromDefault(stream string, dflt api.ConsumerConfig, opts ...ConsumerOption) (consumer *Consumer, err error) {
+func (m *Manager) NewConsumerFromDefault(stream string, dflt api.ConsumerConfig, opts ...ConsumerOption) (consumer *Consumer, err error) {
 	if !IsValidName(stream) {
 		return nil, fmt.Errorf("%q is not a valid stream name", stream)
 	}
@@ -76,16 +72,16 @@ func NewConsumerFromDefault(stream string, dflt api.ConsumerConfig, opts ...Cons
 
 	req := api.JSApiConsumerCreateRequest{
 		Stream: stream,
-		Config: cfg.ConsumerConfig,
+		Config: *cfg,
 	}
 
 	var createdInfo *api.ConsumerInfo
 
 	switch req.Config.Durable {
 	case "":
-		createdInfo, err = createEphemeralConsumer(req, cfg.conn)
+		createdInfo, err = m.createEphemeralConsumer(req)
 	default:
-		createdInfo, err = createDurableConsumer(req, cfg.conn)
+		createdInfo, err = m.createDurableConsumer(req)
 	}
 	if err != nil {
 		return nil, err
@@ -96,12 +92,12 @@ func NewConsumerFromDefault(stream string, dflt api.ConsumerConfig, opts ...Cons
 	}
 
 	// TODO: we have the info, avoid this round trip
-	return LoadConsumer(stream, createdInfo.Name, cfg.ropts...)
+	return m.LoadConsumer(stream, createdInfo.Name)
 }
 
-func createDurableConsumer(req api.JSApiConsumerCreateRequest, opts *reqoptions) (info *api.ConsumerInfo, err error) {
+func (m *Manager) createDurableConsumer(req api.JSApiConsumerCreateRequest) (info *api.ConsumerInfo, err error) {
 	var resp api.JSApiConsumerCreateResponse
-	err = jsonRequest(fmt.Sprintf(api.JSApiDurableCreateT, req.Stream, req.Config.Durable), req, &resp, opts)
+	err = m.jsonRequest(fmt.Sprintf(api.JSApiDurableCreateT, req.Stream, req.Config.Durable), req, &resp)
 	if err != nil {
 		return nil, err
 	}
@@ -109,9 +105,9 @@ func createDurableConsumer(req api.JSApiConsumerCreateRequest, opts *reqoptions)
 	return resp.ConsumerInfo, nil
 }
 
-func createEphemeralConsumer(req api.JSApiConsumerCreateRequest, opts *reqoptions) (info *api.ConsumerInfo, err error) {
+func (m *Manager) createEphemeralConsumer(req api.JSApiConsumerCreateRequest) (info *api.ConsumerInfo, err error) {
 	var resp api.JSApiConsumerCreateResponse
-	err = jsonRequest(fmt.Sprintf(api.JSApiConsumerCreateT, req.Stream), req, &resp, opts)
+	err = m.jsonRequest(fmt.Sprintf(api.JSApiConsumerCreateT, req.Stream), req, &resp)
 	if err != nil {
 		return nil, err
 	}
@@ -120,21 +116,21 @@ func createEphemeralConsumer(req api.JSApiConsumerCreateRequest, opts *reqoption
 }
 
 // NewConsumer creates a consumer based on DefaultConsumer modified by opts
-func NewConsumer(stream string, opts ...ConsumerOption) (consumer *Consumer, err error) {
+func (m *Manager) NewConsumer(stream string, opts ...ConsumerOption) (consumer *Consumer, err error) {
 	if !IsValidName(stream) {
 		return nil, fmt.Errorf("%q is not a valid stream name", stream)
 	}
 
-	return NewConsumerFromDefault(stream, DefaultConsumer, opts...)
+	return m.NewConsumerFromDefault(stream, DefaultConsumer, opts...)
 }
 
 // LoadOrNewConsumer loads a consumer by name if known else creates a new one with these properties
-func LoadOrNewConsumer(stream string, name string, opts ...ConsumerOption) (consumer *Consumer, err error) {
-	return LoadOrNewConsumerFromDefault(stream, name, DefaultConsumer, opts...)
+func (m *Manager) LoadOrNewConsumer(stream string, name string, opts ...ConsumerOption) (consumer *Consumer, err error) {
+	return m.LoadOrNewConsumerFromDefault(stream, name, DefaultConsumer, opts...)
 }
 
 // LoadOrNewConsumerFromDefault loads a consumer by name if known else creates a new one with these properties based on template
-func LoadOrNewConsumerFromDefault(stream string, name string, template api.ConsumerConfig, opts ...ConsumerOption) (consumer *Consumer, err error) {
+func (m *Manager) LoadOrNewConsumerFromDefault(stream string, name string, template api.ConsumerConfig, opts ...ConsumerOption) (consumer *Consumer, err error) {
 	if !IsValidName(stream) {
 		return nil, fmt.Errorf("%q is not a valid stream name", stream)
 	}
@@ -143,21 +139,16 @@ func LoadOrNewConsumerFromDefault(stream string, name string, template api.Consu
 		return nil, fmt.Errorf("%q is not a valid consumer name", name)
 	}
 
-	cfg, err := NewConsumerConfiguration(template, opts...)
-	if err != nil {
-		return nil, err
-	}
-
-	c, err := LoadConsumer(stream, name, cfg.ropts...)
+	c, err := m.LoadConsumer(stream, name)
 	if c == nil || err != nil {
-		return NewConsumerFromDefault(stream, template, opts...)
+		return m.NewConsumerFromDefault(stream, template, opts...)
 	}
 
 	return c, err
 }
 
 // LoadConsumer loads a consumer by name
-func LoadConsumer(stream string, name string, opts ...RequestOption) (consumer *Consumer, err error) {
+func (m *Manager) LoadConsumer(stream string, name string) (consumer *Consumer, err error) {
 	if !IsValidName(stream) {
 		return nil, fmt.Errorf("%q is not a valid stream name", stream)
 	}
@@ -166,14 +157,9 @@ func LoadConsumer(stream string, name string, opts ...RequestOption) (consumer *
 		return nil, fmt.Errorf("%q is not a valid consumer name", name)
 	}
 
-	conn, err := newreqoptions(opts...)
-	if err != nil {
-		return nil, err
-	}
+	consumer = m.consumerFromCfg(stream, name, &api.ConsumerConfig{})
 
-	consumer = consumerFromCfg(stream, name, &ConsumerCfg{ConsumerConfig: api.ConsumerConfig{}, conn: conn, ropts: opts})
-
-	err = loadConfigForConsumer(consumer, conn)
+	err = m.loadConfigForConsumer(consumer)
 	if err != nil {
 		return nil, err
 	}
@@ -181,45 +167,43 @@ func LoadConsumer(stream string, name string, opts ...RequestOption) (consumer *
 	return consumer, nil
 }
 
-func consumerFromCfg(stream string, name string, cfg *ConsumerCfg) *Consumer {
+func (m *Manager) consumerFromCfg(stream string, name string, cfg *api.ConsumerConfig) *Consumer {
 	return &Consumer{
 		name:   name,
 		stream: stream,
 		cfg:    cfg,
+		mgr:    m,
 	}
 }
 
 // NewConsumerConfiguration generates a new configuration based on template modified by opts
-func NewConsumerConfiguration(dflt api.ConsumerConfig, opts ...ConsumerOption) (*ConsumerCfg, error) {
-	cfg := &ConsumerCfg{
-		ConsumerConfig: dflt,
-		conn:           dfltreqoptions(),
-	}
+func NewConsumerConfiguration(dflt api.ConsumerConfig, opts ...ConsumerOption) (*api.ConsumerConfig, error) {
+	cfg := dflt
 
 	for _, o := range opts {
-		err := o(cfg)
+		err := o(&cfg)
 		if err != nil {
-			return cfg, err
+			return nil, err
 		}
 	}
 
-	return cfg, nil
+	return &cfg, nil
 }
 
-func loadConfigForConsumer(consumer *Consumer, opts *reqoptions) (err error) {
-	info, err := loadConsumerInfo(consumer.stream, consumer.name, opts)
+func (m *Manager) loadConfigForConsumer(consumer *Consumer) (err error) {
+	info, err := m.loadConsumerInfo(consumer.stream, consumer.name)
 	if err != nil {
 		return err
 	}
 
-	consumer.cfg.ConsumerConfig = info.Config
+	consumer.cfg = &info.Config
 
 	return nil
 }
 
-func loadConsumerInfo(s string, c string, opts *reqoptions) (info api.ConsumerInfo, err error) {
+func (m *Manager) loadConsumerInfo(s string, c string) (info api.ConsumerInfo, err error) {
 	var resp api.JSApiConsumerInfoResponse
-	err = jsonRequest(fmt.Sprintf(api.JSApiConsumerInfoT, s, c), nil, &resp, opts)
+	err = m.jsonRequest(fmt.Sprintf(api.JSApiConsumerInfoT, s, c), nil, &resp)
 	if err != nil {
 		return info, err
 	}
@@ -227,187 +211,194 @@ func loadConsumerInfo(s string, c string, opts *reqoptions) (info api.ConsumerIn
 	return *resp.ConsumerInfo, nil
 }
 
+// DeliverySubject is the subject where a Push consumer will deliver its messages
 func DeliverySubject(s string) ConsumerOption {
-	return func(o *ConsumerCfg) error {
-		o.ConsumerConfig.DeliverSubject = s
+	return func(o *api.ConsumerConfig) error {
+		o.DeliverSubject = s
 		return nil
 	}
 }
 
+// DurableName is the name given to the consumer, when not set an ephemeral consumer is created
 func DurableName(s string) ConsumerOption {
-	return func(o *ConsumerCfg) error {
+	return func(o *api.ConsumerConfig) error {
 		if !IsValidName(s) {
 			return fmt.Errorf("%q is not a valid consumer name", s)
 		}
 
-		o.ConsumerConfig.Durable = s
+		o.Durable = s
 		return nil
 	}
 }
 
+// StartAtSequence starts consuming messages at a specific sequence in the stream
 func StartAtSequence(s uint64) ConsumerOption {
-	return func(o *ConsumerCfg) error {
+	return func(o *api.ConsumerConfig) error {
 		resetDeliverPolicy(o)
-		o.ConsumerConfig.DeliverPolicy = api.DeliverByStartSequence
-		o.ConsumerConfig.OptStartSeq = s
+		o.DeliverPolicy = api.DeliverByStartSequence
+		o.OptStartSeq = s
 		return nil
 	}
 }
 
+// StartAtTime starts consuming messages at a specific point in time in the stream
 func StartAtTime(t time.Time) ConsumerOption {
-	return func(o *ConsumerCfg) error {
+	return func(o *api.ConsumerConfig) error {
 		resetDeliverPolicy(o)
-		o.ConsumerConfig.DeliverPolicy = api.DeliverByStartTime
-		o.ConsumerConfig.OptStartTime = &t
+		o.DeliverPolicy = api.DeliverByStartTime
+		o.OptStartTime = &t
 		return nil
 	}
 }
 
+// DeliverAllAvailable delivers messages starting with the first available in the stream
 func DeliverAllAvailable() ConsumerOption {
-	return func(o *ConsumerCfg) error {
+	return func(o *api.ConsumerConfig) error {
 		resetDeliverPolicy(o)
-		o.ConsumerConfig.DeliverPolicy = api.DeliverAll
+		o.DeliverPolicy = api.DeliverAll
 		return nil
 	}
 }
 
+// StartWithLastReceived starts delivery at the last messages received in the stream
 func StartWithLastReceived() ConsumerOption {
-	return func(o *ConsumerCfg) error {
+	return func(o *api.ConsumerConfig) error {
 		resetDeliverPolicy(o)
-		o.ConsumerConfig.DeliverPolicy = api.DeliverLast
+		o.DeliverPolicy = api.DeliverLast
 		return nil
 	}
 }
 
+// StartWithNextReceived starts delivery at the next messages received in the stream
 func StartWithNextReceived() ConsumerOption {
-	return func(o *ConsumerCfg) error {
+	return func(o *api.ConsumerConfig) error {
 		resetDeliverPolicy(o)
-		o.ConsumerConfig.DeliverPolicy = api.DeliverNew
+		o.DeliverPolicy = api.DeliverNew
 		return nil
 	}
 }
 
+// StartAtTimeDelta starts delivering messages at a past point in time
 func StartAtTimeDelta(d time.Duration) ConsumerOption {
-	return func(o *ConsumerCfg) error {
+	return func(o *api.ConsumerConfig) error {
 		resetDeliverPolicy(o)
 
 		t := time.Now().Add(-1 * d)
-		o.ConsumerConfig.DeliverPolicy = api.DeliverByStartTime
-		o.ConsumerConfig.OptStartTime = &t
+		o.DeliverPolicy = api.DeliverByStartTime
+		o.OptStartTime = &t
 		return nil
 	}
 }
 
-func resetDeliverPolicy(o *ConsumerCfg) {
-	o.ConsumerConfig.DeliverPolicy = api.DeliverAll
-	o.ConsumerConfig.OptStartSeq = 0
-	o.ConsumerConfig.OptStartTime = nil
+func resetDeliverPolicy(o *api.ConsumerConfig) {
+	o.DeliverPolicy = api.DeliverAll
+	o.OptStartSeq = 0
+	o.OptStartTime = nil
 }
 
+// AcknowledgeNone disables message acknowledgement
 func AcknowledgeNone() ConsumerOption {
-	return func(o *ConsumerCfg) error {
-		o.ConsumerConfig.AckPolicy = api.AckNone
+	return func(o *api.ConsumerConfig) error {
+		o.AckPolicy = api.AckNone
 		return nil
 	}
 }
 
+// AcknowledgeAll enables an acknowledgement mode where acknowledging message 100 will also ack the preceding messages
 func AcknowledgeAll() ConsumerOption {
-	return func(o *ConsumerCfg) error {
-		o.ConsumerConfig.AckPolicy = api.AckAll
+	return func(o *api.ConsumerConfig) error {
+		o.AckPolicy = api.AckAll
 		return nil
 	}
 }
 
+// AcknowledgeExplicit requires that every message received be acknowledged
 func AcknowledgeExplicit() ConsumerOption {
-	return func(o *ConsumerCfg) error {
-		o.ConsumerConfig.AckPolicy = api.AckExplicit
+	return func(o *api.ConsumerConfig) error {
+		o.AckPolicy = api.AckExplicit
 		return nil
 	}
 }
 
+// AckWait sets the time a delivered message might remain unacknowledged before redelivery is attempted
 func AckWait(t time.Duration) ConsumerOption {
-	return func(o *ConsumerCfg) error {
-		o.ConsumerConfig.AckWait = t
+	return func(o *api.ConsumerConfig) error {
+		o.AckWait = t
 		return nil
 	}
 }
 
+// MaxDeliveryAttempts is the number of times a message will be attempted to be delivered
 func MaxDeliveryAttempts(n int) ConsumerOption {
-	return func(o *ConsumerCfg) error {
+	return func(o *api.ConsumerConfig) error {
 		if n == 0 {
 			return fmt.Errorf("configuration would prevent all deliveries")
 		}
-		o.ConsumerConfig.MaxDeliver = n
+		o.MaxDeliver = n
 		return nil
 	}
 }
 
+// FilterStreamBySubject filters the messages in a wildcard stream to those matching a specific subject
 func FilterStreamBySubject(s string) ConsumerOption {
-	return func(o *ConsumerCfg) error {
-		o.ConsumerConfig.FilterSubject = s
+	return func(o *api.ConsumerConfig) error {
+		o.FilterSubject = s
 		return nil
 	}
 }
 
+// ReplayInstantly delivers messages to the consumer as fast as possible
 func ReplayInstantly() ConsumerOption {
-	return func(o *ConsumerCfg) error {
-		o.ConsumerConfig.ReplayPolicy = api.ReplayInstant
+	return func(o *api.ConsumerConfig) error {
+		o.ReplayPolicy = api.ReplayInstant
 		return nil
 	}
 }
 
+// ReplayAsReceived delivers messages at the rate they were received at
 func ReplayAsReceived() ConsumerOption {
-	return func(o *ConsumerCfg) error {
-		o.ConsumerConfig.ReplayPolicy = api.ReplayOriginal
+	return func(o *api.ConsumerConfig) error {
+		o.ReplayPolicy = api.ReplayOriginal
 		return nil
 	}
 }
 
+// SamplePercent configures sampling of a subset of messages expressed as a percentage
 func SamplePercent(i int) ConsumerOption {
-	return func(o *ConsumerCfg) error {
+	return func(o *api.ConsumerConfig) error {
 		if i < 0 || i > 100 {
 			return fmt.Errorf("sample percent must be 0-100")
 		}
 
 		if i == 0 {
-			o.ConsumerConfig.SampleFrequency = ""
+			o.SampleFrequency = ""
 			return nil
 		}
 
-		o.ConsumerConfig.SampleFrequency = fmt.Sprintf("%d%%", i)
+		o.SampleFrequency = fmt.Sprintf("%d%%", i)
 		return nil
 	}
 }
 
+// RateLimitBitsPerSecond limits message delivery to a rate in bits per second
 func RateLimitBitsPerSecond(bps uint64) ConsumerOption {
-	return func(o *ConsumerCfg) error {
-		o.ConsumerConfig.RateLimit = bps
+	return func(o *api.ConsumerConfig) error {
+		o.RateLimit = bps
 		return nil
 	}
 }
 
-func ConsumerConnection(opts ...RequestOption) ConsumerOption {
-	return func(o *ConsumerCfg) error {
-		for _, opt := range opts {
-			opt(o.conn)
-		}
-
-		o.ropts = append(o.ropts, opts...)
-
+// MaxAckPending maximum number of messages without acknowledgement that can be outstanding, once this limit is reached message delivery will be suspended
+func MaxAckPending(pending uint) ConsumerOption {
+	return func(o *api.ConsumerConfig) error {
+		o.MaxAckPending = int(pending)
 		return nil
 	}
 }
 
 // Reset reloads the Consumer configuration from the JetStream server
-func (c *Consumer) Reset(opts ...RequestOption) error {
-	ropts, err := newreqoptions(opts...)
-	if err != nil {
-		if err != nil {
-			return err
-		}
-	}
-
-	return loadConfigForConsumer(c, ropts)
+func (c *Consumer) Reset() error {
+	return c.mgr.loadConfigForConsumer(c)
 }
 
 // NextSubject returns the subject used to retrieve the next message for pull-based Consumers, empty when not a pull-base consumer
@@ -452,98 +443,68 @@ func (c *Consumer) MetricSubject() string {
 	return api.JSMetricPrefix + ".CONSUMER.*." + c.StreamName() + "." + c.name
 }
 
-// Subscribe see nats.Subscribe
-// Deprecated: use core nats feature
-func (c *Consumer) Subscribe(h func(*nats.Msg)) (sub *nats.Subscription, err error) {
-	if !c.IsPushMode() {
-		return nil, fmt.Errorf("consumer %s > %s is not push-based", c.stream, c.name)
-	}
-
-	return c.cfg.conn.nc.Subscribe(c.DeliverySubject(), h)
-}
-
-// ChanSubscribe see nats.ChangSubscribe
-// Deprecated: use core nats feature
-func (c *Consumer) ChanSubscribe(ch chan *nats.Msg) (sub *nats.Subscription, err error) {
-	if !c.IsPushMode() {
-		return nil, fmt.Errorf("consumer %s > %s is not push-based", c.stream, c.name)
-	}
-
-	return c.cfg.conn.nc.ChanSubscribe(c.DeliverySubject(), ch)
-}
-
-// ChanQueueSubscribe see nats.ChanQueueSubscribe
-// Deprecated: use core nats feature
-func (c *Consumer) ChanQueueSubscribe(group string, ch chan *nats.Msg) (sub *nats.Subscription, err error) {
-	if !c.IsPushMode() {
-		return nil, fmt.Errorf("consumer %s > %s is not push-based", c.stream, c.name)
-	}
-
-	return c.cfg.conn.nc.ChanQueueSubscribe(c.DeliverySubject(), group, ch)
-}
-
-// SubscribeSync see nats.SubscribeSync
-// Deprecated: use core nats feature
-func (c *Consumer) SubscribeSync() (sub *nats.Subscription, err error) {
-	if !c.IsPushMode() {
-		return nil, fmt.Errorf("consumer %s > %s is not push-based", c.stream, c.name)
-	}
-
-	return c.cfg.conn.nc.SubscribeSync(c.DeliverySubject())
-}
-
-// QueueSubscribe see nats.QueueSubscribe
-// Deprecated: use core nats feature
-func (c *Consumer) QueueSubscribe(queue string, h func(*nats.Msg)) (sub *nats.Subscription, err error) {
-	if !c.IsPushMode() {
-		return nil, fmt.Errorf("consumer %s > %s is not push-based", c.stream, c.name)
-	}
-
-	return c.cfg.conn.nc.QueueSubscribe(c.DeliverySubject(), queue, h)
-}
-
-// QueueSubscribeSync see nats.QueueSubscribeSync
-// Deprecated: use core nats feature
-func (c *Consumer) QueueSubscribeSync(queue string) (sub *nats.Subscription, err error) {
-	if !c.IsPushMode() {
-		return nil, fmt.Errorf("consumer %s > %s is not push-based", c.stream, c.name)
-	}
-
-	return c.cfg.conn.nc.QueueSubscribeSync(c.DeliverySubject(), queue)
-}
-
-// QueueSubscribeSyncWithChan see nats.QueueSubscribeSyncWithChan
-// Deprecated: use core nats feature
-func (c *Consumer) QueueSubscribeSyncWithChan(queue string, ch chan *nats.Msg) (sub *nats.Subscription, err error) {
-	if !c.IsPushMode() {
-		return nil, fmt.Errorf("consumer %s > %s is not push-based", c.stream, c.name)
-	}
-
-	return c.cfg.conn.nc.QueueSubscribeSyncWithChan(c.DeliverySubject(), queue, ch)
-}
-
-func NextMsg(stream string, consumer string, opts ...RequestOption) (msgs *nats.Msg, err error) {
-	ropts, err := newreqoptions(opts...)
-	if err != nil {
-		return nil, err
-	}
-
+// NextMsg requests the next message from the server with the manager timeout
+func (m *Manager) NextMsg(stream string, consumer string) (*nats.Msg, error) {
 	s, err := NextSubject(stream, consumer)
 	if err != nil {
 		return nil, err
 	}
 
-	return request(s, []byte(strconv.Itoa(1)), ropts)
+	rj, err := json.Marshal(&api.JSApiConsumerGetNextRequest{
+		Expires: time.Now().Add(m.timeout),
+		Batch:   1,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return m.request(s, rj)
 }
 
-// NextMsg retrieves the next message
-func (c *Consumer) NextMsg(opts ...RequestOption) (m *nats.Msg, err error) {
-	return NextMsg(c.stream, c.name, append(c.cfg.ropts, opts...)...)
+// NextMsgRequest creates a request for a batch of messages on a consumer, data or control flow messages will be sent to inbox
+func (m *Manager) NextMsgRequest(stream string, consumer string, inbox string, req *api.JSApiConsumerGetNextRequest) error {
+	s, err := NextSubject(stream, consumer)
+	if err != nil {
+		return err
+	}
+
+	jreq, err := json.Marshal(req)
+	if err != nil {
+		return err
+	}
+
+	return m.nc.PublishMsg(&nats.Msg{Subject: s, Reply: inbox, Data: jreq})
+}
+
+// NextMsg requests the next message from the server. This request will wait for as long as the context is
+// active. If repeated pulls will be made it's better to use NextMsgRequest()
+func (m *Manager) NextMsgContext(ctx context.Context, stream string, consumer string) (*nats.Msg, error) {
+	s, err := NextSubject(stream, consumer)
+	if err != nil {
+		return nil, err
+	}
+
+	return m.requestWithContext(ctx, s, []byte(strconv.Itoa(1)))
+}
+
+// NextMsgRequest creates a request for a batch of messages, data or control flow messages will be sent to inbox
+func (c *Consumer) NextMsgRequest(inbox string, req *api.JSApiConsumerGetNextRequest) error {
+	return c.mgr.NextMsgRequest(c.stream, c.name, inbox, req)
+}
+
+// NextMsg retrieves the next message, waiting up to manager timeout for a response
+func (c *Consumer) NextMsg() (*nats.Msg, error) {
+	return c.mgr.NextMsg(c.stream, c.name)
+}
+
+// NextMsgContext retrieves the next message, interrupted by the cancel context ctx
+func (c *Consumer) NextMsgContext(ctx context.Context) (*nats.Msg, error) {
+	return c.mgr.NextMsgContext(ctx, c.stream, c.name)
 }
 
 // DeliveredState reports the messages sequences that were successfully delivered
-func (c *Consumer) DeliveredState(opts ...RequestOption) (stats api.SequencePair, err error) {
-	info, err := c.State(opts...)
+func (c *Consumer) DeliveredState() (api.SequencePair, error) {
+	info, err := c.State()
 	if err != nil {
 		return api.SequencePair{}, err
 	}
@@ -552,8 +513,8 @@ func (c *Consumer) DeliveredState(opts ...RequestOption) (stats api.SequencePair
 }
 
 // AcknowledgedFloor reports the highest contiguous message sequences that were acknowledged
-func (c *Consumer) AcknowledgedFloor(opts ...RequestOption) (stats api.SequencePair, err error) {
-	info, err := c.State(opts...)
+func (c *Consumer) AcknowledgedFloor() (api.SequencePair, error) {
+	info, err := c.State()
 	if err != nil {
 		return api.SequencePair{}, err
 	}
@@ -561,9 +522,19 @@ func (c *Consumer) AcknowledgedFloor(opts ...RequestOption) (stats api.SequenceP
 	return info.AckFloor, nil
 }
 
-// PendingMessageCount reports the number of messages sent but not yet acknowledged
-func (c *Consumer) PendingMessageCount(opts ...RequestOption) (int, error) {
-	info, err := c.State(opts...)
+// PendingAcknowledgement reports the number of messages sent but not yet acknowledged
+func (c *Consumer) PendingAcknowledgement() (int, error) {
+	info, err := c.State()
+	if err != nil {
+		return 0, err
+	}
+
+	return info.NumAckPending, nil
+}
+
+// PendingMessages is the number of unprocessed messages for this consumer
+func (c *Consumer) PendingMessages() (uint64, error) {
+	info, err := c.State()
 	if err != nil {
 		return 0, err
 	}
@@ -571,9 +542,19 @@ func (c *Consumer) PendingMessageCount(opts ...RequestOption) (int, error) {
 	return info.NumPending, nil
 }
 
+// WaitingClientPulls is the number of clients that have outstanding pull requests against this consumer
+func (c *Consumer) WaitingClientPulls() (int, error) {
+	info, err := c.State()
+	if err != nil {
+		return 0, err
+	}
+
+	return info.NumWaiting, nil
+}
+
 // RedeliveryCount reports the number of redelivers that were done
-func (c *Consumer) RedeliveryCount(opts ...RequestOption) (int, error) {
-	info, err := c.State(opts...)
+func (c *Consumer) RedeliveryCount() (int, error) {
+	info, err := c.State()
 	if err != nil {
 		return 0, err
 	}
@@ -582,26 +563,19 @@ func (c *Consumer) RedeliveryCount(opts ...RequestOption) (int, error) {
 }
 
 // State loads a snapshot of consumer state including delivery counts, retries and more
-func (c *Consumer) State(opts ...RequestOption) (api.ConsumerInfo, error) {
-	ropts, err := newreqoptions(append(c.cfg.ropts, opts...)...)
-	if err != nil {
-		if err != nil {
-			return api.ConsumerInfo{}, err
-		}
-	}
-
-	return loadConsumerInfo(c.stream, c.name, ropts)
+func (c *Consumer) State() (api.ConsumerInfo, error) {
+	return c.mgr.loadConsumerInfo(c.stream, c.name)
 }
 
 // Configuration is the Consumer configuration
 func (c *Consumer) Configuration() (config api.ConsumerConfig) {
-	return c.cfg.ConsumerConfig
+	return *c.cfg
 }
 
 // Delete deletes the Consumer, after this the Consumer object should be disposed
 func (c *Consumer) Delete() (err error) {
 	var resp api.JSApiConsumerDeleteResponse
-	err = jsonRequest(fmt.Sprintf(api.JSApiConsumerDeleteT, c.StreamName(), c.Name()), nil, &resp, c.cfg.conn)
+	err = c.mgr.jsonRequest(fmt.Sprintf(api.JSApiConsumerDeleteT, c.StreamName(), c.Name()), nil, &resp)
 	if err != nil {
 		return err
 	}
@@ -631,6 +605,7 @@ func (c *Consumer) FilterSubject() string            { return c.cfg.FilterSubjec
 func (c *Consumer) ReplayPolicy() api.ReplayPolicy   { return c.cfg.ReplayPolicy }
 func (c *Consumer) SampleFrequency() string          { return c.cfg.SampleFrequency }
 func (c *Consumer) RateLimit() uint64                { return c.cfg.RateLimit }
+func (c *Consumer) MaxAckPending() int               { return c.cfg.MaxAckPending }
 func (c *Consumer) StartTime() time.Time {
 	if c.cfg.OptStartTime == nil {
 		return time.Time{}

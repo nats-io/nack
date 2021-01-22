@@ -27,11 +27,11 @@ func init() {
 	err = event.RegisterTextExtendedTemplate("io.nats.server.advisory.v1.client_disconnect", `
 [{{ .Time | ShortTime }}] [{{ .ID }}] Client Disconnection
 {{ if .Reason }}
-   Reason: {{ .Reason }}
+    Reason: {{ .Reason }}
 {{- end }}
-   Server: {{ .Server.Name }}
+    Server: {{ .Server.Name }}
 {{- if .Server.Cluster }}
-  Cluster: {{ .Server.Cluster }}
+   Cluster: {{ .Server.Cluster }}
 {{- end }}
 
    Client:

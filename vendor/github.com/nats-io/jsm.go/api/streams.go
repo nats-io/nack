@@ -39,9 +39,29 @@ type StoredMsg struct {
 	Time     time.Time `json:"time"`
 }
 
+// io.nats.jetstream.api.v1.pub_ack_response
+type JSPubAckResponse struct {
+	Error *ApiError `json:"error,omitempty"`
+	PubAck
+}
+
+// PubAck is the detail you get back from a publish to a stream that was successful
+type PubAck struct {
+	Stream    string `json:"stream"`
+	Sequence  uint64 `json:"seq"`
+	Duplicate bool   `json:"duplicate,omitempty"`
+}
+
+// io.nats.jetstream.api.v1.stream_create_request
+type JSApiStreamCreateRequest struct {
+	StreamConfig
+}
+
 // io.nats.jetstream.api.v1.stream_names_request
 type JSApiStreamNamesRequest struct {
 	JSApiIterableRequest
+	// Subject filter the names to those consuming messages matching this subject or wildcard
+	Subject string `json:"subject,omitempty"`
 }
 
 // io.nats.jetstream.api.v1.stream_names_response
@@ -102,7 +122,7 @@ type JSApiStreamDeleteResponse struct {
 type JSApiStreamPurgeResponse struct {
 	JSApiResponse
 	Success bool   `json:"success,omitempty"`
-	Purged  uint64 `json:"purged,omitempty"`
+	Purged  uint64 `json:"purged"`
 }
 
 // io.nats.jetstream.api.v1.stream_msg_get_response

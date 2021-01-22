@@ -15,6 +15,7 @@ package jsm
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -26,76 +27,77 @@ import (
 type MsgInfo struct {
 	stream    string
 	consumer  string
-	sSeq      int64
-	cSeq      int64
+	sSeq      uint64
+	cSeq      uint64
 	delivered int
+	pending   uint64
 	ts        time.Time
 }
 
+// Stream is the stream this message is stored in
 func (i *MsgInfo) Stream() string {
 	return i.stream
 }
 
+// Consumer is the name of the consumer that produced this message
 func (i *MsgInfo) Consumer() string {
 	return i.consumer
 }
 
-func (i *MsgInfo) StreamSequence() int64 {
+// StreamSequence is the sequence of this message in the stream
+func (i *MsgInfo) StreamSequence() uint64 {
 	return i.sSeq
 }
 
-func (i *MsgInfo) ConsumerSequence() int64 {
+// ConsumerSequence is the sequence of this message in the consumer
+func (i *MsgInfo) ConsumerSequence() uint64 {
 	return i.cSeq
 }
 
+// Delivered is the number of times this message had delivery attempts including this one
 func (i *MsgInfo) Delivered() int {
 	return i.delivered
 }
 
+// TimeStamp is the time the message was received by JetStream
 func (i *MsgInfo) TimeStamp() time.Time {
 	return i.ts
 }
 
-func oldParseJSMsgMetadata(parts []string) (info *MsgInfo, err error) {
+// Pending is the number of messages left to consumer, -1 when the number is not reported
+func (i *MsgInfo) Pending() uint64 {
+	return i.pending
+}
+
+// ParseJSMsgMetadataReply parses the reply subject of a JetStream originated message
+func ParseJSMsgMetadataReply(reply string) (info *MsgInfo, err error) {
+	if len(reply) == 0 {
+		return nil, fmt.Errorf("reply subject is not an Ack")
+	}
+
+	parts := strings.Split(reply, ".")
 	c := len(parts)
 
-	if c != 7 || parts[0] != "$JS" || parts[1] != "ACK" {
+	if (c != 8 && c != 9) || parts[0] != "$JS" || parts[1] != "ACK" {
 		return nil, fmt.Errorf("message metadata does not appear to be an ACK")
 	}
 
-	stream := parts[c-5]
-	consumer := parts[c-4]
-	delivered, _ := strconv.Atoi(parts[c-3])
-	streamSeq, _ := strconv.ParseInt(parts[c-2], 10, 64)
-	consumerSeq, _ := strconv.ParseInt(parts[c-1], 10, 64)
+	stream := parts[2]
+	consumer := parts[3]
+	delivered, _ := strconv.Atoi(parts[4])
+	streamSeq, _ := strconv.ParseUint(parts[5], 10, 64)
+	consumerSeq, _ := strconv.ParseUint(parts[6], 10, 64)
+	tsi, _ := strconv.Atoi(parts[7])
+	ts := time.Unix(0, int64(tsi))
+	pending := uint64(math.MaxUint64)
+	if c == 9 {
+		pending, _ = strconv.ParseUint(parts[8], 10, 64)
+	}
 
-	return &MsgInfo{stream, consumer, streamSeq, consumerSeq, delivered, time.Time{}}, nil
+	return &MsgInfo{stream, consumer, streamSeq, consumerSeq, delivered, pending, ts}, nil
 }
 
 // ParseJSMsgMetadata parse the reply subject metadata to determine message metadata
 func ParseJSMsgMetadata(m *nats.Msg) (info *MsgInfo, err error) {
-	if len(m.Reply) == 0 {
-		return nil, fmt.Errorf("reply subject is not an Ack")
-	}
-
-	parts := strings.Split(m.Reply, ".")
-	c := len(parts)
-
-	if c == 7 {
-		return oldParseJSMsgMetadata(parts)
-	}
-
-	if c != 8 || parts[0] != "$JS" || parts[1] != "ACK" {
-		return nil, fmt.Errorf("message metadata does not appear to be an ACK")
-	}
-
-	stream := parts[c-6]
-	consumer := parts[c-5]
-	delivered, _ := strconv.Atoi(parts[c-4])
-	streamSeq, _ := strconv.ParseInt(parts[c-3], 10, 64)
-	consumerSeq, _ := strconv.ParseInt(parts[c-2], 10, 64)
-	tsi, _ := strconv.Atoi(parts[c-1])
-	ts := time.Unix(0, int64(tsi))
-
-	return &MsgInfo{stream, consumer, streamSeq, consumerSeq, delivered, ts}, nil
+	return ParseJSMsgMetadataReply(m.Reply)
 }

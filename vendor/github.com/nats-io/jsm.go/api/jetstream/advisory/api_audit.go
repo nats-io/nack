@@ -18,14 +18,14 @@ type JetStreamAPIAuditV1 struct {
 }
 
 type APIAuditClientV1 struct {
-	Host     string `json:"host"`
-	Port     int    `json:"port"`
-	CID      uint64 `json:"cid"`
-	Account  string `json:"account"`
-	User     string `json:"user,omitempty"`
-	Name     string `json:"name,omitempty"`
-	Language string `json:"lang,omitempty"`
-	Version  string `json:"version,omitempty"`
+	Host    string `json:"host"`
+	Port    int    `json:"port"`
+	CID     uint64 `json:"cid"`
+	Account string `json:"account"`
+	User    string `json:"user,omitempty"`
+	Name    string `json:"name,omitempty"`
+	Lang    string `json:"lang,omitempty"`
+	Version string `json:"version,omitempty"`
 }
 
 func init() {
