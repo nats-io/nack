@@ -19,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nats-io/jsm.go"
 	jsmapi "github.com/nats-io/jsm.go/api"
 	"github.com/nats-io/nats.go"
 
@@ -72,6 +73,7 @@ type Controller struct {
 	ctx  context.Context
 	opts Options
 	nc   *nats.Conn
+	jm   *jsm.Manager
 
 	ki              k8styped.CoreV1Interface
 	ji              typed.JetstreamV1beta1Interface
@@ -180,6 +182,11 @@ func (c *Controller) Run() error {
 		return err
 	}
 	c.nc = nc
+	jm, err := jsm.New(c.nc)
+	if err != nil {
+		return err
+	}
+	c.jm = jm
 
 	defer utilruntime.HandleCrash()
 

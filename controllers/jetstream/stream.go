@@ -35,7 +35,7 @@ const (
 
 func (c *Controller) runStreamQueue() {
 	for {
-		processQueueNext(c.strQueue, &realJsmClient{c.nc}, c.processStream)
+		processQueueNext(c.strQueue, &realJsmClient{jm: c.jm}, c.processStream)
 	}
 }
 

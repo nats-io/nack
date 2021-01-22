@@ -23,7 +23,7 @@ const (
 
 func (c *Controller) runConsumerQueue() {
 	for {
-		processQueueNext(c.cnsQueue, &realJsmClient{c.nc}, c.processConsumer)
+		processQueueNext(c.cnsQueue, &realJsmClient{nc: c.nc}, c.processConsumer)
 	}
 }
 

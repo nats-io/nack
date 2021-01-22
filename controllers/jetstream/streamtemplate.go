@@ -22,7 +22,7 @@ const (
 
 func (c *Controller) runStreamTemplateQueue() {
 	for {
-		processQueueNext(c.strTmplQueue, &realJsmClient{c.nc}, c.processStreamTemplate)
+		processQueueNext(c.strTmplQueue, &realJsmClient{jm: c.jm}, c.processStreamTemplate)
 	}
 }
 

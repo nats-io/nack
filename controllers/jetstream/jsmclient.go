@@ -33,6 +33,7 @@ type jsmDeleter interface {
 
 type realJsmClient struct {
 	nc *nats.Conn
+	jm *jsm.Manager
 }
 
 func (c *realJsmClient) Connect(servers string, opts ...nats.Option) error {
@@ -41,6 +42,13 @@ func (c *realJsmClient) Connect(servers string, opts ...nats.Option) error {
 		return err
 	}
 	c.nc = nc
+
+	m, err := jsm.New(nc)
+	if err != nil {
+		return err
+	}
+	c.jm = m
+
 	return nil
 }
 
@@ -48,31 +56,28 @@ func (c *realJsmClient) Close() {
 	c.nc.Drain()
 }
 
-func (c *realJsmClient) LoadStream(ctx context.Context, name string) (jsmStream, error) {
-	return jsm.LoadStream(name, jsm.WithConnection(c.nc), jsm.WithContext(ctx))
+func (c *realJsmClient) LoadStream(_ context.Context, name string) (jsmStream, error) {
+	return c.jm.LoadStream(name)
 }
 
-func (c *realJsmClient) NewStream(ctx context.Context, name string, opts []jsm.StreamOption) (jsmStream, error) {
-	opts = append(opts, jsm.StreamConnection(jsm.WithConnection(c.nc), jsm.WithContext(ctx)))
-	return jsm.NewStream(name, opts...)
+func (c *realJsmClient) NewStream(_ context.Context, name string, opts []jsm.StreamOption) (jsmStream, error) {
+	return c.jm.NewStream(name, opts...)
 }
 
-func (c *realJsmClient) LoadStreamTemplate(ctx context.Context, name string) (jsmDeleter, error) {
-	return jsm.LoadStreamTemplate(name, jsm.WithConnection(c.nc), jsm.WithContext(ctx))
+func (c *realJsmClient) LoadStreamTemplate(_ context.Context, name string) (jsmDeleter, error) {
+	return c.jm.LoadStreamTemplate(name)
 }
 
-func (c *realJsmClient) NewStreamTemplate(ctx context.Context, cnf jsmapi.StreamTemplateConfig) (jsmDeleter, error) {
-	opts := []jsm.StreamOption{jsm.StreamConnection(jsm.WithConnection(c.nc), jsm.WithContext(ctx))}
-	return jsm.NewStreamTemplate(cnf.Name, cnf.MaxStreams, *cnf.Config, opts...)
+func (c *realJsmClient) NewStreamTemplate(_ context.Context, cnf jsmapi.StreamTemplateConfig) (jsmDeleter, error) {
+	return c.jm.NewStreamTemplate(cnf.Name, cnf.MaxStreams, *cnf.Config)
 }
 
-func (c *realJsmClient) LoadConsumer(ctx context.Context, stream, consumer string) (jsmDeleter, error) {
-	return jsm.LoadConsumer(stream, consumer, jsm.WithConnection(c.nc), jsm.WithContext(ctx))
+func (c *realJsmClient) LoadConsumer(_ context.Context, stream, consumer string) (jsmDeleter, error) {
+	return c.jm.LoadConsumer(stream, consumer)
 }
 
-func (c *realJsmClient) NewConsumer(ctx context.Context, stream string, opts []jsm.ConsumerOption) (jsmDeleter, error) {
-	opts = append(opts, jsm.ConsumerConnection(jsm.WithConnection(c.nc), jsm.WithContext(ctx)))
-	return jsm.NewConsumer(stream, opts...)
+func (c *realJsmClient) NewConsumer(_ context.Context, stream string, opts []jsm.ConsumerOption) (jsmDeleter, error) {
+	return c.jm.NewConsumer(stream, opts...)
 }
 
 type mockStream struct {
