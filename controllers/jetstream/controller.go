@@ -64,6 +64,7 @@ type Options struct {
 
 	NATSClientName  string
 	NATSCredentials string
+	NATSNKey		string
 	NATSServerURL   string
 
 	Recorder record.EventRecorder
@@ -172,6 +173,12 @@ func (c *Controller) Run() error {
 	// Use JWT/NKEYS based credentials if present.
 	if c.opts.NATSCredentials != "" {
 		opts = append(opts, nats.UserCredentials(c.opts.NATSCredentials))
+	} else if c.opts.NATSNKey != "" {
+		opt, err := nats.NkeyOptionFromSeed(c.opts.NATSNKey)
+		if err != nil {
+			return nil
+		}
+		opts = append(opts, opt)
 	}
 
 	// Always attempt to have a connection to NATS.
