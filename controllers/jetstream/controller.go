@@ -186,7 +186,7 @@ func (c *Controller) Run() error {
 
 	nc, err := nats.Connect(c.opts.NATSServerURL, opts...)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to connect to nats: %w", err)
 	}
 	c.nc = nc
 	jm, err := jsm.New(c.nc)
