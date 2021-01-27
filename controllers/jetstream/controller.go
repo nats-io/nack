@@ -64,7 +64,7 @@ type Options struct {
 
 	NATSClientName  string
 	NATSCredentials string
-	NATSNKey		string
+	NATSNKey        string
 	NATSServerURL   string
 
 	Recorder record.EventRecorder
