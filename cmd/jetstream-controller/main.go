@@ -48,6 +48,7 @@ func run() error {
 	kubeConfig := flag.String("kubeconfig", "", "Path to kubeconfig")
 	version := flag.Bool("version", false, "Print the version and exit")
 	creds := flag.String("creds", "", "NATS Credentials")
+	nkey := flag.String("nkey", "", "NATS NKey")
 	server := flag.String("s", "", "NATS Server URL") // required
 	flag.Parse()
 
@@ -94,6 +95,7 @@ func run() error {
 		// to avoid keeping state in options.
 		Ctx:             ctx,
 		NATSCredentials: *creds,
+		NATSNKey:        *nkey,
 		NATSServerURL:   *server,
 		KubeIface:       kc,
 		JetstreamIface:  jc,
