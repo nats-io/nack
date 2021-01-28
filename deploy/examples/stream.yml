@@ -8,3 +8,4 @@ spec:
   subjects: ["orders.*"]
   storage: memory
   maxAge: 1h
+  replicas: 1
