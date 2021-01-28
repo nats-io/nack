@@ -14,7 +14,7 @@ gitBranch := $(shell git rev-parse --abbrev-ref HEAD)
 gitCommit := $(shell git rev-parse --short HEAD)
 repoDirty := $(shell git diff --quiet || echo "-dirty")
 
-jetstreamTag := connecteverything/jetstream-controller:$(gitTag)
+jetstreamTag := natsio/jetstream-controller:$(gitTag)
 
 linkerVars := -X main.BuildTime=$(now) -X main.Version=$(gitBranch)-$(gitCommit)$(repoDirty)
 
