@@ -7,14 +7,14 @@ jetstreamGenOut := pkg/jetstream/generated pkg/jetstream/apis/jetstream/v1beta1/
 jetstreamGenIn:= $(shell grep -l -R -F "// +" pkg/jetstream/apis | grep -v "zz_generated.deepcopy.go")
 jetstreamSrc := $(shell find cmd/jetstream-controller pkg/jetstream controllers/jetstream -name "*.go")
 
-jetstreamTag := connecteverything/jetstream-controller:0.1.0
-
 now := $(shell date -u +%Y-%m-%dT%H:%M:%S%z)
 
-gitTag := $(shell git describe --tags --abbrev=0 2>/dev/null)
+gitTag := $(shell git describe --tags --abbrev=0 2>/dev/null | sed -e 's/^v//')
 gitBranch := $(shell git rev-parse --abbrev-ref HEAD)
 gitCommit := $(shell git rev-parse --short HEAD)
 repoDirty := $(shell git diff --quiet || echo "-dirty")
+
+jetstreamTag := natsio/jetstream-controller:$(gitTag)
 
 linkerVars := -X main.BuildTime=$(now) -X main.Version=$(gitBranch)-$(gitCommit)$(repoDirty)
 
