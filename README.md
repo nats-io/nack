@@ -129,9 +129,9 @@ nats-box:~$ nats pub orders.received "order 1"
 nats-box:~$ nats pub orders.received "order 2"
 ```
 
-First, we'll read the data using a pull-based consumer. 
+First, we'll read the data using a pull-based consumer.
 
-From the above `my-pull-consumer` Consumer CRD, we have set the filterSubject 
+From the above `my-pull-consumer` Consumer CRD, we have set the filterSubject
 of `orders.received`. You can double check with the following command:
 
 ```sh
@@ -201,4 +201,48 @@ make jetstream-controller
 # You'll probably want to start a local Jetstream-enabled NATS server, unless
 # you use a public one.
 nats-server -DV -js
+```
+
+Build Docker image
+```sh
+make jetstream-controller-docker jetstreamVersion=1.2.3
+```
+
+## NATS Server Config Reloader
+
+This is a sidecar that you can use to automatically reload your NATS Server
+configuration file.
+
+### Installing with Helm
+
+For more information see the
+[Chart repo](https://github.com/nats-io/k8s/tree/master/helm/charts/nats).
+
+```
+helm repo add nats https://nats-io.github.io/k8s/helm/charts/
+helm install my-nats nats/nats
+```
+
+### Configuring
+
+```yaml
+reloader:
+  enabled: true
+  image: natsio/nats-server-config-reloader:0.6.0
+  pullPolicy: IfNotPresent
+```
+
+### Local Development
+
+```sh
+# First, build the config reloader.
+make nats-server-config-reloader
+
+# Next, run the reloader like this
+./nats-server-config-reloader
+```
+
+Build Docker image
+```sh
+make nats-server-config-reloader-docker configReloaderVersion=1.2.3
 ```

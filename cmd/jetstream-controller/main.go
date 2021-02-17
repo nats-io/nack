@@ -33,7 +33,8 @@ import (
 
 var (
 	BuildTime = "build-time-not-set"
-	Version   = "version-not-set"
+	GitInfo   = "gitinfo-not-set"
+	Version   = "0.2.0"
 )
 
 func main() {
@@ -53,7 +54,7 @@ func run() error {
 	flag.Parse()
 
 	if *version {
-		fmt.Printf("%s version %s, built %s\n", os.Args[0], Version, BuildTime)
+		fmt.Printf("%s version %s (%s), built %s\n", os.Args[0], Version, GitInfo, BuildTime)
 		return nil
 	}
 
