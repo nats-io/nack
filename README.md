@@ -246,3 +246,38 @@ Build Docker image
 ```sh
 make nats-server-config-reloader-docker configReloaderVersion=1.2.3
 ```
+
+## NATS Boot Config
+
+### Installing with Helm
+
+For more information see the
+[Chart repo](https://github.com/nats-io/k8s/tree/master/helm/charts/nats).
+
+```
+helm repo add nats https://nats-io.github.io/k8s/helm/charts/
+helm install my-nats nats/nats
+```
+
+### Configuring
+
+```yaml
+bootconfig:
+  image: natsio/nats-boot-config:0.5.2
+  pullPolicy: IfNotPresent
+```
+
+### Local Development
+
+```sh
+# First, build the project.
+make nats-boot-config
+
+# Next, run the project like this
+./nats-boot-config
+```
+
+Build Docker image
+```sh
+make nats-boot-config-docker bootConfigVersion=1.2.3
+```
