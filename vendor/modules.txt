@@ -78,6 +78,9 @@ github.com/hashicorp/golang-lru/simplelru
 github.com/imdario/mergo
 # github.com/json-iterator/go v1.1.10
 github.com/json-iterator/go
+# github.com/magefile/mage v1.10.0
+github.com/magefile/mage/mg
+github.com/magefile/mage/sh
 # github.com/mailru/easyjson v0.7.0
 github.com/mailru/easyjson/buffer
 github.com/mailru/easyjson/jlexer
@@ -108,8 +111,9 @@ github.com/nats-io/nkeys
 github.com/nats-io/nuid
 # github.com/pkg/errors v0.9.1
 github.com/pkg/errors
-# github.com/sirupsen/logrus v1.6.0
+# github.com/sirupsen/logrus v1.8.0
 ## explicit
+github.com/sirupsen/logrus
 # github.com/spf13/pflag v1.0.5
 github.com/spf13/pflag
 # github.com/xeipuuv/gojsonschema v1.2.0

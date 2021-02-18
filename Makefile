@@ -14,6 +14,8 @@ jetstreamSrc := $(shell find cmd/jetstream-controller pkg/jetstream controllers/
 
 configReloaderSrc := $(shell find cmd/nats-server-config-reloader/ pkg/natsreloader/ -name "*.go")
 
+bootConfigSrc := $(shell find cmd/nats-boot-config/ pkg/bootconfig/ -name "*.go")
+
 vendor: go.mod go.sum
 	go mod vendor
 	touch $@
@@ -69,8 +71,30 @@ else
 	exit 1
 endif
 
+nats-boot-config: $(bootConfigSrc) vendor
+	go build -race -o $@ \
+		-ldflags "$(linkerVars)" \
+		github.com/nats-io/nack/cmd/nats-boot-config
+
+nats-boot-config.docker: $(bootConfigSrc) vendor
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o $@ \
+		-ldflags "-s -w $(linkerVars)" \
+		-tags timetzdata \
+		github.com/nats-io/nack/cmd/nats-boot-config
+
+.PHONY: nats-boot-config-docker
+nats-boot-config-docker:
+ifneq ($(bootConfigVersion),)
+	docker build --tag natsio/nats-boot-config:$(bootConfigVersion) \
+		--file docker/nats-boot-config/Dockerfile .
+else
+	# Missing bootConfigVersion, try again.
+	# make nats-boot-config-docker bootConfigVersion=1.2.3
+	exit 1
+endif
+
 .PHONY: build
-build: jetstream-controller nats-server-config-reloader
+build: jetstream-controller nats-server-config-reloader nats-boot-config
 
 .PHONY: test
 test:
@@ -80,4 +104,5 @@ test:
 .PHONY: clean
 clean:
 	rm -f jetstream-controller jetstream-controller.docker \
-		nats-server-config-reloader nats-server-config-reloader.docker
+		nats-server-config-reloader nats-server-config-reloader.docker \
+		nats-boot-config nats-boot-config.docker

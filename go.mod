@@ -12,7 +12,7 @@ require (
 	github.com/nats-io/jsm.go v0.0.20
 	github.com/nats-io/jwt v1.0.1 // indirect
 	github.com/nats-io/nats.go v1.10.1-0.20201111151633-9e1f4a0d80d8
-	github.com/sirupsen/logrus v1.6.0 // indirect
+	github.com/sirupsen/logrus v1.8.0
 	github.com/xeipuuv/gojsonschema v1.2.0 // indirect
 	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad // indirect
 	golang.org/x/net v0.0.0-20200904194848-62affa334b73 // indirect

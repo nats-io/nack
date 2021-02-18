@@ -15,3 +15,5 @@
 /jetstream-controller
 /nats-server-config-reloader
 /nats-server-config-reloader.docker
+/nats-boot-config
+/nats-boot-config.docker
