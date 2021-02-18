@@ -1,7 +1,8 @@
 FROM golang:1.15 AS build
 COPY . /go/src/nack
 WORKDIR /go/src/nack
-RUN make jetstream-controller.docker
+ARG VERSION
+RUN VERSION=$VERSION make jetstream-controller.docker
 
 FROM alpine:latest as osdeps
 RUN apk add --no-cache ca-certificates

@@ -16,7 +16,7 @@ import (
 var (
 	BuildTime = "build-time-not-set"
 	GitInfo   = "gitinfo-not-set"
-	Version   = "0.6.0"
+	Version   = "version-not-set"
 )
 
 // StringSet is a wrapper for []string to allow using it with the flags package.

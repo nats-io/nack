@@ -6,7 +6,8 @@ gitBranch := $(shell git rev-parse --abbrev-ref HEAD)
 gitCommit := $(shell git rev-parse --short HEAD)
 repoDirty := $(shell git diff --quiet || echo "-dirty")
 
-linkerVars := -X main.BuildTime=$(now) -X main.GitInfo=$(gitBranch)-$(gitCommit)$(repoDirty)
+VERSION ?= version-not-set
+linkerVars := -X main.BuildTime=$(now) -X main.GitInfo=$(gitBranch)-$(gitCommit)$(repoDirty) -X main.Version=$(VERSION)
 
 jetstreamGenOut := $(shell grep -l -R "DO NOT EDIT" pkg/jetstream/)
 jetstreamGenIn:= $(shell grep -l -R -F "// +k8s:" pkg/jetstream/apis)
@@ -42,6 +43,7 @@ jetstream-controller.docker: $(jetstreamSrc) vendor
 jetstream-controller-docker:
 ifneq ($(jetstreamVersion),)
 	docker build --tag natsio/jetstream-controller:$(jetstreamVersion) \
+		--build-arg VERSION=$(jetstreamVersion) \
 		--file docker/jetstream-controller/Dockerfile .
 else
 	# Missing jetstreamVersion, try again.
@@ -64,6 +66,7 @@ nats-server-config-reloader.docker: $(configReloaderSrc) vendor
 nats-server-config-reloader-docker:
 ifneq ($(configReloaderVersion),)
 	docker build --tag natsio/nats-server-config-reloader:$(configReloaderVersion) \
+		--build-arg VERSION=$(configReloaderVersion) \
 		--file docker/nats-server-config-reloader/Dockerfile .
 else
 	# Missing configReloaderVersion, try again.
@@ -86,6 +89,7 @@ nats-boot-config.docker: $(bootConfigSrc) vendor
 nats-boot-config-docker:
 ifneq ($(bootConfigVersion),)
 	docker build --tag natsio/nats-boot-config:$(bootConfigVersion) \
+		--build-arg VERSION=$(bootConfigVersion) \
 		--file docker/nats-boot-config/Dockerfile .
 else
 	# Missing bootConfigVersion, try again.
