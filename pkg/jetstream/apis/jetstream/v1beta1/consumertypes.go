@@ -39,8 +39,8 @@ type ConsumerSpec struct {
 	RateLimitBps      int    `json:"rateLimitBps"`
 	ReplayPolicy      string `json:"replayPolicy"`
 	SampleFreq        string `json:"sampleFreq"`
-
-	StreamName string `json:"streamName"`
+	Servers           []string `json:"servers"`
+	StreamName        string `json:"streamName"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

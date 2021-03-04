@@ -38,6 +38,7 @@ type StreamSpec struct {
 	Replicas          int              `json:"replicas"`
 	Retention         string           `json:"retention"`
 	Sources           []*StreamSource  `json:"sources"`
+	Servers           []string         `json:"servers"`
 	Storage           string           `json:"storage"`
 	Subjects          []string         `json:"subjects"`
 }

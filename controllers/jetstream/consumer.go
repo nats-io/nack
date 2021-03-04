@@ -5,12 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/nats-io/jsm.go"
 	jsmapi "github.com/nats-io/jsm.go/api"
 	apis "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta1"
 	typed "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/typed/jetstream/v1beta1"
+	"github.com/nats-io/nats.go"
 
 	k8sapi "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -63,11 +65,46 @@ func (c *Controller) processConsumer(ns, name string, jsmc jsmClient) (err error
 	updateOK := (consumerOK && !deleteOK && newGeneration)
 	createOK := (!consumerOK && !deleteOK && newGeneration)
 
+	type operator func(ctx context.Context, c jsmClient, spec apis.ConsumerSpec) (err error)
+
+	natsClientUtil := func(op operator) error {
+		servers := spec.Servers
+		if len(servers) != 0 {
+			// Create a new client
+			opts := make([]nats.Option, 0)
+			opts = append(opts, nats.Name(c.opts.NATSClientName+spec.DurableName))
+			opts = append(opts, nats.MaxReconnects(-1))
+
+			natsServers := strings.Join(servers, ",")
+			newNc, err := nats.Connect(natsServers, opts...)
+			if err != nil {
+				return fmt.Errorf("failed to connect to leaf nats(%s): %w", natsServers, err)
+			}
+
+			c.normalEvent(cns, "Connecting", fmt.Sprint("Connecting to new nats-servers"))
+			newJm, err := jsm.New(newNc)
+			if err != nil {
+				return err
+			}
+			newJsmc := &realJsmClient{nc: newNc, jm: newJm}
+
+			if err := op(c.ctx, newJsmc, spec); err != nil {
+				return err
+			}
+			newJsmc.Close()
+		} else {
+			if err := op(c.ctx, jsmc, spec); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
 	switch {
 	case createOK:
 		c.normalEvent(cns, "Creating",
 			fmt.Sprintf("Creating consumer %q on stream %q", spec.DurableName, spec.StreamName))
-		if err := createConsumer(c.ctx, jsmc, spec); err != nil {
+		if err := natsClientUtil(createConsumer); err != nil {
 			return err
 		}
 
@@ -87,7 +124,7 @@ func (c *Controller) processConsumer(ns, name string, jsmc jsmClient) (err error
 			fmt.Sprintf("Consumer updates (%q on %q) are not allowed, recreate to update", spec.DurableName, spec.StreamName))
 	case deleteOK:
 		c.normalEvent(cns, "Deleting", fmt.Sprintf("Deleting consumer %q on stream %q", spec.DurableName, spec.StreamName))
-		if err := deleteConsumer(c.ctx, jsmc, spec.StreamName, spec.DurableName); err != nil {
+		if err := natsClientUtil(deleteConsumer); err != nil {
 			return err
 		}
 
@@ -223,7 +260,8 @@ func createConsumer(ctx context.Context, c jsmClient, spec apis.ConsumerSpec) (e
 	return err
 }
 
-func deleteConsumer(ctx context.Context, c jsmClient, stream, consumer string) (err error) {
+func deleteConsumer(ctx context.Context, c jsmClient, spec apis.ConsumerSpec) (err error) {
+	stream, consumer := spec.StreamName, spec.DurableName
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("failed to delete consumer %q on stream %q: %w", consumer, stream, err)
