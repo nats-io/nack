@@ -181,9 +181,9 @@ func createStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 
 	switch spec.Storage {
 	case "file":
-		opts = append(opts, jsm.MemoryStorage())
-	case "memory":
 		opts = append(opts, jsm.FileStorage())
+	case "memory":
+		opts = append(opts, jsm.MemoryStorage())
 	}
 
 	switch spec.Discard {
