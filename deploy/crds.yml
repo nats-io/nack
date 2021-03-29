@@ -210,6 +210,9 @@ spec:
               rateLimitBps:
                 description: rate at which messages will be delivered to clients, expressed in bit per second.
                 type: integer
+              maxAckPending:
+                description: Maximum pending Acks before consumers are paused
+                type: integer
           status:
             type: object
             properties:
