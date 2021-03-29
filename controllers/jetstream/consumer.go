@@ -131,6 +131,7 @@ func createConsumer(ctx context.Context, c jsmClient, spec apis.ConsumerSpec) (e
 		jsm.DeliverySubject(spec.DeliverSubject),
 		jsm.FilterStreamBySubject(spec.FilterSubject),
 		jsm.RateLimitBitsPerSecond(uint64(spec.RateLimitBps)),
+		jsm.MaxAckPending(uint(spec.MaxAckPending)),
 	}
 
 	if spec.MaxDeliver != 0 {
