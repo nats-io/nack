@@ -23,6 +23,12 @@ spec:
           spec:
             type: object
             properties:
+              servers:
+                description: A list of servers for creating stream
+                type: array
+                items:
+                  type: string
+                default: []
               name:
                 description: A unique name for the Stream.
                 type: string
@@ -151,6 +157,12 @@ spec:
           spec:
             type: object
             properties:
+              servers:
+                description: A list of servers for creating consumer
+                type: array
+                items:
+                  type: string
+                default: []
               streamName:
                 description: The name of the Stream to create the Consumer in.
                 type: string
@@ -275,6 +287,12 @@ spec:
           spec:
             type: object
             properties:
+              servers:
+                description: A list of servers for creating stream
+                type: array
+                items:
+                  type: string
+                default: []
               name:
                 description: A unique name for the Stream Template.
                 type: string

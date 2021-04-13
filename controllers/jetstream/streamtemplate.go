@@ -4,10 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/nats-io/jsm.go"
 	apis "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta1"
 	typed "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/typed/jetstream/v1beta1"
+	"github.com/nats-io/nats.go"
 
 	jsmapi "github.com/nats-io/jsm.go/api"
 
@@ -62,10 +65,45 @@ func (c *Controller) processStreamTemplate(ns, name string, jsmc jsmClient) (err
 	updateOK := (strTmplOK && !deleteOK && newGeneration)
 	createOK := (!strTmplOK && !deleteOK && newGeneration)
 
+	type operator func(ctx context.Context, c jsmClient, spec apis.StreamTemplateSpec) (err error)
+
+	natsClientUtil := func(op operator) error {
+		servers := spec.Servers
+		if len(servers) != 0 {
+			// Create a new client
+			opts := make([]nats.Option, 0)
+			opts = append(opts, nats.Name(c.opts.NATSClientName+spec.Name))
+			opts = append(opts, nats.MaxReconnects(-1))
+
+			natsServers := strings.Join(servers, ",")
+			newNc, err := nats.Connect(natsServers, opts...)
+			if err != nil {
+				return fmt.Errorf("failed to connect to nats-servers(%s): %w", natsServers, err)
+			}
+
+			c.normalEvent(strTmpl, "Connecting", fmt.Sprint("Connecting to new nats-servers"))
+			newJm, err := jsm.New(newNc)
+			if err != nil {
+				return err
+			}
+			newJsmc := &realJsmClient{nc: newNc, jm: newJm}
+
+			if err := op(c.ctx, newJsmc, spec); err != nil {
+				return err
+			}
+			newJsmc.Close()
+		} else {
+			if err := op(c.ctx, jsmc, spec); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
 	switch {
 	case createOK:
 		c.normalEvent(strTmpl, "Creating", fmt.Sprintf("Creating stream template %q", spec.Name))
-		if err := createStreamTemplate(c.ctx, jsmc, spec); err != nil {
+		if err := natsClientUtil(createStreamTemplate); err != nil {
 			return err
 		}
 
@@ -83,7 +121,7 @@ func (c *Controller) processStreamTemplate(ns, name string, jsmc jsmClient) (err
 		c.warningEvent(strTmpl, "Updating", fmt.Sprintf("Stream template (%q) updates are not allowed, recreate to update", spec.Name))
 	case deleteOK:
 		c.normalEvent(strTmpl, "Deleting", fmt.Sprintf("Deleting stream template %q", spec.Name))
-		if err := deleteStreamTemplate(c.ctx, jsmc, spec.Name); err != nil {
+		if err := natsClientUtil(deleteStreamTemplate); err != nil {
 			return err
 		}
 
@@ -158,7 +196,8 @@ func createStreamTemplate(ctx context.Context, c jsmClient, spec apis.StreamTemp
 	return err
 }
 
-func deleteStreamTemplate(ctx context.Context, c jsmClient, name string) (err error) {
+func deleteStreamTemplate(ctx context.Context, c jsmClient, spec apis.StreamTemplateSpec) (err error) {
+	name := spec.Name
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("failed to delete stream template %q: %w", name, err)
