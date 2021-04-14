@@ -39,6 +39,8 @@ type StreamSpec struct {
 	Retention         string           `json:"retention"`
 	Sources           []*StreamSource  `json:"sources"`
 	Servers           []string         `json:"servers"`
+	Creds           string   `json:"creds"`
+	Nkey            string   `json:"nkey"`
 	Storage           string           `json:"storage"`
 	Subjects          []string         `json:"subjects"`
 }

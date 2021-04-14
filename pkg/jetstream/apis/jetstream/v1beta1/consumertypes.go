@@ -22,25 +22,27 @@ func (c *Consumer) GetSpec() interface{} {
 
 // ConsumerSpec is the spec for a Consumer resource
 type ConsumerSpec struct {
-	AckPolicy         string `json:"ackPolicy"`
-	AckWait           string `json:"ackWait"`
-	DeliverGroup      string `json:"deliverGroup"`
-	DeliverPolicy     string `json:"deliverPolicy"`
-	DeliverSubject    string `json:"deliverSubject"`
-	Description       string `json:"description"`
-	DurableName       string `json:"durableName"`
-	FilterSubject     string `json:"filterSubject"`
-	FlowControl       bool   `json:"flowControl"`
-	HeartbeatInterval string `json:"heartbeatInterval"`
-	MaxAckPending     int    `json:"maxAckPending"`
-	MaxDeliver        int    `json:"maxDeliver"`
-	OptStartSeq       int    `json:"optStartSeq"`
-	OptStartTime      string `json:"optStartTime"`
-	RateLimitBps      int    `json:"rateLimitBps"`
-	ReplayPolicy      string `json:"replayPolicy"`
-	SampleFreq        string `json:"sampleFreq"`
+a	AckPolicy         string   `json:"ackPolicy"`
+	AckWait           string   `json:"ackWait"`
+	Creds             string   `json:"creds"`
+	DeliverGroup      string   `json:"deliverGroup"`
+	DeliverPolicy     string   `json:"deliverPolicy"`
+	DeliverSubject    string   `json:"deliverSubject"`
+	Description       string   `json:"description"`
+	DurableName       string   `json:"durableName"`
+	FilterSubject     string   `json:"filterSubject"`
+	FlowControl       bool     `json:"flowControl"`
+	HeartbeatInterval string   `json:"heartbeatInterval"`
+	MaxAckPending     int      `json:"maxAckPending"`
+	MaxDeliver        int      `json:"maxDeliver"`
+	Nkey              string   `json:"nkey"`
+	OptStartSeq       int      `json:"optStartSeq"`
+	OptStartTime      string   `json:"optStartTime"`
+	RateLimitBps      int      `json:"rateLimitBps"`
+	ReplayPolicy      string   `json:"replayPolicy"`
+	SampleFreq        string   `json:"sampleFreq"`
 	Servers           []string `json:"servers"`
-	StreamName        string `json:"streamName"`
+	StreamName        string   `json:"streamName"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
