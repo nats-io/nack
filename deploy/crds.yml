@@ -29,6 +29,14 @@ spec:
                 items:
                   type: string
                 default: []
+              creds:
+                description: NATS user credentials for connecting to servers. Please make sure your controller has mounted the cerds on its path.
+                type: string
+                default: ''
+              nkey:
+                description: NATS user NKey for connecting to servers.
+                type: string
+                default: ''
               name:
                 description: A unique name for the Stream.
                 type: string
@@ -163,6 +171,14 @@ spec:
                 items:
                   type: string
                 default: []
+              creds:
+                description: NATS user credentials for connecting to servers. Please make sure your controller has mounted the cerds on its path.
+                type: string
+                default: ''
+              nkey:
+                description: NATS user NKey for connecting to servers.
+                type: string
+                default: ''
               streamName:
                 description: The name of the Stream to create the Consumer in.
                 type: string
@@ -293,6 +309,14 @@ spec:
                 items:
                   type: string
                 default: []
+              creds:
+                description: NATS user credentials for connecting to servers. Please make sure your controller has mounted the cerds on its path.
+                type: string
+                default: ''
+              nkey:
+                description: NATS user NKey for connecting to servers.
+                type: string
+                default: ''
               name:
                 description: A unique name for the Stream Template.
                 type: string

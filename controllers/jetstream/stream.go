@@ -84,7 +84,17 @@ func (c *Controller) processStream(ns, name string, jsmc jsmClient) (err error) 
 		if len(servers) != 0 {
 			// Create a new client
 			opts := make([]nats.Option, 0)
-			opts = append(opts, nats.Name(c.opts.NATSClientName+spec.Name))
+			opts = append(opts, nats.Name(fmt.Sprintf("%s-str-%s-%d", c.opts.NATSClientName, spec.Name, str.Generation)))
+			// Use JWT/NKEYS based credentials if present.
+			if spec.Creds != "" {
+				opts = append(opts, nats.UserCredentials(spec.Creds))
+			} else if spec.Nkey != "" {
+				opt, err := nats.NkeyOptionFromSeed(spec.Nkey)
+				if err != nil {
+					return err
+				}
+				opts = append(opts, opt)
+			}
 			opts = append(opts, nats.MaxReconnects(-1))
 
 			natsServers := strings.Join(servers, ",")
@@ -93,7 +103,7 @@ func (c *Controller) processStream(ns, name string, jsmc jsmClient) (err error) 
 				return fmt.Errorf("failed to connect to nats-servers(%s): %w", natsServers, err)
 			}
 
-			c.normalEvent(str, "Connecting", fmt.Sprint("Connecting to new nats-servers"))
+			c.normalEvent(str, "Connecting", "Connecting to new nats-servers")
 			newJm, err := jsm.New(newNc)
 			if err != nil {
 				return err
