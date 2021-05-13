@@ -9,7 +9,6 @@ repoDirty := $(shell git diff --quiet || echo "-dirty")
 VERSION ?= version-not-set
 linkerVars := -X main.BuildTime=$(now) -X main.GitInfo=$(gitBranch)-$(gitCommit)$(repoDirty) -X main.Version=$(VERSION)
 
-jetstreamGenOut := $(shell grep -l -R "DO NOT EDIT" pkg/jetstream/)
 jetstreamGenIn:= $(shell grep -l -R -F "// +k8s:" pkg/jetstream/apis)
 jetstreamSrc := $(shell find cmd/jetstream-controller pkg/jetstream controllers/jetstream -name "*.go")
 
@@ -21,12 +20,17 @@ vendor: go.mod go.sum
 	go mod vendor
 	touch $@
 
-$(jetstreamGenOut): vendor $(jetstreamGenIn) pkg/k8scodegen/file-header.txt
+pkg/jetstream/generated pkg/jetstream/apis/jetstream/v1beta1/zz_generated.deepcopy.go: vendor $(jetstreamGenIn) pkg/k8scodegen/file-header.txt
+	rm -rf pkg/jetstream/generated
 	GOFLAGS='' bash vendor/k8s.io/code-generator/generate-groups.sh all \
 		github.com/nats-io/nack/pkg/jetstream/generated \
 		github.com/nats-io/nack/pkg/jetstream/apis \
 		"jetstream:v1beta1" \
+		--output-base . \
 		--go-header-file pkg/k8scodegen/file-header.txt
+	mv github.com/nats-io/nack/pkg/jetstream/generated pkg/jetstream/generated
+	mv github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta1/zz_generated.deepcopy.go pkg/jetstream/apis/jetstream/v1beta1/zz_generated.deepcopy.go
+	rm -rf github.com
 
 jetstream-controller: $(jetstreamSrc) vendor
 	go build -race -o $@ \
