@@ -205,7 +205,7 @@ nats-server -DV -js
 
 Build Docker image
 ```sh
-make jetstream-controller-docker jetstreamVersion=1.2.3
+make jetstream-controller-docker ver=1.2.3
 ```
 
 ## NATS Server Config Reloader
@@ -244,7 +244,7 @@ make nats-server-config-reloader
 
 Build Docker image
 ```sh
-make nats-server-config-reloader-docker configReloaderVersion=1.2.3
+make nats-server-config-reloader-docker ver=1.2.3
 ```
 
 ## NATS Boot Config
@@ -279,5 +279,5 @@ make nats-boot-config
 
 Build Docker image
 ```sh
-make nats-boot-config-docker bootConfigVersion=1.2.3
+make nats-boot-config-docker ver=1.2.3
 ```

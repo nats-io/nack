@@ -45,13 +45,13 @@ jetstream-controller.docker: $(jetstreamSrc) vendor
 
 .PHONY: jetstream-controller-docker
 jetstream-controller-docker:
-ifneq ($(jetstreamVersion),)
-	docker build --tag natsio/jetstream-controller:$(jetstreamVersion) \
-		--build-arg VERSION=$(jetstreamVersion) \
+ifneq ($(ver),)
+	docker build --tag natsio/jetstream-controller:$(ver) \
+		--build-arg VERSION=$(ver) \
 		--file docker/jetstream-controller/Dockerfile .
 else
-	# Missing jetstreamVersion, try again.
-	# make jetstream-controller-docker jetstreamVersion=1.2.3
+	# Missing version, try this.
+	# make jetstream-controller-docker ver=1.2.3
 	exit 1
 endif
 
@@ -68,13 +68,13 @@ nats-server-config-reloader.docker: $(configReloaderSrc) vendor
 
 .PHONY: nats-server-config-reloader-docker
 nats-server-config-reloader-docker:
-ifneq ($(configReloaderVersion),)
-	docker build --tag natsio/nats-server-config-reloader:$(configReloaderVersion) \
-		--build-arg VERSION=$(configReloaderVersion) \
+ifneq ($(ver),)
+	docker build --tag natsio/nats-server-config-reloader:$(ver) \
+		--build-arg VERSION=$(ver) \
 		--file docker/nats-server-config-reloader/Dockerfile .
 else
-	# Missing configReloaderVersion, try again.
-	# make nats-server-config-reloader-docker configReloaderVersion=1.2.3
+	# Missing version, try this.
+	# make nats-server-config-reloader-docker ver=1.2.3
 	exit 1
 endif
 
@@ -91,13 +91,13 @@ nats-boot-config.docker: $(bootConfigSrc) vendor
 
 .PHONY: nats-boot-config-docker
 nats-boot-config-docker:
-ifneq ($(bootConfigVersion),)
-	docker build --tag natsio/nats-boot-config:$(bootConfigVersion) \
-		--build-arg VERSION=$(bootConfigVersion) \
+ifneq ($(ver),)
+	docker build --tag natsio/nats-boot-config:$(ver) \
+		--build-arg VERSION=$(ver) \
 		--file docker/nats-boot-config/Dockerfile .
 else
-	# Missing bootConfigVersion, try again.
-	# make nats-boot-config-docker bootConfigVersion=1.2.3
+	# Missing version, try this.
+	# make nats-boot-config-docker ver=1.2.3
 	exit 1
 endif
 
