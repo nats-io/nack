@@ -16,6 +16,12 @@ configReloaderSrc := $(shell find cmd/nats-server-config-reloader/ pkg/natsreloa
 
 bootConfigSrc := $(shell find cmd/nats-boot-config/ pkg/bootconfig/ -name "*.go")
 
+default:
+	# Try these (read Makefile for more recipes):
+	#   make jetstream-controller
+	#   make nats-server-config-reloader
+	#   make nats-boot-config
+
 vendor: go.mod go.sum
 	go mod vendor
 	touch $@
