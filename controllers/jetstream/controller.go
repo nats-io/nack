@@ -67,6 +67,10 @@ type Options struct {
 	NATSNKey        string
 	NATSServerURL   string
 
+	NATSCA          string
+	NATSCertificate string
+	NATSKey         string
+
 	Recorder record.EventRecorder
 }
 
@@ -179,6 +183,14 @@ func (c *Controller) Run() error {
 			return nil
 		}
 		opts = append(opts, opt)
+	}
+
+	if c.opts.NATSCertificate != "" && c.opts.NATSKey != "" {
+		opts = append(opts, nats.ClientCert(c.opts.NATSCertificate, c.opts.NATSKey))
+	}
+
+	if c.opts.NATSCA != "" {
+		opts = append(opts, nats.RootCAs(c.opts.NATSCA))
 	}
 
 	// Always attempt to have a connection to NATS.
