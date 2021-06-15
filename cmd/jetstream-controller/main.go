@@ -50,6 +50,9 @@ func run() error {
 	version := flag.Bool("version", false, "Print the version and exit")
 	creds := flag.String("creds", "", "NATS Credentials")
 	nkey := flag.String("nkey", "", "NATS NKey")
+	cert := flag.String("tlscert", "", "NATS TLS public certificate")
+	key := flag.String("tlskey", "", "NATS TLS private key")
+	ca := flag.String("tlsca", "", "NATS TLS certificate authority chain")
 	server := flag.String("s", "", "NATS Server URL") // required
 	flag.Parse()
 
@@ -98,6 +101,9 @@ func run() error {
 		NATSCredentials: *creds,
 		NATSNKey:        *nkey,
 		NATSServerURL:   *server,
+		NATSCA:          *ca,
+		NATSCertificate: *cert,
+		NATSKey:         *key,
 		KubeIface:       kc,
 		JetstreamIface:  jc,
 	})
