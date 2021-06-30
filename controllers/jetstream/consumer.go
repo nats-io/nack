@@ -56,15 +56,6 @@ func (c *Controller) processConsumer(ns, name string, jsmc jsmClient) (err error
 		}
 	}()
 
-	deleteOK := cns.GetDeletionTimestamp() != nil
-	newGeneration := cns.Generation != cns.Status.ObservedGeneration
-	consumerOK, err := consumerExists(c.ctx, jsmc, spec.StreamName, spec.DurableName)
-	if err != nil {
-		return err
-	}
-	updateOK := (consumerOK && !deleteOK && newGeneration)
-	createOK := (!consumerOK && !deleteOK && newGeneration)
-
 	type operator func(ctx context.Context, c jsmClient, spec apis.ConsumerSpec) (err error)
 
 	natsClientUtil := func(op operator) error {
@@ -110,6 +101,19 @@ func (c *Controller) processConsumer(ns, name string, jsmc jsmClient) (err error
 		return nil
 	}
 
+	deleteOK := cns.GetDeletionTimestamp() != nil
+	newGeneration := cns.Generation != cns.Status.ObservedGeneration
+	consumerOK := true
+	err = natsClientUtil(consumerExists)
+	var apierr jsmapi.ApiError
+	if errors.As(err, &apierr) && apierr.NotFoundError() {
+		consumerOK = false
+	} else if err != nil {
+		return err
+	}
+	updateOK := (consumerOK && !deleteOK && newGeneration)
+	createOK := (!consumerOK && !deleteOK && newGeneration)
+
 	switch {
 	case createOK:
 		c.normalEvent(cns, "Creating",
@@ -148,22 +152,15 @@ func (c *Controller) processConsumer(ns, name string, jsmc jsmClient) (err error
 	return nil
 }
 
-func consumerExists(ctx context.Context, c jsmClient, stream, consumer string) (ok bool, err error) {
+func consumerExists(ctx context.Context, c jsmClient, spec apis.ConsumerSpec) (err error) {
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("failed to check if consumer exists: %w", err)
 		}
 	}()
 
-	var apierr jsmapi.ApiError
-	_, err = c.LoadConsumer(ctx, stream, consumer)
-	if errors.As(err, &apierr) && apierr.NotFoundError() {
-		return false, nil
-	} else if err != nil {
-		return false, err
-	}
-
-	return true, nil
+	_, err = c.LoadConsumer(ctx, spec.StreamName, spec.DurableName)
+	return err
 }
 
 func createConsumer(ctx context.Context, c jsmClient, spec apis.ConsumerSpec) (err error) {

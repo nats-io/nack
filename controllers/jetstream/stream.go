@@ -68,15 +68,6 @@ func (c *Controller) processStream(ns, name string, jsmc jsmClient) (err error) 
 		}
 	}()
 
-	deleteOK := str.GetDeletionTimestamp() != nil
-	newGeneration := str.Generation != str.Status.ObservedGeneration
-	strOK, err := streamExists(c.ctx, jsmc, spec.Name)
-	if err != nil {
-		return err
-	}
-	updateOK := (strOK && !deleteOK && newGeneration)
-	createOK := (!strOK && !deleteOK && newGeneration)
-
 	type operator func(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err error)
 
 	natsClientUtil := func(op operator) error {
@@ -121,6 +112,19 @@ func (c *Controller) processStream(ns, name string, jsmc jsmClient) (err error) 
 		}
 		return nil
 	}
+
+	deleteOK := str.GetDeletionTimestamp() != nil
+	newGeneration := str.Generation != str.Status.ObservedGeneration
+	strOK := true
+	err = natsClientUtil(streamExists)
+	var apierr jsmapi.ApiError
+	if errors.As(err, &apierr) && apierr.NotFoundError() {
+		strOK = false
+	} else if err != nil {
+		return err
+	}
+	updateOK := (strOK && !deleteOK && newGeneration)
+	createOK := (!strOK && !deleteOK && newGeneration)
 
 	switch {
 	case createOK:
@@ -172,22 +176,15 @@ func (c *Controller) processStream(ns, name string, jsmc jsmClient) (err error) 
 	return nil
 }
 
-func streamExists(ctx context.Context, c jsmClient, name string) (ok bool, err error) {
+func streamExists(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err error) {
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("failed to check if stream exists: %w", err)
 		}
 	}()
 
-	var apierr jsmapi.ApiError
-	_, err = c.LoadStream(ctx, name)
-	if errors.As(err, &apierr) && apierr.NotFoundError() {
-		return false, nil
-	} else if err != nil {
-		return false, err
-	}
-
-	return true, nil
+	_, err = c.LoadStream(ctx, spec.Name)
+	return err
 }
 
 func createStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err error) {
