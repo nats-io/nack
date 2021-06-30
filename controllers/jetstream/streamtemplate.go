@@ -56,15 +56,6 @@ func (c *Controller) processStreamTemplate(ns, name string, jsmc jsmClient) (err
 		}
 	}()
 
-	deleteOK := strTmpl.GetDeletionTimestamp() != nil
-	newGeneration := strTmpl.Generation != strTmpl.Status.ObservedGeneration
-	strTmplOK, err := streamTemplateExists(c.ctx, jsmc, spec.Name)
-	if err != nil {
-		return err
-	}
-	updateOK := (strTmplOK && !deleteOK && newGeneration)
-	createOK := (!strTmplOK && !deleteOK && newGeneration)
-
 	type operator func(ctx context.Context, c jsmClient, spec apis.StreamTemplateSpec) (err error)
 
 	natsClientUtil := func(op operator) error {
@@ -110,6 +101,19 @@ func (c *Controller) processStreamTemplate(ns, name string, jsmc jsmClient) (err
 		return nil
 	}
 
+	deleteOK := strTmpl.GetDeletionTimestamp() != nil
+	newGeneration := strTmpl.Generation != strTmpl.Status.ObservedGeneration
+	strTmplOK := true
+	err = natsClientUtil(streamTemplateExists)
+	var apierr jsmapi.ApiError
+	if errors.As(err, &apierr) && apierr.NotFoundError() {
+		strTmplOK = false
+	} else if err != nil {
+		return err
+	}
+	updateOK := (strTmplOK && !deleteOK && newGeneration)
+	createOK := (!strTmplOK && !deleteOK && newGeneration)
+
 	switch {
 	case createOK:
 		c.normalEvent(strTmpl, "Creating", fmt.Sprintf("Creating stream template %q", spec.Name))
@@ -145,22 +149,15 @@ func (c *Controller) processStreamTemplate(ns, name string, jsmc jsmClient) (err
 	return nil
 }
 
-func streamTemplateExists(ctx context.Context, c jsmClient, name string) (ok bool, err error) {
+func streamTemplateExists(ctx context.Context, c jsmClient, spec apis.StreamTemplateSpec) (err error) {
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("failed to check if stream exists: %w", err)
 		}
 	}()
 
-	var apierr jsmapi.ApiError
-	_, err = c.LoadStreamTemplate(ctx, name)
-	if errors.As(err, &apierr) && apierr.NotFoundError() {
-		return false, nil
-	} else if err != nil {
-		return false, err
-	}
-
-	return true, nil
+	_, err = c.LoadStreamTemplate(ctx, spec.Name)
+	return err
 }
 
 func createStreamTemplate(ctx context.Context, c jsmClient, spec apis.StreamTemplateSpec) (err error) {
