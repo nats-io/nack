@@ -16,7 +16,7 @@ spec:
       serviceAccountName: jetstream-controller
       containers:
       - name: jsc
-        image: connecteverything/jetstream-controller:0.1.0
+        image: natsio/jetstream-controller:0.3.0
         imagePullPolicy: IfNotPresent
         command:
         - /jetstream-controller
