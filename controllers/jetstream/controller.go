@@ -71,6 +71,8 @@ type Options struct {
 	NATSCertificate string
 	NATSKey         string
 
+	Namespace       string
+
 	Recorder record.EventRecorder
 }
 
@@ -102,7 +104,7 @@ type Controller struct {
 
 func NewController(opt Options) *Controller {
 	resyncPeriod := 30 * time.Second
-	informerFactory := informers.NewSharedInformerFactory(opt.JetstreamIface, resyncPeriod)
+	informerFactory := informers.NewSharedInformerFactory(opt.JetstreamIface, resyncPeriod, opt.Namespace)
 
 	streamInformer := informerFactory.Jetstream().V1beta1().Streams()
 	streamTmplInformer := informerFactory.Jetstream().V1beta1().StreamTemplates()
