@@ -18,6 +18,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"os"
 	"os/signal"
 	"syscall"
@@ -47,6 +48,7 @@ func main() {
 func run() error {
 	klog.InitFlags(nil)
 	kubeConfig := flag.String("kubeconfig", "", "Path to kubeconfig")
+	namespace := flag.String("namespace", v1.NamespaceAll, "Restrict to a namespace")
 	version := flag.Bool("version", false, "Print the version and exit")
 	creds := flag.String("creds", "", "NATS Credentials")
 	nkey := flag.String("nkey", "", "NATS NKey")
@@ -106,6 +108,7 @@ func run() error {
 		NATSKey:         *key,
 		KubeIface:       kc,
 		JetstreamIface:  jc,
+		Namespace:       *namespace,
 	})
 
 	klog.Infof("Starting %s %s...", os.Args[0], Version)

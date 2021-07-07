@@ -72,9 +72,9 @@ func WithNamespace(namespace string) SharedInformerOption {
 	}
 }
 
-// NewSharedInformerFactory constructs a new instance of sharedInformerFactory for all namespaces.
-func NewSharedInformerFactory(client versioned.Interface, defaultResync time.Duration) SharedInformerFactory {
-	return NewSharedInformerFactoryWithOptions(client, defaultResync)
+// NewSharedInformerFactory constructs a new instance of sharedInformerFactory.
+func NewSharedInformerFactory(client versioned.Interface, defaultResync time.Duration, namespace string) SharedInformerFactory {
+	return NewSharedInformerFactoryWithOptions(client, defaultResync, WithNamespace(namespace))
 }
 
 // NewFilteredSharedInformerFactory constructs a new instance of sharedInformerFactory.
@@ -89,7 +89,6 @@ func NewFilteredSharedInformerFactory(client versioned.Interface, defaultResync 
 func NewSharedInformerFactoryWithOptions(client versioned.Interface, defaultResync time.Duration, options ...SharedInformerOption) SharedInformerFactory {
 	factory := &sharedInformerFactory{
 		client:           client,
-		namespace:        v1.NamespaceAll,
 		defaultResync:    defaultResync,
 		informers:        make(map[reflect.Type]cache.SharedIndexInformer),
 		startedInformers: make(map[reflect.Type]bool),
