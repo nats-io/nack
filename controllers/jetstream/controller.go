@@ -104,7 +104,7 @@ type Controller struct {
 
 func NewController(opt Options) *Controller {
 	resyncPeriod := 30 * time.Second
-	informerFactory := informers.NewSharedInformerFactory(opt.JetstreamIface, resyncPeriod, opt.Namespace)
+	informerFactory := informers.NewSharedInformerFactoryWithOptions(opt.JetstreamIface, resyncPeriod, informers.WithNamespace(opt.Namespace))
 
 	streamInformer := informerFactory.Jetstream().V1beta1().Streams()
 	streamTmplInformer := informerFactory.Jetstream().V1beta1().StreamTemplates()
