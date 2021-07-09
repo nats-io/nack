@@ -17,12 +17,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	jsm "github.com/nats-io/jsm.go"
 	jsmapi "github.com/nats-io/jsm.go/api"
 	apis "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta1"
 	typed "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/typed/jetstream/v1beta1"
+	"github.com/nats-io/nats.go"
 
 	k8sapi "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -66,10 +68,59 @@ func (c *Controller) processStream(ns, name string, jsmc jsmClient) (err error) 
 		}
 	}()
 
+	type operator func(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err error)
+
+	natsClientUtil := func(op operator) error {
+		servers := spec.Servers
+		if len(servers) != 0 {
+			// Create a new client
+			opts := make([]nats.Option, 0)
+			opts = append(opts, nats.Name(fmt.Sprintf("%s-str-%s-%d", c.opts.NATSClientName, spec.Name, str.Generation)))
+			// Use JWT/NKEYS based credentials if present.
+			if spec.Creds != "" {
+				opts = append(opts, nats.UserCredentials(spec.Creds))
+			} else if spec.Nkey != "" {
+				opt, err := nats.NkeyOptionFromSeed(spec.Nkey)
+				if err != nil {
+					return err
+				}
+				opts = append(opts, opt)
+			}
+			opts = append(opts, nats.MaxReconnects(-1))
+
+			natsServers := strings.Join(servers, ",")
+			newNc, err := nats.Connect(natsServers, opts...)
+			if err != nil {
+				return fmt.Errorf("failed to connect to nats-servers(%s): %w", natsServers, err)
+			}
+
+			c.normalEvent(str, "Connecting", "Connecting to new nats-servers")
+			newJm, err := jsm.New(newNc)
+			if err != nil {
+				return err
+			}
+			newJsmc := &realJsmClient{nc: newNc, jm: newJm}
+
+			if err := op(c.ctx, newJsmc, spec); err != nil {
+				return err
+			}
+			newJsmc.Close()
+		} else {
+			if err := op(c.ctx, jsmc, spec); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
 	deleteOK := str.GetDeletionTimestamp() != nil
 	newGeneration := str.Generation != str.Status.ObservedGeneration
-	strOK, err := streamExists(c.ctx, jsmc, spec.Name)
-	if err != nil {
+	strOK := true
+	err = natsClientUtil(streamExists)
+	var apierr jsmapi.ApiError
+	if errors.As(err, &apierr) && apierr.NotFoundError() {
+		strOK = false
+	} else if err != nil {
 		return err
 	}
 	updateOK := (strOK && !deleteOK && newGeneration)
@@ -78,7 +129,7 @@ func (c *Controller) processStream(ns, name string, jsmc jsmClient) (err error) 
 	switch {
 	case createOK:
 		c.normalEvent(str, "Creating", fmt.Sprintf("Creating stream %q", spec.Name))
-		if err := createStream(c.ctx, jsmc, spec); err != nil {
+		if err := natsClientUtil(createStream); err != nil {
 			return err
 		}
 
@@ -94,7 +145,7 @@ func (c *Controller) processStream(ns, name string, jsmc jsmClient) (err error) 
 		c.normalEvent(str, "Created", fmt.Sprintf("Created stream %q", spec.Name))
 	case updateOK:
 		c.normalEvent(str, "Updating", fmt.Sprintf("Updating stream %q", spec.Name))
-		if err := updateStream(c.ctx, jsmc, spec); err != nil {
+		if err := natsClientUtil(updateStream); err != nil {
 			return err
 		}
 
@@ -111,7 +162,7 @@ func (c *Controller) processStream(ns, name string, jsmc jsmClient) (err error) 
 		return nil
 	case deleteOK:
 		c.normalEvent(str, "Deleting", fmt.Sprintf("Deleting stream %q", spec.Name))
-		if err := deleteStream(c.ctx, jsmc, spec.Name); err != nil {
+		if err := natsClientUtil(deleteStream); err != nil {
 			return err
 		}
 
@@ -125,22 +176,15 @@ func (c *Controller) processStream(ns, name string, jsmc jsmClient) (err error) 
 	return nil
 }
 
-func streamExists(ctx context.Context, c jsmClient, name string) (ok bool, err error) {
+func streamExists(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err error) {
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("failed to check if stream exists: %w", err)
 		}
 	}()
 
-	var apierr jsmapi.ApiError
-	_, err = c.LoadStream(ctx, name)
-	if errors.As(err, &apierr) && apierr.NotFoundError() {
-		return false, nil
-	} else if err != nil {
-		return false, err
-	}
-
-	return true, nil
+	_, err = c.LoadStream(ctx, spec.Name)
+	return err
 }
 
 func createStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err error) {
@@ -244,7 +288,8 @@ func updateStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 	})
 }
 
-func deleteStream(ctx context.Context, c jsmClient, name string) (err error) {
+func deleteStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err error) {
+	name := spec.Name
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("failed to delete stream %q: %w", name, err)
