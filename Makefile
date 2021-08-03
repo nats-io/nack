@@ -44,7 +44,7 @@ jetstream-controller: $(jetstreamSrc) vendor
 		github.com/nats-io/nack/cmd/jetstream-controller
 
 jetstream-controller.docker: $(jetstreamSrc) vendor
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o $@ \
+	CGO_ENABLED=0 GOOS=linux go build -o $@ \
 		-ldflags "-s -w $(linkerVars)" \
 		-tags timetzdata \
 		github.com/nats-io/nack/cmd/jetstream-controller
@@ -61,13 +61,28 @@ else
 	exit 1
 endif
 
+.PHONY: jetstream-controller-dockerx
+jetstream-controller-dockerx:
+ifneq ($(ver),)
+	# Ensure 'docker buildx ls' shows correct platforms.
+	docker buildx build --tag natsio/jetstream-controller:$(ver) \
+		--build-arg VERSION=$(ver) \
+		--platform linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64/v8 \
+		--file docker/jetstream-controller/Dockerfile \
+		--push .
+else
+	# Missing version, try this.
+	# make jetstream-controller-dockerx ver=1.2.3
+	exit 1
+endif
+
 nats-server-config-reloader: $(configReloaderSrc) vendor
 	go build -race -o $@ \
 		-ldflags "$(linkerVars)" \
 		github.com/nats-io/nack/cmd/nats-server-config-reloader
 
 nats-server-config-reloader.docker: $(configReloaderSrc) vendor
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o $@ \
+	CGO_ENABLED=0 GOOS=linux go build -o $@ \
 		-ldflags "-s -w $(linkerVars)" \
 		-tags timetzdata \
 		github.com/nats-io/nack/cmd/nats-server-config-reloader
@@ -84,13 +99,28 @@ else
 	exit 1
 endif
 
+.PHONY: nats-server-config-reloader-dockerx
+nats-server-config-reloader-dockerx:
+ifneq ($(ver),)
+	# Ensure 'docker buildx ls' shows correct platforms.
+	docker buildx build --tag natsio/nats-server-config-reloader:$(ver) \
+		--build-arg VERSION=$(ver) \
+		--platform linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64/v8 \
+		--file docker/nats-server-config-reloader/Dockerfile \
+		--push .
+else
+	# Missing version, try this.
+	# make nats-server-config-reloader-dockerx ver=1.2.3
+	exit 1
+endif
+
 nats-boot-config: $(bootConfigSrc) vendor
 	go build -race -o $@ \
 		-ldflags "$(linkerVars)" \
 		github.com/nats-io/nack/cmd/nats-boot-config
 
 nats-boot-config.docker: $(bootConfigSrc) vendor
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o $@ \
+	CGO_ENABLED=0 GOOS=linux go build -o $@ \
 		-ldflags "-s -w $(linkerVars)" \
 		-tags timetzdata \
 		github.com/nats-io/nack/cmd/nats-boot-config
@@ -104,6 +134,21 @@ ifneq ($(ver),)
 else
 	# Missing version, try this.
 	# make nats-boot-config-docker ver=1.2.3
+	exit 1
+endif
+
+.PHONY: nats-boot-config-dockerx
+nats-boot-config-dockerx:
+ifneq ($(ver),)
+	# Ensure 'docker buildx ls' shows correct platforms.
+	docker buildx build --tag natsio/nats-boot-config:$(ver) \
+		--build-arg VERSION=$(ver) \
+		--platform linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64/v8 \
+		--file docker/nats-boot-config/Dockerfile \
+		--push .
+else
+	# Missing version, try this.
+	# make nats-boot-config-dockerx ver=1.2.3
 	exit 1
 endif
 
