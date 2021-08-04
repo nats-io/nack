@@ -65,7 +65,8 @@ endif
 jetstream-controller-dockerx:
 ifneq ($(ver),)
 	# Ensure 'docker buildx ls' shows correct platforms.
-	docker buildx build --tag natsio/jetstream-controller:$(ver) \
+	docker buildx build \
+		--tag natsio/jetstream-controller:$(ver) --tag natsio/jetstream-controller:latest \
 		--build-arg VERSION=$(ver) \
 		--platform linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64/v8 \
 		--file docker/jetstream-controller/Dockerfile \
@@ -103,7 +104,8 @@ endif
 nats-server-config-reloader-dockerx:
 ifneq ($(ver),)
 	# Ensure 'docker buildx ls' shows correct platforms.
-	docker buildx build --tag natsio/nats-server-config-reloader:$(ver) \
+	docker buildx build \
+		--tag natsio/nats-server-config-reloader:$(ver) --tag natsio/nats-server-config-reloader:latest \
 		--build-arg VERSION=$(ver) \
 		--platform linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64/v8 \
 		--file docker/nats-server-config-reloader/Dockerfile \
@@ -141,7 +143,8 @@ endif
 nats-boot-config-dockerx:
 ifneq ($(ver),)
 	# Ensure 'docker buildx ls' shows correct platforms.
-	docker buildx build --tag natsio/nats-boot-config:$(ver) \
+	docker buildx build \
+		--tag natsio/nats-boot-config:$(ver) --tag natsio/nats-boot-config:latest \
 		--build-arg VERSION=$(ver) \
 		--platform linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64/v8 \
 		--file docker/nats-boot-config/Dockerfile \
