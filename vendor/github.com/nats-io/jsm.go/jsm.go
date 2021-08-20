@@ -110,3 +110,58 @@ func IsValidName(n string) bool {
 
 	return !strings.ContainsAny(n, ">*. ")
 }
+
+// APISubject returns API subject with prefix applied
+func APISubject(subject string, prefix string, domain string) string {
+	if domain != "" {
+		return fmt.Sprintf("$JS.%s.API", domain) + strings.TrimPrefix(subject, "$JS.API")
+	}
+
+	if prefix == "" {
+		return subject
+	}
+
+	return prefix + strings.TrimPrefix(subject, "$JS.API")
+}
+
+// EventSubject returns Event subject with prefix applied
+func EventSubject(subject string, prefix string) string {
+	if prefix == "" {
+		return subject
+	}
+
+	return prefix + strings.TrimPrefix(subject, "$JS.EVENT")
+}
+
+// ParsePubAck parses a stream publish response and returns an error if the publish failed or parsing failed
+func ParsePubAck(m *nats.Msg) (*api.PubAck, error) {
+	if m == nil {
+		return nil, fmt.Errorf("no message supplied")
+	}
+
+	err := ParseErrorResponse(m)
+	if err != nil {
+		return nil, err
+	}
+
+	res := api.PubAck{}
+	err = json.Unmarshal(m.Data, &res)
+	if err != nil {
+		return nil, err
+	}
+
+	return &res, nil
+}
+
+// IsNatsError checks if err is a ApiErr matching code
+func IsNatsError(err error, code uint16) bool {
+	if ae, ok := err.(*api.ApiError); ok {
+		return ae.NatsErrorCode() == code
+	}
+
+	if ae, ok := err.(api.ApiError); ok {
+		return ae.NatsErrorCode() == code
+	}
+
+	return false
+}

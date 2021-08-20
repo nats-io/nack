@@ -1,0 +1,258 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://nats.io/schemas/jetstream/api/v1/stream_update_request.json",
+  "description": "A request to the JetStream $JS.API.STREAM.UPDATE API",
+  "title": "io.nats.jetstream.api.v1.stream_update_request",
+  "type": "object",
+  "allOf": [
+    {
+      "type": "object",
+      "required": [
+        "retention",
+        "max_consumers",
+        "max_msgs",
+        "max_bytes",
+        "max_age",
+        "storage",
+        "num_replicas"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "description": "A unique name for the Stream, empty for Stream Templates.",
+          "type": "string",
+          "pattern": "^[^.*>]*$",
+          "minLength": 0
+        },
+        "subjects": {
+          "description": "A list of subjects to consume, supports wildcards. Must be empty when a mirror is configured. May be empty when sources are configured.",
+          "type": "array",
+          "minLength": 0,
+          "items": {
+            "type": "string"
+          }
+        },
+        "retention": {
+          "description": "How messages are retained in the Stream, once this is exceeded old messages are removed.",
+          "type": "string",
+          "enum": [
+            "limits",
+            "interest",
+            "workqueue"
+          ],
+          "default": "limits"
+        },
+        "max_consumers": {
+          "description": "How many Consumers can be defined for a given Stream. -1 for unlimited.",
+          "minimum": -1,
+          "default": -1,
+          "$comment": "integer with a dynamic bit size depending on the platform the cluster runs on, can be up to 64bit",
+          "type": "integer",
+          "maximum": 9223372036854775807
+        },
+        "max_msgs": {
+          "description": "How many messages may be in a Stream, oldest messages will be removed if the Stream exceeds this size. -1 for unlimited.",
+          "minimum": -1,
+          "default": -1,
+          "$comment": "unsigned 64 bit integer",
+          "type": "integer",
+          "maximum": 18446744073709551615
+        },
+        "max_msgs_per_subject": {
+          "description": "For wildcard streams ensure that for every unique subject this many messages are kept - a per subject retention limit",
+          "minimum": -1,
+          "default": -1,
+          "$comment": "unsigned 64 bit integer",
+          "type": "integer",
+          "maximum": 18446744073709551615
+        },
+        "max_bytes": {
+          "description": "How big the Stream may be, when the combined stream size exceeds this old messages are removed. -1 for unlimited.",
+          "minimum": -1,
+          "default": -1,
+          "$comment": "unsigned 64 bit integer",
+          "type": "integer",
+          "maximum": 18446744073709551615
+        },
+        "max_age": {
+          "description": "Maximum age of any message in the stream, expressed in nanoseconds. 0 for unlimited.",
+          "minimum": 0,
+          "default": 0,
+          "$comment": "nanoseconds depicting a duration in time, signed 64 bit integer",
+          "type": "integer",
+          "maximum": 9223372036854775807
+        },
+        "max_msg_size": {
+          "description": "The largest message that will be accepted by the Stream. -1 for unlimited.",
+          "minimum": -1,
+          "default": -1,
+          "$comment": "signed 32 bit integer",
+          "type": "integer",
+          "maximum": 2147483647
+        },
+        "storage": {
+          "description": "The storage backend to use for the Stream.",
+          "type": "string",
+          "enum": [
+            "file",
+            "memory"
+          ],
+          "default": "file"
+        },
+        "num_replicas": {
+          "description": "How many replicas to keep for each message.",
+          "minimum": 1,
+          "default": 1,
+          "maximum": 5,
+          "$comment": "integer with a dynamic bit size depending on the platform the cluster runs on, can be up to 64bit",
+          "type": "integer"
+        },
+        "no_ack": {
+          "description": "Disables acknowledging messages that are received by the Stream.",
+          "type": "boolean",
+          "default": false
+        },
+        "template_owner": {
+          "description": "When the Stream is managed by a Stream Template this identifies the template that manages the Stream.",
+          "type": "string"
+        },
+        "discard": {
+          "description": "When a Stream reach it's limits either old messages are deleted or new ones are denied",
+          "type": "string",
+          "enum": [
+            "old",
+            "new"
+          ],
+          "default": "old"
+        },
+        "duplicate_window": {
+          "description": "The time window to track duplicate messages for, expressed in nanoseconds. 0 for default",
+          "minimum": 0,
+          "default": 0,
+          "$comment": "nanoseconds depicting a duration in time, signed 64 bit integer",
+          "type": "integer",
+          "maximum": 9223372036854775807
+        },
+        "placement": {
+          "description": "Placement directives to consider when placing replicas of this stream, random placement when unset",
+          "type": "object",
+          "required": [
+            "cluster"
+          ],
+          "properties": {
+            "cluster": {
+              "type": "string",
+              "description": "The desired cluster name to place the stream",
+              "minLength": 1
+            },
+            "tags": {
+              "description": "Tags required on servers hosting this stream",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "mirror": {
+          "description": "Maintains a 1:1 mirror of another stream with name matching this property.  When a mirror is configured subjects and sources must be empty.",
+          "type": "object",
+          "required": [
+            "name"
+          ],
+          "properties": {
+            "name": {
+              "description": "Stream name",
+              "type": "string",
+              "pattern": "^[^.*>]+$",
+              "minLength": 1
+            },
+            "opt_start_seq": {
+              "description": "Sequence to start replicating from",
+              "$comment": "unsigned 64 bit integer",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 18446744073709551615
+            },
+            "opt_start_time": {
+              "description": "Time stamp to start replicating from",
+              "type": "string"
+            },
+            "filter_subject": {
+              "description": "Replicate only a subset of messages based on filter",
+              "type": "string"
+            },
+            "external": {
+              "required": [
+                "api"
+              ],
+              "type": "object",
+              "description": "Configuration referencing a stream source in another account or JetStream domain",
+              "properties": {
+                "api": {
+                  "type": "string",
+                  "description": "The subject prefix that imports the other account/domain $JS.API.CONSUMER.> subjects"
+                },
+                "deliver": {
+                  "type": "string",
+                  "description": "The delivery subject to use for the push consumer"
+                }
+              }
+            }
+          }
+        },
+        "sources": {
+          "type": "array",
+          "description": "List of Stream names to replicate into this Stream",
+          "items": {
+            "type": "object",
+            "description": "Defines a source where streams should be replicated from",
+            "required": [
+              "name"
+            ],
+            "properties": {
+              "name": {
+                "description": "Stream name",
+                "type": "string",
+                "pattern": "^[^.*>]+$",
+                "minLength": 1
+              },
+              "opt_start_seq": {
+                "description": "Sequence to start replicating from",
+                "$comment": "unsigned 64 bit integer",
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 18446744073709551615
+              },
+              "opt_start_time": {
+                "description": "Time stamp to start replicating from",
+                "type": "string"
+              },
+              "filter_subject": {
+                "description": "Replicate only a subset of messages based on filter",
+                "type": "string"
+              },
+              "external": {
+                "required": [
+                  "api"
+                ],
+                "type": "object",
+                "description": "Configuration referencing a stream source in another account or JetStream domain",
+                "properties": {
+                  "api": {
+                    "type": "string",
+                    "description": "The subject prefix that imports the other account/domain $JS.API.CONSUMER.> subjects"
+                  },
+                  "deliver": {
+                    "type": "string",
+                    "description": "The delivery subject to use for the push consumer"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

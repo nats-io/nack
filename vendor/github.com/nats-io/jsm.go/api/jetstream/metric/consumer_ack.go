@@ -20,7 +20,7 @@ type ConsumerAckMetricV1 struct {
 }
 
 func init() {
-	err := event.RegisterTextCompactTemplate("io.nats.jetstream.metric.v1.consumer_ack", `{{ .Time | ShortTime }} [JS Ack] {{ .Stream }} ({{ .Stream }}) > {{ .Consumer }} ({{ .Consumer}}): {{ .Deliveries }} deliveries in {{ .Delay }}`)
+	err := event.RegisterTextCompactTemplate("io.nats.jetstream.metric.v1.consumer_ack", `{{ .Time | ShortTime }} [JS Ack] {{ .Stream }} ({{ .StreamSeq }}) > {{ .Consumer }} ({{ .ConsumerSeq}}): {{ .Deliveries }} deliveries in {{ .Delay }}`)
 	if err != nil {
 		panic(err)
 	}
@@ -29,8 +29,8 @@ func init() {
 [{{ .Time | ShortTime }}] [{{ .ID }}] Acknowledgment Sample
 
               Consumer: {{ .Stream }} > {{ .Consumer }}
-       Stream Sequence: {{ .Stream }}
-     Consumer Sequence: {{ .Consumer }}
+       Stream Sequence: {{ .StreamSeq }}
+     Consumer Sequence: {{ .ConsumerSeq }}
             Deliveries: {{ .Deliveries }}
                  Delay: {{ .Delay }}`)
 	if err != nil {

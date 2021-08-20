@@ -28,6 +28,7 @@ var DefaultStream = api.StreamConfig{
 	Discard:      api.DiscardOld,
 	MaxConsumers: -1,
 	MaxMsgs:      -1,
+	MaxMsgsPer:   -1,
 	MaxBytes:     -1,
 	MaxAge:       24 * 365 * time.Hour,
 	MaxMsgSize:   -1,
@@ -41,10 +42,11 @@ var DefaultWorkQueue = api.StreamConfig{
 	Discard:      api.DiscardOld,
 	MaxConsumers: -1,
 	MaxMsgs:      -1,
+	MaxMsgsPer:   -1,
 	MaxBytes:     -1,
 	MaxAge:       24 * 365 * time.Hour,
 	MaxMsgSize:   -1,
-	Replicas:     1,
+	Replicas:     api.StreamDefaultReplicas,
 	NoAck:        false,
 }
 
@@ -121,7 +123,7 @@ func (m *Manager) NewStream(name string, opts ...StreamOption) (stream *Stream, 
 	return m.NewStreamFromDefault(name, DefaultStream, opts...)
 }
 
-// LoadOrNewStreamFromDefault loads an existing stream or creates a new one matching opts
+// LoadOrNewStream loads an existing stream or creates a new one matching opts
 func (m *Manager) LoadOrNewStream(name string, opts ...StreamOption) (stream *Stream, err error) {
 	return m.LoadOrNewStreamFromDefault(name, DefaultStream, opts...)
 }
@@ -230,6 +232,13 @@ func MaxMessages(m int64) StreamOption {
 	}
 }
 
+func MaxMessagesPerSubject(m int64) StreamOption {
+	return func(o *api.StreamConfig) error {
+		o.MaxMsgsPer = m
+		return nil
+	}
+}
+
 func MaxBytes(m int64) StreamOption {
 	return func(o *api.StreamConfig) error {
 		o.MaxBytes = m
@@ -296,6 +305,54 @@ func DiscardOld() StreamOption {
 func DuplicateWindow(d time.Duration) StreamOption {
 	return func(o *api.StreamConfig) error {
 		o.Duplicates = d
+		return nil
+	}
+}
+
+func PlacementCluster(cluster string) StreamOption {
+	return func(o *api.StreamConfig) error {
+		if o.Placement == nil {
+			o.Placement = &api.Placement{}
+		}
+
+		o.Placement.Cluster = cluster
+
+		return nil
+	}
+}
+
+func PlacementTags(tags ...string) StreamOption {
+	return func(o *api.StreamConfig) error {
+		if o.Placement == nil {
+			o.Placement = &api.Placement{}
+		}
+
+		o.Placement.Tags = tags
+
+		return nil
+	}
+}
+
+func Mirror(stream *api.StreamSource) StreamOption {
+	return func(o *api.StreamConfig) error {
+		o.Mirror = stream
+
+		return nil
+	}
+}
+
+func AppendSource(source *api.StreamSource) StreamOption {
+	return func(o *api.StreamConfig) error {
+		o.Sources = append(o.Sources, source)
+
+		return nil
+	}
+}
+
+func Sources(streams ...*api.StreamSource) StreamOption {
+	return func(o *api.StreamConfig) error {
+		o.Sources = streams
+
 		return nil
 	}
 }
@@ -443,10 +500,19 @@ func (s *Stream) Delete() error {
 	return nil
 }
 
-// Purge deletes all messages from the Stream
-func (s *Stream) Purge() error {
+// Purge deletes messages from the Stream, an optional JSApiStreamPurgeRequest can be supplied to limit the purge to a subset of messages
+func (s *Stream) Purge(opts ...*api.JSApiStreamPurgeRequest) error {
+	if len(opts) > 1 {
+		return fmt.Errorf("only one purge option allowed")
+	}
+
+	var req *api.JSApiStreamPurgeRequest
+	if len(opts) == 1 {
+		req = opts[0]
+	}
+
 	var resp api.JSApiStreamPurgeResponse
-	err := s.mgr.jsonRequest(fmt.Sprintf(api.JSApiStreamPurgeT, s.Name()), nil, &resp)
+	err := s.mgr.jsonRequest(fmt.Sprintf(api.JSApiStreamPurgeT, s.Name()), req, &resp)
 	if err != nil {
 		return err
 	}
@@ -458,10 +524,15 @@ func (s *Stream) Purge() error {
 	return nil
 }
 
+// ReadLastMessageForSubject reads the last message stored in the stream for a specific subject
+func (s *Stream) ReadLastMessageForSubject(subj string) (*api.StoredMsg, error) {
+	return s.mgr.ReadLastMessageForSubject(s.Name(), subj)
+}
+
 // ReadMessage loads a message from the stream by its sequence number
-func (s *Stream) ReadMessage(seq int) (msg *api.StoredMsg, err error) {
+func (s *Stream) ReadMessage(seq uint64) (msg *api.StoredMsg, err error) {
 	var resp api.JSApiMsgGetResponse
-	err = s.mgr.jsonRequest(fmt.Sprintf(api.JSApiMsgGetT, s.Name()), api.JSApiMsgGetRequest{Seq: uint64(seq)}, &resp)
+	err = s.mgr.jsonRequest(fmt.Sprintf(api.JSApiMsgGetT, s.Name()), api.JSApiMsgGetRequest{Seq: seq}, &resp)
 	if err != nil {
 		return nil, err
 	}
@@ -469,10 +540,15 @@ func (s *Stream) ReadMessage(seq int) (msg *api.StoredMsg, err error) {
 	return resp.Message, nil
 }
 
-// DeleteMessage deletes a specific message from the Stream by overwriting it with random data
-func (s *Stream) DeleteMessage(seq int) (err error) {
+// FastDeleteMessage deletes a specific message from the Stream without erasing the data, see DeleteMessage() for a safe delete
+func (s *Stream) FastDeleteMessage(seq uint64) error {
+	return s.mgr.DeleteStreamMessage(s.Name(), seq, true)
+}
+
+// DeleteMessage deletes a specific message from the Stream by overwriting it with random data, see FastDeleteMessage() to remove the message without over writing data
+func (s *Stream) DeleteMessage(seq uint64) (err error) {
 	var resp api.JSApiMsgDeleteResponse
-	err = s.mgr.jsonRequest(fmt.Sprintf(api.JSApiMsgDeleteT, s.Name()), api.JSApiMsgDeleteRequest{Seq: uint64(seq)}, &resp)
+	err = s.mgr.jsonRequest(fmt.Sprintf(api.JSApiMsgDeleteT, s.Name()), api.JSApiMsgDeleteRequest{Seq: seq}, &resp)
 	if err != nil {
 		return err
 	}
@@ -495,8 +571,45 @@ func (s *Stream) MetricSubject() string {
 	return api.JSMetricPrefix + ".*.*." + s.Name() + ".*"
 }
 
+// RemoveRAFTPeer removes a peer from the group indicating it will not return
+func (s *Stream) RemoveRAFTPeer(peer string) error {
+	var resp api.JSApiStreamRemovePeerResponse
+	err := s.mgr.jsonRequest(fmt.Sprintf(api.JSApiStreamRemovePeerT, s.Name()), api.JSApiStreamRemovePeerRequest{Peer: peer}, &resp)
+	if err != nil {
+		return err
+	}
+
+	if !resp.Success {
+		return fmt.Errorf("unknown error while removing peer %q", peer)
+	}
+
+	return nil
+}
+
+// LeaderStepDown requests the current RAFT group leader in a clustered JetStream to stand down forcing a new election
+func (s *Stream) LeaderStepDown() error {
+	var resp api.JSApiStreamLeaderStepDownResponse
+	err := s.mgr.jsonRequest(fmt.Sprintf(api.JSApiStreamLeaderStepDownT, s.Name()), nil, &resp)
+	if err != nil {
+		return err
+	}
+
+	if !resp.Success {
+		return fmt.Errorf("unknown error while requesting leader step down")
+	}
+
+	return nil
+}
+
 // IsTemplateManaged determines if this stream is managed by a template
 func (s *Stream) IsTemplateManaged() bool { return s.Template() != "" }
+
+// IsMirror determines if this stream is a mirror of another
+func (s *Stream) IsMirror() bool { return s.cfg.Mirror != nil }
+
+// IsSourced determines if this stream is sourcing data from another stream. Other streams
+// could be synced to this stream and it would not be reported by this property
+func (s *Stream) IsSourced() bool { return len(s.cfg.Sources) > 0 }
 
 func (s *Stream) Configuration() api.StreamConfig { return *s.cfg }
 func (s *Stream) Name() string                    { return s.cfg.Name }
@@ -504,6 +617,7 @@ func (s *Stream) Subjects() []string              { return s.cfg.Subjects }
 func (s *Stream) Retention() api.RetentionPolicy  { return s.cfg.Retention }
 func (s *Stream) MaxConsumers() int               { return s.cfg.MaxConsumers }
 func (s *Stream) MaxMsgs() int64                  { return s.cfg.MaxMsgs }
+func (s *Stream) MaxMsgsPerSubject() int64        { return s.cfg.MaxMsgsPer }
 func (s *Stream) MaxBytes() int64                 { return s.cfg.MaxBytes }
 func (s *Stream) MaxAge() time.Duration           { return s.cfg.MaxAge }
 func (s *Stream) MaxMsgSize() int32               { return s.cfg.MaxMsgSize }
@@ -512,3 +626,5 @@ func (s *Stream) Replicas() int                   { return s.cfg.Replicas }
 func (s *Stream) NoAck() bool                     { return s.cfg.NoAck }
 func (s *Stream) Template() string                { return s.cfg.Template }
 func (s *Stream) DuplicateWindow() time.Duration  { return s.cfg.Duplicates }
+func (s *Stream) Mirror() *api.StreamSource       { return s.cfg.Mirror }
+func (s *Stream) Sources() []*api.StreamSource    { return s.cfg.Sources }
