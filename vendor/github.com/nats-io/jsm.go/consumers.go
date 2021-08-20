@@ -17,8 +17,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -43,15 +45,18 @@ var SampledDefaultConsumer = api.ConsumerConfig{
 	SampleFrequency: "100%",
 }
 
-// ConsumerOptions configures consumers
+// ConsumerOption configures consumers
 type ConsumerOption func(o *api.ConsumerConfig) error
 
 // Consumer represents a JetStream consumer
 type Consumer struct {
-	name   string
-	stream string
-	cfg    *api.ConsumerConfig
-	mgr    *Manager
+	name     string
+	stream   string
+	cfg      *api.ConsumerConfig
+	mgr      *Manager
+	lastInfo *api.ConsumerInfo
+
+	sync.Mutex
 }
 
 // NewConsumerFromDefault creates a new consumer based on a template config that gets modified by opts
@@ -91,8 +96,10 @@ func (m *Manager) NewConsumerFromDefault(stream string, dflt api.ConsumerConfig,
 		return nil, fmt.Errorf("expected a consumer name but none were generated")
 	}
 
-	// TODO: we have the info, avoid this round trip
-	return m.LoadConsumer(stream, createdInfo.Name)
+	c := m.consumerFromCfg(stream, createdInfo.Name, &createdInfo.Config)
+	c.lastInfo = createdInfo
+
+	return c, nil
 }
 
 func (m *Manager) createDurableConsumer(req api.JSApiConsumerCreateRequest) (info *api.ConsumerInfo, err error) {
@@ -196,7 +203,10 @@ func (m *Manager) loadConfigForConsumer(consumer *Consumer) (err error) {
 		return err
 	}
 
+	consumer.Lock()
 	consumer.cfg = &info.Config
+	consumer.lastInfo = &info
+	consumer.Unlock()
 
 	return nil
 }
@@ -246,7 +256,8 @@ func StartAtTime(t time.Time) ConsumerOption {
 	return func(o *api.ConsumerConfig) error {
 		resetDeliverPolicy(o)
 		o.DeliverPolicy = api.DeliverByStartTime
-		o.OptStartTime = &t
+		ut := t.UTC()
+		o.OptStartTime = &ut
 		return nil
 	}
 }
@@ -283,7 +294,7 @@ func StartAtTimeDelta(d time.Duration) ConsumerOption {
 	return func(o *api.ConsumerConfig) error {
 		resetDeliverPolicy(o)
 
-		t := time.Now().Add(-1 * d)
+		t := time.Now().UTC().Add(-1 * d)
 		o.DeliverPolicy = api.DeliverByStartTime
 		o.OptStartTime = &t
 		return nil
@@ -388,10 +399,34 @@ func RateLimitBitsPerSecond(bps uint64) ConsumerOption {
 	}
 }
 
+// MaxWaiting is the number of outstanding pulls that are allowed on any one consumer.  Pulls made that exceeds this limit are discarded.
+func MaxWaiting(pulls uint) ConsumerOption {
+	return func(o *api.ConsumerConfig) error {
+		o.MaxWaiting = int(pulls)
+		return nil
+	}
+}
+
 // MaxAckPending maximum number of messages without acknowledgement that can be outstanding, once this limit is reached message delivery will be suspended
 func MaxAckPending(pending uint) ConsumerOption {
 	return func(o *api.ConsumerConfig) error {
 		o.MaxAckPending = int(pending)
+		return nil
+	}
+}
+
+// IdleHeartbeat sets the time before an idle consumer will send a empty message with Status header 100 indicating the consumer is still alive
+func IdleHeartbeat(hb time.Duration) ConsumerOption {
+	return func(o *api.ConsumerConfig) error {
+		o.Heartbeat = hb
+		return nil
+	}
+}
+
+// PushFlowControl enables flow control for push based consumers
+func PushFlowControl() ConsumerOption {
+	return func(o *api.ConsumerConfig) error {
+		o.FlowControl = true
 		return nil
 	}
 }
@@ -402,12 +437,22 @@ func (c *Consumer) Reset() error {
 }
 
 // NextSubject returns the subject used to retrieve the next message for pull-based Consumers, empty when not a pull-base consumer
+func (m *Manager) NextSubject(stream string, consumer string) (string, error) {
+	s, err := NextSubject(stream, consumer)
+	if err != nil {
+		return "", err
+	}
+
+	return m.apiSubject(s), err
+}
+
+// NextSubject returns the subject used to retrieve the next message for pull-based Consumers, empty when not a pull-base consumer
 func (c *Consumer) NextSubject() string {
 	if !c.IsPullMode() {
 		return ""
 	}
 
-	s, _ := NextSubject(c.stream, c.name)
+	s, _ := c.mgr.NextSubject(c.stream, c.name)
 
 	return s
 }
@@ -445,13 +490,17 @@ func (c *Consumer) MetricSubject() string {
 
 // NextMsg requests the next message from the server with the manager timeout
 func (m *Manager) NextMsg(stream string, consumer string) (*nats.Msg, error) {
-	s, err := NextSubject(stream, consumer)
+	if !m.nc.Opts.UseOldRequestStyle {
+		return nil, fmt.Errorf("pull mode requires the use of UseOldRequestStyle() option")
+	}
+
+	s, err := m.NextSubject(stream, consumer)
 	if err != nil {
 		return nil, err
 	}
 
 	rj, err := json.Marshal(&api.JSApiConsumerGetNextRequest{
-		Expires: time.Now().Add(m.timeout),
+		Expires: m.timeout,
 		Batch:   1,
 	})
 	if err != nil {
@@ -463,7 +512,7 @@ func (m *Manager) NextMsg(stream string, consumer string) (*nats.Msg, error) {
 
 // NextMsgRequest creates a request for a batch of messages on a consumer, data or control flow messages will be sent to inbox
 func (m *Manager) NextMsgRequest(stream string, consumer string, inbox string, req *api.JSApiConsumerGetNextRequest) error {
-	s, err := NextSubject(stream, consumer)
+	s, err := m.NextSubject(stream, consumer)
 	if err != nil {
 		return err
 	}
@@ -473,13 +522,21 @@ func (m *Manager) NextMsgRequest(stream string, consumer string, inbox string, r
 		return err
 	}
 
+	if m.trace {
+		log.Printf(">>> %s:\n%s\n\n", s, string(jreq))
+	}
+
 	return m.nc.PublishMsg(&nats.Msg{Subject: s, Reply: inbox, Data: jreq})
 }
 
 // NextMsg requests the next message from the server. This request will wait for as long as the context is
 // active. If repeated pulls will be made it's better to use NextMsgRequest()
 func (m *Manager) NextMsgContext(ctx context.Context, stream string, consumer string) (*nats.Msg, error) {
-	s, err := NextSubject(stream, consumer)
+	if !m.nc.Opts.UseOldRequestStyle {
+		return nil, fmt.Errorf("pull mode requires the use of UseOldRequestStyle() option")
+	}
+
+	s, err := m.NextSubject(stream, consumer)
 	if err != nil {
 		return nil, err
 	}
@@ -562,9 +619,31 @@ func (c *Consumer) RedeliveryCount() (int, error) {
 	return info.NumRedelivered, nil
 }
 
+// LatestState returns the most recently loaded state
+func (c *Consumer) LatestState() (api.ConsumerInfo, error) {
+	c.Lock()
+	s := c.lastInfo
+	c.Unlock()
+
+	if s != nil {
+		return *s, nil
+	}
+
+	return c.State()
+}
+
 // State loads a snapshot of consumer state including delivery counts, retries and more
 func (c *Consumer) State() (api.ConsumerInfo, error) {
-	return c.mgr.loadConsumerInfo(c.stream, c.name)
+	s, err := c.mgr.loadConsumerInfo(c.stream, c.name)
+	if err != nil {
+		return api.ConsumerInfo{}, err
+	}
+
+	c.Lock()
+	c.lastInfo = &s
+	c.Unlock()
+
+	return s, nil
 }
 
 // Configuration is the Consumer configuration
@@ -587,6 +666,21 @@ func (c *Consumer) Delete() (err error) {
 	return fmt.Errorf("unknown response while removing consumer %s", c.Name())
 }
 
+// LeaderStepDown requests the current RAFT group leader in a clustered JetStream to stand down forcing a new election
+func (c *Consumer) LeaderStepDown() error {
+	var resp api.JSApiConsumerLeaderStepDownResponse
+	err := c.mgr.jsonRequest(fmt.Sprintf(api.JSApiConsumerLeaderStepDownT, c.StreamName(), c.Name()), nil, &resp)
+	if err != nil {
+		return err
+	}
+
+	if !resp.Success {
+		return fmt.Errorf("unknown error while requesting leader step down")
+	}
+
+	return nil
+}
+
 func (c *Consumer) Name() string                     { return c.name }
 func (c *Consumer) IsSampled() bool                  { return c.SampleFrequency() != "" }
 func (c *Consumer) IsPullMode() bool                 { return c.cfg.DeliverSubject == "" }
@@ -606,6 +700,9 @@ func (c *Consumer) ReplayPolicy() api.ReplayPolicy   { return c.cfg.ReplayPolicy
 func (c *Consumer) SampleFrequency() string          { return c.cfg.SampleFrequency }
 func (c *Consumer) RateLimit() uint64                { return c.cfg.RateLimit }
 func (c *Consumer) MaxAckPending() int               { return c.cfg.MaxAckPending }
+func (c *Consumer) FlowControl() bool                { return c.cfg.FlowControl }
+func (c *Consumer) Heartbeat() time.Duration         { return c.cfg.Heartbeat }
+func (c *Consumer) MaxWaiting() int                  { return c.cfg.MaxWaiting }
 func (c *Consumer) StartTime() time.Time {
 	if c.cfg.OptStartTime == nil {
 		return time.Time{}

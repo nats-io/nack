@@ -2,6 +2,7 @@ package advisory
 
 import (
 	"github.com/nats-io/jsm.go/api/event"
+	"github.com/nats-io/jsm.go/api/server/advisory"
 )
 
 // JSSnapshotCreateAdvisoryV1 is an advisory sent after a snapshot is successfully started
@@ -9,10 +10,10 @@ import (
 // NATS Schema io.nats.jetstream.advisory.v1.snapshot_create
 type JSSnapshotCreateAdvisoryV1 struct {
 	event.NATSEvent
-	Stream  string           `json:"stream"`
-	NumBlks int64            `json:"blocks"`
-	BlkSize int64            `json:"block_size"`
-	Client  APIAuditClientV1 `json:"client"`
+	Stream  string                `json:"stream"`
+	NumBlks int64                 `json:"blocks"`
+	BlkSize int64                 `json:"block_size"`
+	Client  advisory.ClientInfoV1 `json:"client"`
 }
 
 func init() {
@@ -31,8 +32,8 @@ func init() {
 {{- if .Client.User }}
                       User: {{ .Client.User }} Account: {{ .Client.Account }}
 {{- end }}
-                      Host: {{ HostPort .Client.Host .Client.Port }}
-                       CID: {{ .Client.CID }}
+                      Host: {{ .Client.Host }}
+                       ID: {{ .Client.ID }}
 {{- if .Client.Name }}
                       Name: {{ .Client.Name }}
 {{- end }}

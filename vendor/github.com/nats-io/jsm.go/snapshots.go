@@ -14,32 +14,36 @@
 package jsm
 
 import (
-	"archive/tar"
-	"compress/gzip"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"math"
 	"net"
 	"os"
-	"strings"
+	"path/filepath"
 	"sync"
 	"time"
 
+	"github.com/klauspost/compress/s2"
 	"github.com/nats-io/nats.go"
 
 	"github.com/nats-io/jsm.go/api"
 )
 
 type snapshotOptions struct {
-	file      string
-	scb       func(SnapshotProgress)
-	rcb       func(RestoreProgress)
-	debug     bool
-	consumers bool
-	jsck      bool
-	chunkSz   int
+	dir           string
+	metaFile      string
+	dataFile      string
+	scb           func(SnapshotProgress)
+	rcb           func(RestoreProgress)
+	debug         bool
+	consumers     bool
+	jsck          bool
+	chunkSz       int
+	restoreConfig *api.StreamConfig
 }
 
 type SnapshotOption func(o *snapshotOptions)
@@ -79,6 +83,13 @@ func SnapshotDebug() SnapshotOption {
 	}
 }
 
+// RestoreConfiguration overrides the configuration used to restore
+func RestoreConfiguration(cfg api.StreamConfig) SnapshotOption {
+	return func(o *snapshotOptions) {
+		o.restoreConfig = &cfg
+	}
+}
+
 type SnapshotProgress interface {
 	// StartTime is when the process started
 	StartTime() time.Time
@@ -88,24 +99,18 @@ type SnapshotProgress interface {
 	ChunkSize() int
 	// ChunksReceived is how many chunks of ChunkSize were received
 	ChunksReceived() uint32
+	// BytesExpected is how many Bytes we should be receiving
+	BytesExpected() uint64
 	// BytesReceived is how many Bytes have been received
 	BytesReceived() uint64
-	// BlocksReceived is how many data storage Blocks have been received
-	BlocksReceived() int
-	// BlockSize is the size in bytes of each data storage Block
-	BlockSize() int
-	// BlocksExpected is the number of blocks expected to be received
-	BlocksExpected() int
-	// BlockBytesReceived is the size of uncompressed block data received
-	BlockBytesReceived() uint64
-	// HasMetadata indicates if the metadata blocks have been received yet
-	HasMetadata() bool
-	// HasData indicates if all the data blocks have been received
-	HasData() bool
+	// UncompressedBytesReceived is the number of bytes received uncompressed
+	UncompressedBytesReceived() uint64
 	// BytesPerSecond is the number of bytes received in the last second, 0 during the first second
 	BytesPerSecond() uint64
 	// HealthCheck indicates if health checking was requested
 	HealthCheck() bool
+	// Finished will be true after all data have been written
+	Finished() bool
 }
 
 type RestoreProgress interface {
@@ -126,66 +131,72 @@ type RestoreProgress interface {
 }
 
 type snapshotProgress struct {
-	startTime          time.Time
-	endTime            time.Time
-	healthCheck        bool
-	chunkSize          int
-	chunksReceived     uint32
-	chunksSent         uint32
-	chunksToSend       int
-	bytesReceived      uint64
-	bytesSent          uint64
-	blocksReceived     int32
-	blockSize          int
-	blocksExpected     int
-	blockBytesReceived uint64
-	metadataDone       bool
-	dataDone           bool
-	sending            bool   // if we are sending data, this is a hint for bps calc
-	bps                uint64 // Bytes per second
-	scb                func(SnapshotProgress)
-	rcb                func(RestoreProgress)
+	startTime                 time.Time
+	endTime                   time.Time
+	healthCheck               bool
+	chunkSize                 int
+	chunksReceived            uint32
+	chunksSent                uint32
+	chunksToSend              int
+	bytesReceived             uint64
+	uncompressedBytesReceived uint64
+	bytesExpected             uint64
+	bytesSent                 uint64
+	finished                  bool
+	sending                   bool   // if we are sending data, this is a hint for bps calc
+	bps                       uint64 // Bytes per second
+	scb                       func(SnapshotProgress)
+	rcb                       func(RestoreProgress)
 
 	sync.Mutex
 }
 
+func (sp *snapshotProgress) Finished() bool {
+	sp.Lock()
+	defer sp.Unlock()
+
+	return sp.finished
+}
+
 func (sp *snapshotProgress) HealthCheck() bool {
+	sp.Lock()
+	defer sp.Unlock()
+
 	return sp.healthCheck
 }
 
-func (sp *snapshotProgress) BlockBytesReceived() uint64 {
-	return sp.blockBytesReceived
-}
-
 func (sp *snapshotProgress) ChunksReceived() uint32 {
+	sp.Lock()
+	defer sp.Unlock()
+
 	return sp.chunksReceived
 }
 
+func (sp *snapshotProgress) BytesExpected() uint64 {
+	sp.Lock()
+	defer sp.Unlock()
+
+	return sp.bytesExpected
+}
+
 func (sp *snapshotProgress) BytesReceived() uint64 {
+	sp.Lock()
+	defer sp.Unlock()
+
 	return sp.bytesReceived
 }
 
-func (sp *snapshotProgress) BlocksReceived() int {
-	return int(sp.blocksReceived)
-}
+func (sp *snapshotProgress) UncompressedBytesReceived() uint64 {
+	sp.Lock()
+	defer sp.Unlock()
 
-func (sp *snapshotProgress) BlockSize() int {
-	return sp.blockSize
-}
-
-func (sp *snapshotProgress) BlocksExpected() int {
-	return sp.blocksExpected
-}
-
-func (sp *snapshotProgress) HasMetadata() bool {
-	return sp.metadataDone
-}
-
-func (sp *snapshotProgress) HasData() bool {
-	return sp.dataDone
+	return sp.uncompressedBytesReceived
 }
 
 func (sp *snapshotProgress) BytesPerSecond() uint64 {
+	sp.Lock()
+	defer sp.Unlock()
+
 	if sp.bps > 0 {
 		return sp.bps
 	}
@@ -198,26 +209,44 @@ func (sp *snapshotProgress) BytesPerSecond() uint64 {
 }
 
 func (sp *snapshotProgress) StartTime() time.Time {
+	sp.Lock()
+	defer sp.Unlock()
+
 	return sp.startTime
 }
 
 func (sp *snapshotProgress) EndTime() time.Time {
+	sp.Lock()
+	defer sp.Unlock()
+
 	return sp.endTime
 }
 
 func (sp *snapshotProgress) ChunkSize() int {
+	sp.Lock()
+	defer sp.Unlock()
+
 	return sp.chunkSize
 }
 
 func (sp *snapshotProgress) ChunksToSend() int {
+	sp.Lock()
+	defer sp.Unlock()
+
 	return sp.chunksToSend
 }
 
 func (sp *snapshotProgress) ChunksSent() uint32 {
+	sp.Lock()
+	defer sp.Unlock()
+
 	return sp.chunksSent
 }
 
 func (sp *snapshotProgress) BytesSent() uint64 {
+	sp.Lock()
+	defer sp.Unlock()
+
 	return sp.bytesSent
 }
 
@@ -230,67 +259,23 @@ func (sp *snapshotProgress) notify() {
 	}
 }
 
-// the tracker will gunzip and untar the stream as it passes by looking
-// for the file names in the tar data and based on these will notify the
-// caller about blocks received etc
+// the tracker will uncompress and untar the stream keeping count of bytes received etc
 func (sp *snapshotProgress) trackBlockProgress(r io.Reader, debug bool, errc chan error) {
-	seenMetaSum := false
-	seenMetaInf := false
-
-	zr, err := gzip.NewReader(r)
-	if err != nil {
-		errc <- fmt.Errorf("progress tracker failed to start gzip: %s", err)
-		return
-	}
-	defer zr.Close()
-
-	tr := tar.NewReader(zr)
+	sr := s2.NewReader(r)
 
 	for {
-		hdr, err := tr.Next()
-		if err == io.EOF {
-			errc <- fmt.Errorf("progress tracker received EOF")
-			return
-		}
+		b := make([]byte, sp.chunkSize)
+		i, err := sr.Read(b)
 		if err != nil {
-			errc <- fmt.Errorf("progress tracker received an unexpected error: %s", err)
+			sp.notify()
 			return
 		}
 
-		if debug {
-			log.Printf("Received file %s", hdr.Name)
-		}
+		sp.Lock()
+		sp.uncompressedBytesReceived += uint64(i)
+		sp.Unlock()
 
-		if !sp.metadataDone {
-			if hdr.Name == "meta.sum" {
-				seenMetaSum = true
-			}
-			if hdr.Name == "meta.inf" {
-				seenMetaInf = true
-			}
-			if seenMetaInf && seenMetaSum {
-				sp.metadataDone = true
-
-				// tell the caller soon as we are done with metadata
-				sp.notify()
-			}
-		}
-
-		if strings.HasSuffix(hdr.Name, "blk") {
-			sp.Lock()
-			br := sp.blocksReceived
-			sp.blocksReceived++
-			sp.blockBytesReceived += uint64(hdr.Size)
-			sp.Unlock()
-
-			// notify before setting done so callers can easily print the
-			// last progress for blocks
-			sp.notify()
-
-			if int(br) == sp.blocksExpected {
-				sp.dataDone = true
-			}
-		}
+		sp.notify()
 	}
 }
 
@@ -322,29 +307,56 @@ func (sp *snapshotProgress) trackBps(ctx context.Context) {
 	}
 }
 
-func (m *Manager) RestoreSnapshotFromFile(ctx context.Context, stream string, file string, opts ...SnapshotOption) (RestoreProgress, *api.StreamState, error) {
+func (m *Manager) RestoreSnapshotFromDirectory(ctx context.Context, stream string, dir string, opts ...SnapshotOption) (RestoreProgress, *api.StreamState, error) {
 	sopts := &snapshotOptions{
-		file:    file,
-		chunkSz: 512 * 1024,
+		dir:      dir,
+		dataFile: filepath.Join(dir, "stream.tar.s2"),
+		metaFile: filepath.Join(dir, "backup.json"),
+		chunkSz:  512 * 1024,
 	}
 
 	for _, opt := range opts {
 		opt(sopts)
 	}
 
-	fstat, err := os.Stat(file)
+	_, err := os.Stat(sopts.metaFile)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	inf, err := os.Open(file)
+	fstat, err := os.Stat(sopts.dataFile)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	req := api.JSApiStreamRestoreRequest{}
+	mj, err := ioutil.ReadFile(sopts.metaFile)
+	if err != nil {
+		return nil, nil, err
+	}
+	err = json.Unmarshal(mj, &req)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// allow full config override
+	if sopts.restoreConfig != nil {
+		req.Config = *sopts.restoreConfig
+	}
+
+	// allow just stream name override
+	if req.Config.Name != stream {
+		req.Config.Name = stream
+	}
+
+	inf, err := os.Open(sopts.dataFile)
 	if err != nil {
 		return nil, nil, err
 	}
 	defer inf.Close()
 
 	var resp api.JSApiStreamRestoreResponse
-	err = m.jsonRequest(fmt.Sprintf(api.JSApiStreamRestoreT, stream), map[string]string{}, &resp)
+	err = m.jsonRequest(fmt.Sprintf(api.JSApiStreamRestoreT, req.Config.Name), req, &resp)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -361,7 +373,7 @@ func (m *Manager) RestoreSnapshotFromFile(ctx context.Context, stream string, fi
 	go progress.trackBps(ctx)
 
 	if sopts.debug {
-		log.Printf("Starting restore of %q from %s using %d chunks", stream, file, progress.chunksToSend)
+		log.Printf("Starting restore of %q from %s using %d chunks", req.Config.Name, sopts.dataFile, progress.chunksToSend)
 	}
 
 	// in debug notify ~20ish times
@@ -443,10 +455,12 @@ func (m *Manager) RestoreSnapshotFromFile(ctx context.Context, stream string, fi
 	return progress, &createResp.State, nil
 }
 
-// SnapshotToFile creates a backup into gzipped tar file
-func (s *Stream) SnapshotToFile(ctx context.Context, file string, opts ...SnapshotOption) (SnapshotProgress, error) {
+// SnapshotToDirectory creates a backup into s2 compressed tar file
+func (s *Stream) SnapshotToDirectory(ctx context.Context, dir string, opts ...SnapshotOption) (SnapshotProgress, error) {
 	sopts := &snapshotOptions{
-		file:      file,
+		dir:       dir,
+		dataFile:  filepath.Join(dir, "stream.tar.s2"),
+		metaFile:  filepath.Join(dir, "backup.json"),
 		jsck:      false,
 		consumers: false,
 		chunkSz:   512 * 1024,
@@ -457,14 +471,25 @@ func (s *Stream) SnapshotToFile(ctx context.Context, file string, opts ...Snapsh
 	}
 
 	if sopts.debug {
-		log.Printf("Starting backup of %q to %q", s.Name(), file)
+		log.Printf("Starting backup of %q to %q", s.Name(), dir)
 	}
 
-	of, err := os.Create(file)
+	err := os.MkdirAll(sopts.dir, 0700)
 	if err != nil {
 		return nil, err
 	}
-	defer of.Close()
+
+	mf, err := os.Create(sopts.metaFile)
+	if err != nil {
+		return nil, err
+	}
+	defer mf.Close()
+
+	df, err := os.Create(sopts.dataFile)
+	if err != nil {
+		return nil, err
+	}
+	defer df.Close()
 
 	ib := nats.NewInbox()
 	req := api.JSApiStreamSnapshotRequest{
@@ -485,13 +510,12 @@ func (s *Stream) SnapshotToFile(ctx context.Context, file string, opts ...Snapsh
 	defer cancel()
 
 	progress := &snapshotProgress{
-		startTime:      time.Now(),
-		chunkSize:      req.ChunkSize,
-		blockSize:      resp.BlkSize,
-		blocksExpected: resp.NumBlks,
-		scb:            sopts.scb,
-		rcb:            sopts.rcb,
-		healthCheck:    sopts.jsck,
+		startTime:     time.Now(),
+		chunkSize:     req.ChunkSize,
+		bytesExpected: resp.State.Bytes,
+		scb:           sopts.scb,
+		rcb:           sopts.rcb,
+		healthCheck:   sopts.jsck,
 	}
 	defer func() { progress.endTime = time.Now() }()
 	go progress.trackBps(sctx)
@@ -503,7 +527,7 @@ func (s *Stream) SnapshotToFile(ctx context.Context, file string, opts ...Snapsh
 	defer trackingW.Close()
 	go progress.trackBlockProgress(trackingR, sopts.debug, errc)
 
-	writer := io.MultiWriter(of, trackingW)
+	writer := io.MultiWriter(df, trackingW)
 
 	// tell the caller we are starting and what to expect
 	progress.notify()
@@ -526,14 +550,19 @@ func (s *Stream) SnapshotToFile(ctx context.Context, file string, opts ...Snapsh
 			return
 		}
 		if n != len(m.Data) {
-			errc <- fmt.Errorf("failed to write %d bytes to %s, only wrote %d", len(m.Data), file, n)
+			errc <- fmt.Errorf("failed to write %d bytes to %s, only wrote %d", len(m.Data), sopts.dataFile, n)
 			return
+		}
+
+		if m.Reply != "" {
+			m.Respond(nil)
 		}
 	})
 	if err != nil {
 		return progress, err
 	}
 	defer sub.Unsubscribe()
+	sub.SetPendingLimits(-1, -1)
 
 	select {
 	case err := <-errc:
@@ -543,6 +572,26 @@ func (s *Stream) SnapshotToFile(ctx context.Context, file string, opts ...Snapsh
 
 		return progress, err
 	case <-sctx.Done():
+		mf, err := os.Create(sopts.metaFile)
+		if err != nil {
+			return nil, err
+		}
+		defer mf.Close()
+
+		meta := map[string]interface{}{
+			"config": resp.Config,
+			"state":  resp.State,
+		}
+		mj, err := json.MarshalIndent(meta, "", "  ")
+		if err != nil {
+			return nil, err
+		}
+
+		mf.Write(mj)
+
+		progress.finished = true
+		progress.notify()
+
 		return progress, nil
 	}
 }

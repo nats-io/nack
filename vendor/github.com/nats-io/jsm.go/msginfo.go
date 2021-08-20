@@ -64,7 +64,7 @@ func (i *MsgInfo) TimeStamp() time.Time {
 	return i.ts
 }
 
-// Pending is the number of messages left to consumer, -1 when the number is not reported
+// Pending is the number of messages left to consume, -1 when the number is not reported
 func (i *MsgInfo) Pending() uint64 {
 	return i.pending
 }
@@ -72,7 +72,7 @@ func (i *MsgInfo) Pending() uint64 {
 // ParseJSMsgMetadataReply parses the reply subject of a JetStream originated message
 func ParseJSMsgMetadataReply(reply string) (info *MsgInfo, err error) {
 	if len(reply) == 0 {
-		return nil, fmt.Errorf("reply subject is not an Ack")
+		return nil, fmt.Errorf("reply subject %q is not an Ack", reply)
 	}
 
 	parts := strings.Split(reply, ".")

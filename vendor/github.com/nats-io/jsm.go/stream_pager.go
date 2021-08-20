@@ -18,14 +18,15 @@ type StreamPager struct {
 	sub      *nats.Subscription
 	consumer *Consumer
 
-	q          chan *nats.Msg
-	stream     string
-	startSeq   int
-	startDelta time.Duration
-	pageSize   int
-	started    bool
-	timeout    time.Duration
-	seen       int
+	q             chan *nats.Msg
+	stream        string
+	startSeq      int
+	startDelta    time.Duration
+	pageSize      int
+	filterSubject string
+	started       bool
+	timeout       time.Duration
+	seen          int
 
 	mu sync.Mutex
 }
@@ -37,6 +38,13 @@ type PagerOption func(p *StreamPager)
 func PagerStartId(id int) PagerOption {
 	return func(p *StreamPager) {
 		p.startSeq = id
+	}
+}
+
+// PagerFilterSubject sets a filter subject for the pager
+func PagerFilterSubject(s string) PagerOption {
+	return func(p *StreamPager) {
+		p.filterSubject = s
 	}
 }
 
@@ -145,6 +153,8 @@ func (p *StreamPager) NextMsg(ctx context.Context) (msg *nats.Msg, last bool, er
 			return nil, true, fmt.Errorf("last message reached")
 		}
 
+		msg.Ack()
+
 		return msg, p.seen == p.pageSize, nil
 
 	case <-timeout.Done():
@@ -166,6 +176,10 @@ func (p *StreamPager) createConsumer() error {
 		cops = append(cops, DeliverAllAvailable())
 	default:
 		return fmt.Errorf("no valid start options specified")
+	}
+
+	if p.filterSubject != "" {
+		cops = append(cops, FilterStreamBySubject(p.filterSubject))
 	}
 
 	var err error

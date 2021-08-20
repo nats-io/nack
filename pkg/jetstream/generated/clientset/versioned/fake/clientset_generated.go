@@ -71,7 +71,10 @@ func (c *Clientset) Tracker() testing.ObjectTracker {
 	return c.tracker
 }
 
-var _ clientset.Interface = &Clientset{}
+var (
+	_ clientset.Interface = &Clientset{}
+	_ testing.FakeClient  = &Clientset{}
+)
 
 // JetstreamV1beta1 retrieves the JetstreamV1beta1Client
 func (c *Clientset) JetstreamV1beta1() jetstreamv1beta1.JetstreamV1beta1Interface {

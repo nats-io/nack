@@ -14,7 +14,6 @@
 package api
 
 import (
-	"encoding/json"
 	"fmt"
 )
 
@@ -30,142 +29,27 @@ const (
 const (
 	// OK response
 	OK = "+OK"
-	// ERR prefix response
+	// ErrPrefix is the ERR prefix response
 	ErrPrefix = "-ERR"
 )
 
-type DiscardPolicy int
-
+// Headers for publishing
 const (
-	DiscardOld DiscardPolicy = iota
-	DiscardNew
+	// JSMsgId used for tracking duplicates
+	JSMsgId = "Nats-Msg-Id"
+
+	// JSExpectedStream only store the message in this stream
+	JSExpectedStream = "Nats-Expected-Stream"
+
+	// JSExpectedLastSeq only store the message if stream last sequence matched
+	JSExpectedLastSeq = "Nats-Expected-Last-Sequence"
+
+	// JSExpectedLastSubjSeq only stores the message if last sequence for this subject matched
+	JSExpectedLastSubjSeq = "Nats-Expected-Last-Subject-Sequence"
+
+	// JSExpectedLastMsgId only stores the message if previous Nats-Msg-Id header value matches this
+	JSExpectedLastMsgId = "Nats-Expected-Last-Msg-Id"
 )
-
-func (p DiscardPolicy) String() string {
-	switch p {
-	case DiscardOld:
-		return "Old"
-	case DiscardNew:
-		return "New"
-	default:
-		return "Unknown Discard Policy"
-	}
-}
-
-func (p *DiscardPolicy) UnmarshalJSON(data []byte) error {
-	switch string(data) {
-	case jsonString("old"):
-		*p = DiscardOld
-	case jsonString("new"):
-		*p = DiscardNew
-	default:
-		return fmt.Errorf("can not unmarshal %q", data)
-	}
-
-	return nil
-}
-
-func (p DiscardPolicy) MarshalJSON() ([]byte, error) {
-	switch p {
-	case DiscardOld:
-		return json.Marshal("old")
-	case DiscardNew:
-		return json.Marshal("new")
-	default:
-		return nil, fmt.Errorf("unknown discard policy %v", p)
-	}
-}
-
-type StorageType int
-
-const (
-	MemoryStorage StorageType = iota
-	FileStorage
-)
-
-func (t StorageType) String() string {
-	switch t {
-	case MemoryStorage:
-		return "Memory"
-	case FileStorage:
-		return "File"
-	default:
-		return "Unknown Storage Type"
-	}
-}
-
-func (t *StorageType) UnmarshalJSON(data []byte) error {
-	switch string(data) {
-	case jsonString("memory"):
-		*t = MemoryStorage
-	case jsonString("file"):
-		*t = FileStorage
-	default:
-		return fmt.Errorf("can not unmarshal %q", data)
-	}
-
-	return nil
-}
-
-func (t StorageType) MarshalJSON() ([]byte, error) {
-	switch t {
-	case MemoryStorage:
-		return json.Marshal("memory")
-	case FileStorage:
-		return json.Marshal("file")
-	default:
-		return nil, fmt.Errorf("unknown storage type %q", t)
-	}
-}
-
-type RetentionPolicy int
-
-const (
-	LimitsPolicy RetentionPolicy = iota
-	InterestPolicy
-	WorkQueuePolicy
-)
-
-func (p RetentionPolicy) String() string {
-	switch p {
-	case LimitsPolicy:
-		return "Limits"
-	case InterestPolicy:
-		return "Interest"
-	case WorkQueuePolicy:
-		return "WorkQueue"
-	default:
-		return "Unknown Retention Policy"
-	}
-}
-
-func (p *RetentionPolicy) UnmarshalJSON(data []byte) error {
-	switch string(data) {
-	case jsonString("limits"):
-		*p = LimitsPolicy
-	case jsonString("interest"):
-		*p = InterestPolicy
-	case jsonString("workqueue"):
-		*p = WorkQueuePolicy
-	default:
-		return fmt.Errorf("can not unmarshal %q", data)
-	}
-
-	return nil
-}
-
-func (p RetentionPolicy) MarshalJSON() ([]byte, error) {
-	switch p {
-	case LimitsPolicy:
-		return json.Marshal("limits")
-	case InterestPolicy:
-		return json.Marshal("interest")
-	case WorkQueuePolicy:
-		return json.Marshal("workqueue")
-	default:
-		return nil, fmt.Errorf("unknown retention policy %q", p)
-	}
-}
 
 type JSApiIterableRequest struct {
 	Offset int `json:"offset"`
@@ -193,10 +77,17 @@ type JSApiAccountInfoResponse struct {
 }
 
 type JetStreamAccountStats struct {
-	Memory  uint64                 `json:"memory"`
-	Store   uint64                 `json:"storage"`
-	Streams int                    `json:"streams"`
-	Limits  JetStreamAccountLimits `json:"limits"`
+	Memory    uint64                 `json:"memory"`
+	Store     uint64                 `json:"storage"`
+	Streams   int                    `json:"streams"`
+	Consumers int                    `json:"consumers"`
+	API       JetStreamAPIStats      `json:"api"`
+	Limits    JetStreamAccountLimits `json:"limits"`
+}
+
+type JetStreamAPIStats struct {
+	Total  uint64 `json:"total"`
+	Errors uint64 `json:"errors"`
 }
 
 type JetStreamAccountLimits struct {
@@ -208,6 +99,7 @@ type JetStreamAccountLimits struct {
 
 type ApiError struct {
 	Code        int    `json:"code"`
+	ErrCode     uint16 `json:"err_code,omitempty"`
 	Description string `json:"description,omitempty"`
 }
 
@@ -217,9 +109,9 @@ func (e ApiError) Error() string {
 	case e.Description == "" && e.Code == 0:
 		return "unknown JetStream Error"
 	case e.Description == "" && e.Code > 0:
-		return fmt.Sprintf("unknown JetStream %d Error", e.Code)
+		return fmt.Sprintf("unknown JetStream %d Error (%d)", e.Code, e.ErrCode)
 	default:
-		return e.Description
+		return fmt.Sprintf("%s (%d)", e.Description, e.ErrCode)
 	}
 }
 
@@ -234,6 +126,9 @@ func (e ApiError) UserError() bool { return e.Code >= 400 && e.Code < 500 }
 
 // ErrorCode is the JetStream error code
 func (e ApiError) ErrorCode() int { return e.Code }
+
+// NatsErrorCode is the unique nats error code, see `nats errors` command
+func (e ApiError) NatsErrorCode() uint16 { return e.ErrCode }
 
 type JSApiResponse struct {
 	Type  string    `json:"type"`

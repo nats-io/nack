@@ -10,10 +10,12 @@ import (
 	"strings"
 	"text/template"
 	"time"
+
+	scfs "github.com/nats-io/jsm.go/schemas"
 )
 
 // SchemasRepo is the repository holding NATS Schemas
-var SchemasRepo = "https://raw.githubusercontent.com/nats-io/jetstream/master/schemas"
+var SchemasRepo = "https://raw.githubusercontent.com/nats-io/jsm.go/master/schemas"
 
 // UnknownMessage is a type returned when parsing an unknown type of event
 type UnknownMessage = map[string]interface{}
@@ -140,9 +142,14 @@ func SchemaTypeForMessage(e []byte) (schemaType string, err error) {
 
 // Schema returns the JSON schema for a NATS specific Schema type like io.nats.jetstream.advisory.v1.api_audit
 func Schema(schemaType string) (schema []byte, err error) {
-	schema, ok := schemas[schemaType]
-	if !ok {
-		return nil, fmt.Errorf("unknown schema %s", schemaType)
+	path, err := SchemaFileForType(schemaType)
+	if err != nil {
+		return nil, err
+	}
+
+	schema, err = scfs.Load(path)
+	if err != nil {
+		return nil, err
 	}
 
 	return schema, nil
@@ -229,4 +236,14 @@ func RenderEvent(wr io.Writer, e Event, format RenderFormat) error {
 	default:
 		return fmt.Errorf("unsupported format %q", format)
 	}
+}
+
+// SchemaFileForType determines what file on the file system to load for a particular schema type
+func SchemaFileForType(schemaType string) (path string, err error) {
+	if !IsNatsSchemaType(schemaType) {
+		return "", fmt.Errorf("unsupported schema type %q", schemaType)
+	}
+
+	token := strings.TrimPrefix(schemaType, "io.nats.")
+	return fmt.Sprintf("%s.json", strings.ReplaceAll(token, ".", "/")), nil
 }

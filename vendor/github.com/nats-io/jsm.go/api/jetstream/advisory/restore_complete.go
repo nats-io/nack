@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/nats-io/jsm.go/api/event"
+	"github.com/nats-io/jsm.go/api/server/advisory"
 )
 
 // JSRestoreCompleteAdvisoryV1 is an advisory sent after a snapshot is successfully started
@@ -12,11 +13,11 @@ import (
 type JSRestoreCompleteAdvisoryV1 struct {
 	event.NATSEvent
 
-	Stream string           `json:"stream"`
-	Start  time.Time        `json:"start"`
-	End    time.Time        `json:"end"`
-	Bytes  int64            `json:"bytes"`
-	Client APIAuditClientV1 `json:"client"`
+	Stream string                `json:"stream"`
+	Start  time.Time             `json:"start"`
+	End    time.Time             `json:"end"`
+	Bytes  int64                 `json:"bytes"`
+	Client advisory.ClientInfoV1 `json:"client"`
 }
 
 func init() {
@@ -36,8 +37,8 @@ func init() {
 {{- if .Client.User }}
                       User: {{ .Client.User }} Account: {{ .Client.Account }}
 {{- end }}
-                      Host: {{ HostPort .Client.Host .Client.Port }}
-                       CID: {{ .Client.CID }}
+                      Host: {{ .Client.Host }}
+                        ID: {{ .Client.ID }}
 {{- if .Client.Name }}
                       Name: {{ .Client.Name }}
 {{- end }}

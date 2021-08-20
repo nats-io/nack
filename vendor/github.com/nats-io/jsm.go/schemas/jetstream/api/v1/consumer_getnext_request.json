@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://nats.io/schemas/jetstream/api/v1/consumer_getnext_request.json",
+  "description": "A request to the JetStream $JS.API.CONSUMER.MSG.NEXT API",
+  "title": "io.nats.jetstream.api.v1.consumer_getnext_request",
+  "type": "object",
+  "properties": {
+    "expires": {
+      "description": "A duration from now when the pull should expire, stated in nanoseconds, 0 for no expiry",
+      "$comment": "nanoseconds depicting a duration in time, signed 64 bit integer",
+      "type": "integer",
+      "maximum": 9223372036854775807,
+      "minimum": -9223372036854775807
+    },
+    "batch": {
+      "description": "How many messages the server should deliver to the requestor",
+      "minimum": 0,
+      "maximum": 256,
+      "$comment": "integer with a dynamic bit size depending on the platform the cluster runs on, can be up to 64bit",
+      "type": "integer"
+    },
+    "no_wait": {
+      "type": "boolean",
+      "description": "When true a response with a 404 status header will be returned when no messages are available"
+    }
+  }
+}

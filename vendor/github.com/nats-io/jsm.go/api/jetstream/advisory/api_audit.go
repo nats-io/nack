@@ -2,6 +2,7 @@ package advisory
 
 import (
 	"github.com/nats-io/jsm.go/api/event"
+	"github.com/nats-io/jsm.go/api/server/advisory"
 )
 
 // JetStreamAPIAuditV1 is a advisory published for any JetStream API access
@@ -10,22 +11,11 @@ import (
 type JetStreamAPIAuditV1 struct {
 	event.NATSEvent
 
-	Server   string           `json:"server"`
-	Client   APIAuditClientV1 `json:"client"`
-	Subject  string           `json:"subject"`
-	Request  string           `json:"request,omitempty"`
-	Response string           `json:"response"`
-}
-
-type APIAuditClientV1 struct {
-	Host    string `json:"host"`
-	Port    int    `json:"port"`
-	CID     uint64 `json:"cid"`
-	Account string `json:"account"`
-	User    string `json:"user,omitempty"`
-	Name    string `json:"name,omitempty"`
-	Lang    string `json:"lang,omitempty"`
-	Version string `json:"version,omitempty"`
+	Server   string                `json:"server"`
+	Client   advisory.ClientInfoV1 `json:"client"`
+	Subject  string                `json:"subject"`
+	Request  string                `json:"request,omitempty"`
+	Response string                `json:"response"`
 }
 
 func init() {
@@ -43,8 +33,8 @@ func init() {
 {{- if .Client.User }}
                       User: {{ .Client.User }} Account: {{ .Client.Account }}
 {{- end }}
-                      Host: {{ HostPort .Client.Host .Client.Port }}
-                       CID: {{ .Client.CID }}
+                      Host: {{ .Client.Host }}
+                        ID: {{ .Client.ID }}
 {{- if .Client.Name }}
                       Name: {{ .Client.Name }}
 {{- end }}

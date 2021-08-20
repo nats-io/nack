@@ -2,6 +2,7 @@ package advisory
 
 import (
 	"github.com/nats-io/jsm.go/api/event"
+	"github.com/nats-io/jsm.go/api/server/advisory"
 )
 
 // JSRestoreCreateAdvisoryV1 is an advisory sent after a snapshot is successfully started
@@ -10,8 +11,8 @@ import (
 type JSRestoreCreateAdvisoryV1 struct {
 	event.NATSEvent
 
-	Stream string           `json:"stream"`
-	Client APIAuditClientV1 `json:"client"`
+	Stream string                `json:"stream"`
+	Client advisory.ClientInfoV1 `json:"client"`
 }
 
 func init() {
@@ -28,8 +29,8 @@ func init() {
 {{- if .Client.User }}
                       User: {{ .Client.User }} Account: {{ .Client.Account }}
 {{- end }}
-                      Host: {{ HostPort .Client.Host .Client.Port }}
-                       CID: {{ .Client.CID }}
+                      Host: {{ .Client.Host }}
+                        ID: {{ .Client.ID }}
 {{- if .Client.Name }}
                       Name: {{ .Client.Name }}
 {{- end }}

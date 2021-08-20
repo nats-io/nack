@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/nats-io/jsm.go/api/event"
+	"github.com/nats-io/jsm.go/api/server/advisory"
 )
 
 // ServiceLatencyV1 is the JSON message sent out in response to latency tracking for
@@ -14,28 +15,15 @@ import (
 type ServiceLatencyV1 struct {
 	event.NATSEvent
 
-	Status         int             `json:"status"`
-	Error          string          `json:"description,omitempty"`
-	Requestor      LatencyClientV1 `json:"requestor,omitempty"`
-	Responder      LatencyClientV1 `json:"responder,omitempty"`
-	RequestHeader  http.Header     `json:"header,omitempty"`
-	RequestStart   time.Time       `json:"start"`
-	ServiceLatency time.Duration   `json:"service"`
-	SystemLatency  time.Duration   `json:"system"`
-	TotalLatency   time.Duration   `json:"total"`
-}
-
-type LatencyClientV1 struct {
-	Account string        `json:"acc"`
-	RTT     time.Duration `json:"rtt"`
-	Start   time.Time     `json:"start,omitempty"`
-	User    string        `json:"user,omitempty"`
-	Name    string        `json:"name,omitempty"`
-	Lang    string        `json:"lang,omitempty"`
-	Version string        `json:"ver,omitempty"`
-	IP      string        `json:"ip,omitempty"`
-	CID     uint64        `json:"cid,omitempty"`
-	Server  string        `json:"server,omitempty"`
+	Status         int                   `json:"status"`
+	Error          string                `json:"description,omitempty"`
+	Requestor      advisory.ClientInfoV1 `json:"requestor,omitempty"`
+	Responder      advisory.ClientInfoV1 `json:"responder,omitempty"`
+	RequestHeader  http.Header           `json:"header,omitempty"`
+	RequestStart   time.Time             `json:"start"`
+	ServiceLatency time.Duration         `json:"service"`
+	SystemLatency  time.Duration         `json:"system"`
+	TotalLatency   time.Duration         `json:"total"`
 }
 
 func init() {
@@ -75,9 +63,9 @@ func init() {
     Language: {{ .Lang }}
      Version: {{ .Version }}
 {{- end }}
-{{- if .CID }}
-          IP: {{ .IP }}
-         CID: {{ .CID }}
+{{- if .ID }}
+        Host: {{ .Host }}
+          ID: {{ .ID }}
       Server: {{ .Server }}
 {{- end }}
 {{- end }}
@@ -92,9 +80,9 @@ func init() {
     Language: {{ .Lang }}
      Version: {{ .Version }}
 {{- end }}
-{{- if .CID }}
-          IP: {{ .IP }}
-         CID: {{ .CID }}
+{{- if .ID }}
+        Host: {{ .Host }}
+          ID: {{ .ID }}
       Server: {{ .Server }}
 {{- end }}
 {{- end }}`)

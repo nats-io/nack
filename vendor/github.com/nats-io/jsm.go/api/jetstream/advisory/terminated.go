@@ -19,7 +19,7 @@ type JSConsumerDeliveryTerminatedAdvisoryV1 struct {
 }
 
 func init() {
-	err := event.RegisterTextCompactTemplate("io.nats.jetstream.advisory.v1.terminated", `{{ .Time | ShortTime }} [JS Delivery Terminated] {{ .Stream }} ({{ .Stream }}) > {{ .Consumer }}: {{ .Deliveries }} deliveries`)
+	err := event.RegisterTextCompactTemplate("io.nats.jetstream.advisory.v1.terminated", `{{ .Time | ShortTime }} [JS Delivery Terminated] {{ .Stream }} ({{ .StreamSeq }}) > {{ .Consumer }}: {{ .Deliveries }} deliveries`)
 	if err != nil {
 		panic(err)
 	}
@@ -28,7 +28,7 @@ func init() {
 [{{ .Time | ShortTime }}] [{{ .ID }}] Delivery Terminated
 
           Consumer: {{ .Stream }} > {{ .Consumer }}
-   Stream Sequence: {{ .Stream }}
+   Stream Sequence: {{ .StreamSeq }}
         Deliveries: {{ .Deliveries }}`)
 	if err != nil {
 		panic(err)

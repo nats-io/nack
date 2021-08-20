@@ -145,6 +145,7 @@ func compileTemplate(schema string, body string) (*template.Template, error) {
 		"LeftPad":     func(indent int, v string) string { return leftPad(v, indent) },
 		"ToString":    func(v stringer) string { return v.String() },
 		"TitleString": func(v string) string { return strings.Title(v) },
+		"JoinStrings": func(v []string) string { return strings.Join(v, ",") },
 	}).Parse(body)
 }
 

@@ -293,8 +293,7 @@ func (m *Manager) backupStream(stream *Stream, backupDir string, data bool) erro
 
 	if data {
 		if stream.Storage() == api.FileStorage {
-			dataPath := filepath.Join(backupDir, fmt.Sprintf("stream_%s.tgz", stream.Name()))
-			_, err := stream.SnapshotToFile(context.Background(), dataPath, SnapshotConsumers(), SnapshotDebug())
+			_, err := stream.SnapshotToDirectory(context.Background(), backupDir, SnapshotConsumers(), SnapshotDebug())
 			if err != nil {
 				return err
 			}
