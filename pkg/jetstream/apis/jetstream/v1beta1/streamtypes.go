@@ -22,19 +22,39 @@ func (s *Stream) GetSpec() interface{} {
 
 // StreamSpec is the spec for a Stream resource
 type StreamSpec struct {
-	Discard         string   `json:"discard"`
-	DuplicateWindow string   `json:"duplicateWindow"`
-	MaxAge          string   `json:"maxAge"`
-	MaxBytes        int      `json:"maxBytes"`
-	MaxConsumers    int      `json:"maxConsumers"`
-	MaxMsgs         int      `json:"maxMsgs"`
-	MaxMsgSize      int      `json:"maxMsgSize"`
-	Name            string   `json:"name"`
-	NoAck           bool     `json:"noAck"`
-	Replicas        int      `json:"replicas"`
-	Retention       string   `json:"retention"`
-	Storage         string   `json:"storage"`
-	Subjects        []string `json:"subjects"`
+	Description       string           `json:"description"`
+	Discard           string           `json:"discard"`
+	DuplicateWindow   string           `json:"duplicateWindow"`
+	MaxAge            string           `json:"maxAge"`
+	MaxBytes          int              `json:"maxBytes"`
+	MaxConsumers      int              `json:"maxConsumers"`
+	MaxMsgs           int              `json:"maxMsgs"`
+	MaxMsgSize        int              `json:"maxMsgSize"`
+	MaxMsgsPerSubject int              `json:"maxMsgsPerSubject"`
+	Mirror            *StreamSource    `json:"mirror"`
+	Name              string           `json:"name"`
+	NoAck             bool             `json:"noAck"`
+	Placement         *StreamPlacement `json:"placement"`
+	Replicas          int              `json:"replicas"`
+	Retention         string           `json:"retention"`
+	Sources           []*StreamSource  `json:"sources"`
+	Storage           string           `json:"storage"`
+	Subjects          []string         `json:"subjects"`
+}
+
+type StreamPlacement struct {
+	Cluster string   `json:"cluster"`
+	Tags    []string `json:"tags"`
+}
+
+type StreamSource struct {
+	Name          string `json:"name"`
+	OptStartSeq   int    `json:"optStartSeq"`
+	OptStartTime  string `json:"optStartTime"`
+	FilterSubject string `json:"filterSubject"`
+
+	ExternalAPIPrefix     string `json:"externalApiPrefix"`
+	ExternalDeliverPrefix string `json:"externalDeliverPrefix"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

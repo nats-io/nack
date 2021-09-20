@@ -93,6 +93,59 @@ spec:
               duplicateWindow:
                 description: The duration window to track duplicate messages for.
                 type: string
+              description:
+                description: The description of the stream.
+                type: string
+              maxMsgsPerSubject:
+                description: The maximum of messages per subject.
+                type: integer
+                default: 0
+              mirror:
+                description: A stream mirror.
+                type: object
+                properties:
+                  name:
+                    type: string
+                  optStartSeq:
+                    type: integer
+                  optStartTime:
+                    description: Time format must be RFC3339.
+                    type: string
+                  filterSubject:
+                    type: string
+                  externalApiPrefix:
+                    type: string
+                  externalDeliverPrefix:
+                    type: string
+              placement:
+                description: A stream's placement.
+                type: object
+                properties:
+                  cluster:
+                    type: string
+                  tags:
+                    type: array
+                    items:
+                      type: string
+              sources:
+                description: A stream's sources.
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    optStartSeq:
+                      type: integer
+                    optStartTime:
+                      description: Time format must be RFC3339.
+                      type: string
+                    filterSubject:
+                      type: string
+                    externalApiPrefix:
+                      type: string
+                    externalDeliverPrefix:
+                      type: string
           status:
             type: object
             properties:
