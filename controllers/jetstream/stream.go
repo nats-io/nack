@@ -197,6 +197,55 @@ func createStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 		opts = append(opts, jsm.NoAck())
 	}
 
+	if spec.Description != "" {
+		opts = append(opts, func(o *jsmapi.StreamConfig) error {
+			o.Description = spec.Description
+			return nil
+		})
+	}
+
+	if spec.MaxMsgsPerSubject > 0 {
+		opts = append(opts, func(o *jsmapi.StreamConfig) error {
+			o.MaxMsgsPer = int64(spec.MaxMsgsPerSubject)
+			return nil
+		})
+	}
+
+	if spec.Mirror != nil {
+		ss, err := getStreamSource(spec.Mirror)
+		if err != nil {
+			return err
+		}
+
+		opts = append(opts, func(o *jsmapi.StreamConfig) error {
+			o.Mirror = ss
+			return nil
+		})
+	}
+
+	if spec.Placement != nil {
+		opts = append(opts, func(o *jsmapi.StreamConfig) error {
+			o.Placement = &jsmapi.Placement{
+				Cluster: spec.Placement.Cluster,
+				Tags:    spec.Placement.Tags,
+			}
+			return nil
+		})
+	}
+
+	var srcs []*jsmapi.StreamSource
+	for _, ss := range spec.Sources {
+		jss, err := getStreamSource(ss)
+		if err != nil {
+			return err
+		}
+		srcs = append(srcs, jss)
+	}
+	opts = append(opts, func(o *jsmapi.StreamConfig) error {
+		o.Sources = srcs
+		return nil
+	})
+
 	_, err = c.NewStream(ctx, spec.Name, opts)
 	return err
 }
@@ -381,4 +430,30 @@ func getDuplicates(v string) (time.Duration, error) {
 	}
 
 	return time.ParseDuration(v)
+}
+
+func getStreamSource(ss *apis.StreamSource) (*jsmapi.StreamSource, error) {
+		jss := &jsmapi.StreamSource{
+			Name:          ss.Name,
+			FilterSubject: ss.FilterSubject,
+		}
+
+		if ss.OptStartSeq > 0 {
+			jss.OptStartSeq = uint64(ss.OptStartSeq)
+		} else if ss.OptStartTime != "" {
+			t, err := time.Parse(ss.OptStartTime, time.RFC3339)
+			if err != nil {
+				return nil, err
+			}
+			jss.OptStartTime = &t
+		}
+
+		if ss.ExternalAPIPrefix != "" || ss.ExternalDeliverPrefix != "" {
+			jss.External = &jsmapi.ExternalStream{
+				ApiPrefix:     ss.ExternalAPIPrefix,
+				DeliverPrefix: ss.ExternalDeliverPrefix,
+			}
+		}
+
+	return jss, nil
 }
