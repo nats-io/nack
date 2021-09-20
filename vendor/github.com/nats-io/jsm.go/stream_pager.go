@@ -164,6 +164,7 @@ func (p *StreamPager) NextMsg(ctx context.Context) (msg *nats.Msg, last bool, er
 
 func (p *StreamPager) createConsumer() error {
 	cops := []ConsumerOption{
+		ConsumerDescription("JSM Stream Pager"),
 		DurableName(fmt.Sprintf("jsm_stream_pager_%d%d", os.Getpid(), time.Now().UnixNano())),
 	}
 

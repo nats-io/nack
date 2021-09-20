@@ -55,6 +55,7 @@ type JSPubAckResponse struct {
 type PubAck struct {
 	Stream    string `json:"stream"`
 	Sequence  uint64 `json:"seq"`
+	Domain    string `json:"domain,omitempty"`
 	Duplicate bool   `json:"duplicate,omitempty"`
 }
 
@@ -351,6 +352,7 @@ func (p RetentionPolicy) MarshalJSON() ([]byte, error) {
 // NATS Schema Type io.nats.jetstream.api.v1.stream_configuration
 type StreamConfig struct {
 	Name         string          `json:"name"`
+	Description  string          `json:"description,omitempty"`
 	Subjects     []string        `json:"subjects,omitempty"`
 	Retention    RetentionPolicy `json:"retention"`
 	MaxConsumers int             `json:"max_consumers"`

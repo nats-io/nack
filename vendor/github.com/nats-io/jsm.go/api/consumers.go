@@ -193,6 +193,7 @@ const (
 	DeliverNew
 	DeliverByStartSequence
 	DeliverByStartTime
+	DeliverLastPerSubject
 )
 
 func (p DeliverPolicy) String() string {
@@ -207,6 +208,8 @@ func (p DeliverPolicy) String() string {
 		return "By Start Sequence"
 	case DeliverByStartTime:
 		return "By Start Time"
+	case DeliverLastPerSubject:
+		return "Last Per Subject"
 	default:
 		return "Unknown Deliver Policy"
 	}
@@ -224,6 +227,8 @@ func (p *DeliverPolicy) UnmarshalJSON(data []byte) error {
 		*p = DeliverByStartSequence
 	case jsonString("by_start_time"):
 		*p = DeliverByStartTime
+	case jsonString("last_per_subject"):
+		*p = DeliverLastPerSubject
 	}
 
 	return nil
@@ -241,6 +246,8 @@ func (p DeliverPolicy) MarshalJSON() ([]byte, error) {
 		return json.Marshal("by_start_sequence")
 	case DeliverByStartTime:
 		return json.Marshal("by_start_time")
+	case DeliverLastPerSubject:
+		return json.Marshal("last_per_subject")
 	default:
 		return nil, fmt.Errorf("unknown deliver policy %v", p)
 	}
@@ -250,10 +257,12 @@ func (p DeliverPolicy) MarshalJSON() ([]byte, error) {
 //
 // NATS Schema Type io.nats.jetstream.api.v1.consumer_configuration
 type ConsumerConfig struct {
+	Description     string        `json:"description,omitempty"`
 	AckPolicy       AckPolicy     `json:"ack_policy"`
 	AckWait         time.Duration `json:"ack_wait,omitempty"`
 	DeliverPolicy   DeliverPolicy `json:"deliver_policy"`
 	DeliverSubject  string        `json:"deliver_subject,omitempty"`
+	DeliverGroup    string        `json:"deliver_group,omitempty"`
 	Durable         string        `json:"durable_name,omitempty"`
 	FilterSubject   string        `json:"filter_subject,omitempty"`
 	FlowControl     bool          `json:"flow_control,omitempty"`
@@ -271,10 +280,11 @@ type ConsumerConfig struct {
 	Direct bool `json:"direct,omitempty"`
 }
 
-// SequencePair is the consumer and stream sequence that uniquely identify a message
-type SequencePair struct {
-	Consumer uint64 `json:"consumer_seq"`
-	Stream   uint64 `json:"stream_seq"`
+// SequenceInfo is the consumer and stream sequence that uniquely identify a message
+type SequenceInfo struct {
+	Consumer uint64     `json:"consumer_seq"`
+	Stream   uint64     `json:"stream_seq"`
+	Last     *time.Time `json:"last_active,omitempty"`
 }
 
 // ConsumerInfo reports the current state of a consumer
@@ -283,13 +293,14 @@ type ConsumerInfo struct {
 	Name           string         `json:"name"`
 	Config         ConsumerConfig `json:"config"`
 	Created        time.Time      `json:"created"`
-	Delivered      SequencePair   `json:"delivered"`
-	AckFloor       SequencePair   `json:"ack_floor"`
+	Delivered      SequenceInfo   `json:"delivered"`
+	AckFloor       SequenceInfo   `json:"ack_floor"`
 	NumAckPending  int            `json:"num_ack_pending"`
 	NumRedelivered int            `json:"num_redelivered"`
 	NumWaiting     int            `json:"num_waiting"`
 	NumPending     uint64         `json:"num_pending"`
 	Cluster        *ClusterInfo   `json:"cluster,omitempty"`
+	PushBound      bool           `json:"push_bound,omitempty"`
 }
 
 // JSApiConsumerGetNextRequest is for getting next messages for pull based consumers

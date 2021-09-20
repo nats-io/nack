@@ -63,6 +63,11 @@
               "pattern": "^[^.*>]*$",
               "minLength": 0
             },
+            "description": {
+              "description": "A short description of the purpose of this stream",
+              "type": "string",
+              "maxLength": 4096
+            },
             "subjects": {
               "description": "A list of subjects to consume, supports wildcards. Must be empty when a mirror is configured. May be empty when sources are configured.",
               "type": "array",
@@ -93,25 +98,25 @@
               "description": "How many messages may be in a Stream, oldest messages will be removed if the Stream exceeds this size. -1 for unlimited.",
               "minimum": -1,
               "default": -1,
-              "$comment": "unsigned 64 bit integer",
+              "$comment": "signed 64 bit integer",
               "type": "integer",
-              "maximum": 18446744073709551615
+              "maximum": 9223372036854775807
             },
             "max_msgs_per_subject": {
               "description": "For wildcard streams ensure that for every unique subject this many messages are kept - a per subject retention limit",
               "minimum": -1,
               "default": -1,
-              "$comment": "unsigned 64 bit integer",
+              "$comment": "signed 64 bit integer",
               "type": "integer",
-              "maximum": 18446744073709551615
+              "maximum": 9223372036854775807
             },
             "max_bytes": {
               "description": "How big the Stream may be, when the combined stream size exceeds this old messages are removed. -1 for unlimited.",
               "minimum": -1,
               "default": -1,
-              "$comment": "unsigned 64 bit integer",
+              "$comment": "signed 64 bit integer",
               "type": "integer",
-              "maximum": 18446744073709551615
+              "maximum": 9223372036854775807
             },
             "max_age": {
               "description": "Maximum age of any message in the stream, expressed in nanoseconds. 0 for unlimited.",
@@ -215,7 +220,9 @@
                 },
                 "opt_start_time": {
                   "description": "Time stamp to start replicating from",
-                  "type": "string"
+                  "$comment": "A point in time in RFC3339 format including timezone, though typically in UTC",
+                  "type": "string",
+                  "format": "date-time"
                 },
                 "filter_subject": {
                   "description": "Replicate only a subset of messages based on filter",
@@ -265,7 +272,9 @@
                   },
                   "opt_start_time": {
                     "description": "Time stamp to start replicating from",
-                    "type": "string"
+                    "$comment": "A point in time in RFC3339 format including timezone, though typically in UTC",
+                    "type": "string",
+                    "format": "date-time"
                   },
                   "filter_subject": {
                     "description": "Replicate only a subset of messages based on filter",
@@ -345,8 +354,10 @@
               "type": "array",
               "minLength": 0,
               "items": {
+                "minimum": 0,
+                "$comment": "unsigned 64 bit integer",
                 "type": "integer",
-                "minimum": 0
+                "maximum": 18446744073709551615
               }
             },
             "num_deleted": {

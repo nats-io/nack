@@ -174,7 +174,22 @@
                           ]
                         },
                         "opt_start_time": {
-                          "type": "string"
+                          "$comment": "A point in time in RFC3339 format including timezone, though typically in UTC",
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    },
+                    {
+                      "required": [
+                        "deliver_policy"
+                      ],
+                      "properties": {
+                        "deliver_policy": {
+                          "type": "string",
+                          "enum": [
+                            "last_per_subject"
+                          ]
                         }
                       }
                     }
@@ -188,6 +203,11 @@
                   "pattern": "^[^.*>]+$",
                   "minLength": 1
                 },
+                "description": {
+                  "description": "A short description of the purpose of this consumer",
+                  "type": "string",
+                  "maxLength": 4096
+                },
                 "deliver_subject": {
                   "type": "string",
                   "minLength": 1
@@ -198,17 +218,20 @@
                     "none",
                     "all",
                     "explicit"
-                  ]
+                  ],
+                  "default": "none"
                 },
                 "ack_wait": {
                   "description": "How long (in nanoseconds) to allow messages to remain un-acknowledged before attempting redelivery",
                   "minimum": 1,
+                  "default": "30000000000",
                   "$comment": "nanoseconds depicting a duration in time, signed 64 bit integer",
                   "type": "integer",
                   "maximum": 9223372036854775807
                 },
                 "max_deliver": {
                   "description": "The number of times a message will be redelivered to consumers if not acknowledged in time",
+                  "default": -1,
                   "$comment": "integer with a dynamic bit size depending on the platform the cluster runs on, can be up to 64bit",
                   "type": "integer",
                   "maximum": 9223372036854775807,
@@ -222,7 +245,8 @@
                   "enum": [
                     "instant",
                     "original"
-                  ]
+                  ],
+                  "default": "instant"
                 },
                 "sample_freq": {
                   "type": "string"
@@ -236,6 +260,7 @@
                 },
                 "max_ack_pending": {
                   "description": "The maximum number of messages without acknowledgement that can be outstanding, once this limit is reached message delivery will be suspended",
+                  "default": 20000,
                   "$comment": "integer with a dynamic bit size depending on the platform the cluster runs on, can be up to 64bit",
                   "type": "integer",
                   "maximum": 9223372036854775807,
@@ -268,7 +293,10 @@
               }
             },
             "created": {
-              "type": "string"
+              "description": "The time the Consumer was created",
+              "$comment": "A point in time in RFC3339 format including timezone, though typically in UTC",
+              "type": "string",
+              "format": "date-time"
             },
             "delivered": {
               "description": "The last message delivered from this Consumer",
@@ -292,6 +320,12 @@
                   "type": "integer",
                   "minimum": 0,
                   "maximum": 18446744073709551615
+                },
+                "last_active": {
+                  "description": "The last time a message was delivered or acknowledged (for ack_floor)",
+                  "$comment": "A point in time in RFC3339 format including timezone, though typically in UTC",
+                  "type": "string",
+                  "format": "date-time"
                 }
               }
             },
@@ -317,6 +351,12 @@
                   "type": "integer",
                   "minimum": 0,
                   "maximum": 18446744073709551615
+                },
+                "last_active": {
+                  "description": "The last time a message was delivered or acknowledged (for ack_floor)",
+                  "$comment": "A point in time in RFC3339 format including timezone, though typically in UTC",
+                  "type": "string",
+                  "format": "date-time"
                 }
               }
             },
@@ -398,6 +438,10 @@
                   }
                 }
               }
+            },
+            "push_bound": {
+              "description": "Indicates if any client is connected and receiving messages from a push consumer",
+              "type": "boolean"
             }
           }
         }

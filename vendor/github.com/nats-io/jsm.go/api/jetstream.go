@@ -148,3 +148,23 @@ func (r JSApiResponse) ToError() error {
 func (r JSApiResponse) IsError() bool {
 	return r.Error != nil
 }
+
+// IsNatsErr determines if a error matches ID, if multiple IDs are given if the error matches any of these the function will be true
+func IsNatsErr(err error, ids ...uint16) bool {
+	if err == nil {
+		return false
+	}
+
+	ce, ok := err.(ApiError)
+	if !ok {
+		return false
+	}
+
+	for _, id := range ids {
+		if ce.ErrCode == id {
+			return true
+		}
+	}
+
+	return false
+}

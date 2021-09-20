@@ -52,7 +52,6 @@
           "required": [
             "subject",
             "seq",
-            "data",
             "time"
           ],
           "properties": {
