@@ -91,7 +91,7 @@ github.com/nats-io/jsm.go/api/jetstream/metric
 github.com/nats-io/jsm.go/api/server/advisory
 github.com/nats-io/jsm.go/api/server/metric
 github.com/nats-io/jsm.go/schemas
-# github.com/nats-io/nats.go v1.11.1-0.20210623165838-4b75fc59ae30
+# github.com/nats-io/nats.go v1.12.1
 ## explicit
 github.com/nats-io/nats.go
 github.com/nats-io/nats.go/encoders/builtin
