@@ -22,19 +22,19 @@ func (s *Stream) GetSpec() interface{} {
 
 // StreamSpec is the spec for a Stream resource
 type StreamSpec struct {
-	Name            string   `json:"name"`
-	Subjects        []string `json:"subjects"`
-	Retention       string   `json:"retention"`
-	MaxConsumers    int      `json:"maxConsumers"`
-	MaxMsgs         int      `json:"maxMsgs"`
-	MaxBytes        int      `json:"maxBytes"`
-	MaxAge          string   `json:"maxAge"`
-	MaxMsgSize      int      `json:"maxMsgSize"`
-	Storage         string   `json:"storage"`
-	Replicas        int      `json:"replicas"`
-	NoAck           bool     `json:"noAck"`
 	Discard         string   `json:"discard"`
 	DuplicateWindow string   `json:"duplicateWindow"`
+	MaxAge          string   `json:"maxAge"`
+	MaxBytes        int      `json:"maxBytes"`
+	MaxConsumers    int      `json:"maxConsumers"`
+	MaxMsgs         int      `json:"maxMsgs"`
+	MaxMsgSize      int      `json:"maxMsgSize"`
+	Name            string   `json:"name"`
+	NoAck           bool     `json:"noAck"`
+	Replicas        int      `json:"replicas"`
+	Retention       string   `json:"retention"`
+	Storage         string   `json:"storage"`
+	Subjects        []string `json:"subjects"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
