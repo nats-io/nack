@@ -187,6 +187,38 @@ func createConsumer(ctx context.Context, c jsmClient, spec apis.ConsumerSpec) (e
 		opts = append(opts, jsm.SamplePercent(n))
 	}
 
+	if spec.DeliverGroup != "" {
+		opts = append(opts, func(o *jsmapi.ConsumerConfig) error {
+			o.DeliverGroup = spec.DeliverGroup
+			return nil
+		})
+	}
+
+	if spec.Description != "" {
+		opts = append(opts, func(o *jsmapi.ConsumerConfig) error {
+			o.Description = spec.Description
+			return nil
+		})
+	}
+
+	if spec.FlowControl {
+		opts = append(opts, func(o *jsmapi.ConsumerConfig) error {
+			o.FlowControl = spec.FlowControl
+			return nil
+		})
+	}
+
+	if spec.HeartbeatInterval != "" {
+		d, err := time.ParseDuration(spec.HeartbeatInterval)
+		if err != nil {
+			return err
+		}
+		opts = append(opts, func(o *jsmapi.ConsumerConfig) error {
+			o.Heartbeat = d
+			return nil
+		})
+	}
+
 	_, err = c.NewConsumer(ctx, spec.StreamName, opts)
 	return err
 }
