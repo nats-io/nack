@@ -10,3 +10,5 @@ spec:
   deliverPolicy: last
   ackPolicy: none
   replayPolicy: instant
+  description: my consumer description
+  flowControl: true

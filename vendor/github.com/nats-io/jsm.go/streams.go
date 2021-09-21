@@ -197,6 +197,14 @@ func Subjects(s ...string) StreamOption {
 	}
 }
 
+// StreamDescription is a textual description of this stream to provide additional context
+func StreamDescription(d string) StreamOption {
+	return func(o *api.StreamConfig) error {
+		o.Description = d
+		return nil
+	}
+}
+
 func LimitsRetention() StreamOption {
 	return func(o *api.StreamConfig) error {
 		o.Retention = api.LimitsPolicy
@@ -613,6 +621,7 @@ func (s *Stream) IsSourced() bool { return len(s.cfg.Sources) > 0 }
 
 func (s *Stream) Configuration() api.StreamConfig { return *s.cfg }
 func (s *Stream) Name() string                    { return s.cfg.Name }
+func (s *Stream) Description() string             { return s.cfg.Description }
 func (s *Stream) Subjects() []string              { return s.cfg.Subjects }
 func (s *Stream) Retention() api.RetentionPolicy  { return s.cfg.Retention }
 func (s *Stream) MaxConsumers() int               { return s.cfg.MaxConsumers }

@@ -221,6 +221,14 @@ func (m *Manager) loadConsumerInfo(s string, c string) (info api.ConsumerInfo, e
 	return *resp.ConsumerInfo, nil
 }
 
+// ConsumerDescription is a textual description of this consumer to provide additional context
+func ConsumerDescription(d string) ConsumerOption {
+	return func(o *api.ConsumerConfig) error {
+		o.Description = d
+		return nil
+	}
+}
+
 // DeliverySubject is the subject where a Push consumer will deliver its messages
 func DeliverySubject(s string) ConsumerOption {
 	return func(o *api.ConsumerConfig) error {
@@ -267,6 +275,15 @@ func DeliverAllAvailable() ConsumerOption {
 	return func(o *api.ConsumerConfig) error {
 		resetDeliverPolicy(o)
 		o.DeliverPolicy = api.DeliverAll
+		return nil
+	}
+}
+
+// DeliverLastPerSubject delivers the last message for each subject in a wildcard stream based on the filter subjects of the consumer
+func DeliverLastPerSubject() ConsumerOption {
+	return func(o *api.ConsumerConfig) error {
+		resetDeliverPolicy(o)
+		o.DeliverPolicy = api.DeliverLastPerSubject
 		return nil
 	}
 }
@@ -431,6 +448,14 @@ func PushFlowControl() ConsumerOption {
 	}
 }
 
+// DeliverGroup when set will only deliver messages to subscriptions matching that group
+func DeliverGroup(g string) ConsumerOption {
+	return func(o *api.ConsumerConfig) error {
+		o.DeliverGroup = g
+		return nil
+	}
+}
+
 // Reset reloads the Consumer configuration from the JetStream server
 func (c *Consumer) Reset() error {
 	return c.mgr.loadConfigForConsumer(c)
@@ -529,7 +554,7 @@ func (m *Manager) NextMsgRequest(stream string, consumer string, inbox string, r
 	return m.nc.PublishMsg(&nats.Msg{Subject: s, Reply: inbox, Data: jreq})
 }
 
-// NextMsg requests the next message from the server. This request will wait for as long as the context is
+// NextMsgContext requests the next message from the server. This request will wait for as long as the context is
 // active. If repeated pulls will be made it's better to use NextMsgRequest()
 func (m *Manager) NextMsgContext(ctx context.Context, stream string, consumer string) (*nats.Msg, error) {
 	if !m.nc.Opts.UseOldRequestStyle {
@@ -560,20 +585,20 @@ func (c *Consumer) NextMsgContext(ctx context.Context) (*nats.Msg, error) {
 }
 
 // DeliveredState reports the messages sequences that were successfully delivered
-func (c *Consumer) DeliveredState() (api.SequencePair, error) {
+func (c *Consumer) DeliveredState() (api.SequenceInfo, error) {
 	info, err := c.State()
 	if err != nil {
-		return api.SequencePair{}, err
+		return api.SequenceInfo{}, err
 	}
 
 	return info.Delivered, nil
 }
 
 // AcknowledgedFloor reports the highest contiguous message sequences that were acknowledged
-func (c *Consumer) AcknowledgedFloor() (api.SequencePair, error) {
+func (c *Consumer) AcknowledgedFloor() (api.SequenceInfo, error) {
 	info, err := c.State()
 	if err != nil {
-		return api.SequencePair{}, err
+		return api.SequenceInfo{}, err
 	}
 
 	return info.AckFloor, nil
@@ -690,6 +715,7 @@ func (c *Consumer) IsEphemeral() bool                { return !c.IsDurable() }
 func (c *Consumer) StreamName() string               { return c.stream }
 func (c *Consumer) DeliverySubject() string          { return c.cfg.DeliverSubject }
 func (c *Consumer) DurableName() string              { return c.cfg.Durable }
+func (c *Consumer) Description() string              { return c.cfg.Description }
 func (c *Consumer) StartSequence() uint64            { return c.cfg.OptStartSeq }
 func (c *Consumer) DeliverPolicy() api.DeliverPolicy { return c.cfg.DeliverPolicy }
 func (c *Consumer) AckPolicy() api.AckPolicy         { return c.cfg.AckPolicy }
@@ -702,6 +728,7 @@ func (c *Consumer) RateLimit() uint64                { return c.cfg.RateLimit }
 func (c *Consumer) MaxAckPending() int               { return c.cfg.MaxAckPending }
 func (c *Consumer) FlowControl() bool                { return c.cfg.FlowControl }
 func (c *Consumer) Heartbeat() time.Duration         { return c.cfg.Heartbeat }
+func (c *Consumer) DeliverGroup() string             { return c.cfg.DeliverGroup }
 func (c *Consumer) MaxWaiting() int                  { return c.cfg.MaxWaiting }
 func (c *Consumer) StartTime() time.Time {
 	if c.cfg.OptStartTime == nil {

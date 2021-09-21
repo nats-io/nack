@@ -32,6 +32,7 @@ type MsgInfo struct {
 	delivered int
 	pending   uint64
 	ts        time.Time
+	domain    string
 }
 
 // Stream is the stream this message is stored in
@@ -64,10 +65,17 @@ func (i *MsgInfo) TimeStamp() time.Time {
 	return i.ts
 }
 
+// Domain is the domain the message came from, can be empty
+func (i *MsgInfo) Domain() string {
+	return i.domain
+}
+
 // Pending is the number of messages left to consume, -1 when the number is not reported
 func (i *MsgInfo) Pending() uint64 {
 	return i.pending
 }
+
+const _EMPTY_ = ""
 
 // ParseJSMsgMetadataReply parses the reply subject of a JetStream originated message
 func ParseJSMsgMetadataReply(reply string) (info *MsgInfo, err error) {
@@ -78,23 +86,38 @@ func ParseJSMsgMetadataReply(reply string) (info *MsgInfo, err error) {
 	parts := strings.Split(reply, ".")
 	c := len(parts)
 
-	if (c != 8 && c != 9) || parts[0] != "$JS" || parts[1] != "ACK" {
+	if c < 9 || (c > 9 && c < 11) {
 		return nil, fmt.Errorf("message metadata does not appear to be an ACK")
 	}
 
-	stream := parts[2]
-	consumer := parts[3]
-	delivered, _ := strconv.Atoi(parts[4])
-	streamSeq, _ := strconv.ParseUint(parts[5], 10, 64)
-	consumerSeq, _ := strconv.ParseUint(parts[6], 10, 64)
-	tsi, _ := strconv.Atoi(parts[7])
-	ts := time.Unix(0, int64(tsi))
-	pending := uint64(math.MaxUint64)
-	if c == 9 {
-		pending, _ = strconv.ParseUint(parts[8], 10, 64)
+	if parts[0] != "$JS" || parts[1] != "ACK" {
+		return nil, fmt.Errorf("message metadata does not appear to be an ACK")
 	}
 
-	return &MsgInfo{stream, consumer, streamSeq, consumerSeq, delivered, pending, ts}, nil
+	// $JS.ACK.<domain>.<account hash>.<stream>.<consumer>...<random>
+	// $JS.ACK.<stream>.<consumer>...
+
+	offset := 0
+	if c == 12 {
+		offset = 2
+	}
+
+	stream := parts[2+offset]
+	consumer := parts[3+offset]
+	delivered, _ := strconv.Atoi(parts[4+offset])
+	streamSeq, _ := strconv.ParseUint(parts[5+offset], 10, 64)
+	consumerSeq, _ := strconv.ParseUint(parts[6+offset], 10, 64)
+	tsi, _ := strconv.Atoi(parts[7+offset])
+	ts := time.Unix(0, int64(tsi))
+	pending := uint64(math.MaxUint64)
+	pending, _ = strconv.ParseUint(parts[8+offset], 10, 64)
+
+	domain := _EMPTY_
+	if c == 12 {
+		domain = parts[2]
+	}
+
+	return &MsgInfo{stream, consumer, streamSeq, consumerSeq, delivered, pending, ts, domain}, nil
 }
 
 // ParseJSMsgMetadata parse the reply subject metadata to determine message metadata

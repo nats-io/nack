@@ -1,0 +1,12 @@
+---
+apiVersion: jetstream.nats.io/v1beta1
+kind: Stream
+metadata:
+  name: mystream-mirror
+spec:
+  name: mystream-mirror
+  storage: memory
+  mirror:
+    name: my-publish-subj
+    externalApiPrefix: FOO.JS.API
+    externalDeliverPrefix: FOO.DELIVER.SYNC.MIRRORS

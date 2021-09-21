@@ -1,0 +1,11 @@
+---
+apiVersion: jetstream.nats.io/v1beta1
+kind: Stream
+metadata:
+  name: mystream-sources
+spec:
+  name: mystream-sources
+  storage: memory
+  sources:
+  - name: m1
+  - name: m2

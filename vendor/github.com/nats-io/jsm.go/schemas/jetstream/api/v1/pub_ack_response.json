@@ -41,6 +41,7 @@
     "seq": {
       "type": "integer",
       "description": "If successful this will be the sequence the message is stored at",
+      "$comment": "unsigned 64 bit integer",
       "minimum": 0,
       "maximum": 18446744073709551615
     },
@@ -48,6 +49,10 @@
       "type": "boolean",
       "description": "Indicates that the message was not stored due to the Nats-Msg-Id header and duplicate tracking",
       "default": false
+    },
+    "domain": {
+      "type": "string",
+      "description": "If the Stream accepting the message is in a JetStream server configured for a domain this would be that domain"
     }
   }
 }
