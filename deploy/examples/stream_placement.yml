@@ -1,0 +1,11 @@
+---
+apiVersion: jetstream.nats.io/v1beta1
+kind: Stream
+metadata:
+  name: mystream-placement
+spec:
+  name: mystream-placement
+  storage: memory
+  placement:
+    tags:
+    - NODE_0
