@@ -46,12 +46,6 @@ type ConsumerSpec struct {
 	TLS               TLS      `json:"tls"`
 }
 
-type TLS struct {
-	ClientCert string   `json:"clientCert"`
-	ClientKey  string   `json:"clientKey"`
-	RootCAs    []string `json:"rootCas"`
-}
-
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ConsumerList is a list of Consumer resources

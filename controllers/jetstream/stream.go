@@ -86,6 +86,12 @@ func (c *Controller) processStream(ns, name string, jsmc jsmClient) (err error) 
 				}
 				opts = append(opts, opt)
 			}
+			if spec.TLS.ClientCert != "" && spec.TLS.ClientKey != "" {
+				opts = append(opts, nats.ClientCert(spec.TLS.ClientCert, spec.TLS.ClientKey))
+			}
+			if len(spec.TLS.RootCAs) > 0 {
+				opts = append(opts, nats.RootCAs(spec.TLS.RootCAs...))
+			}
 			opts = append(opts, nats.MaxReconnects(-1))
 
 			natsServers := strings.Join(servers, ",")

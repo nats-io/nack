@@ -21,3 +21,9 @@ type Condition struct {
 	Message            string                 `json:"message"`
 	LastTransitionTime string                 `json:"lastTransitionTime"`
 }
+
+type TLS struct {
+	ClientCert string   `json:"clientCert"`
+	ClientKey  string   `json:"clientKey"`
+	RootCAs    []string `json:"rootCas"`
+}

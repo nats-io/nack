@@ -61,12 +61,6 @@ type StreamSource struct {
 	ExternalDeliverPrefix string `json:"externalDeliverPrefix"`
 }
 
-type TLS struct {
-	ClientCert string   `json:"clientCert"`
-	ClientKey  string   `json:"clientKey"`
-	RootCAs    []string `json:"rootCas"`
-}
-
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // StreamList is a list of Stream resources
