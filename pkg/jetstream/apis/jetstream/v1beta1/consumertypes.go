@@ -22,7 +22,7 @@ func (c *Consumer) GetSpec() interface{} {
 
 // ConsumerSpec is the spec for a Consumer resource
 type ConsumerSpec struct {
-a	AckPolicy         string   `json:"ackPolicy"`
+	AckPolicy         string   `json:"ackPolicy"`
 	AckWait           string   `json:"ackWait"`
 	Creds             string   `json:"creds"`
 	DeliverGroup      string   `json:"deliverGroup"`
