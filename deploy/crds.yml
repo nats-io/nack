@@ -167,7 +167,7 @@ spec:
                   clientCert:
                     description: A client's cert filepath. Should be mounted.
                     type: string
-                  clientCert:
+                  clientKey:
                     description: A client's key filepath. Should be mounted.
                     type: string
                   rootCas:
@@ -329,7 +329,7 @@ spec:
                   clientCert:
                     description: A client's cert filepath. Should be mounted.
                     type: string
-                  clientCert:
+                  clientKey:
                     description: A client's key filepath. Should be mounted.
                     type: string
                   rootCas:
