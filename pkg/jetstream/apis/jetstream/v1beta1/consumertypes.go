@@ -43,6 +43,13 @@ type ConsumerSpec struct {
 	SampleFreq        string   `json:"sampleFreq"`
 	Servers           []string `json:"servers"`
 	StreamName        string   `json:"streamName"`
+	TLS               TLS      `json:"tls"`
+}
+
+type TLS struct {
+	ClientCert string   `json:"clientCert"`
+	ClientKey  string   `json:"clientKey"`
+	RootCAs    []string `json:"rootCas"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

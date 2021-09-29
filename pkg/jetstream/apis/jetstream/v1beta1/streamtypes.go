@@ -22,6 +22,7 @@ func (s *Stream) GetSpec() interface{} {
 
 // StreamSpec is the spec for a Stream resource
 type StreamSpec struct {
+	Creds             string           `json:"creds"`
 	Description       string           `json:"description"`
 	Discard           string           `json:"discard"`
 	DuplicateWindow   string           `json:"duplicateWindow"`
@@ -33,16 +34,16 @@ type StreamSpec struct {
 	MaxMsgsPerSubject int              `json:"maxMsgsPerSubject"`
 	Mirror            *StreamSource    `json:"mirror"`
 	Name              string           `json:"name"`
+	Nkey              string           `json:"nkey"`
 	NoAck             bool             `json:"noAck"`
 	Placement         *StreamPlacement `json:"placement"`
 	Replicas          int              `json:"replicas"`
 	Retention         string           `json:"retention"`
-	Sources           []*StreamSource  `json:"sources"`
 	Servers           []string         `json:"servers"`
-	Creds           string   `json:"creds"`
-	Nkey            string   `json:"nkey"`
+	Sources           []*StreamSource  `json:"sources"`
 	Storage           string           `json:"storage"`
 	Subjects          []string         `json:"subjects"`
+	TLS               TLS              `json:"tls"`
 }
 
 type StreamPlacement struct {
@@ -58,6 +59,12 @@ type StreamSource struct {
 
 	ExternalAPIPrefix     string `json:"externalApiPrefix"`
 	ExternalDeliverPrefix string `json:"externalDeliverPrefix"`
+}
+
+type TLS struct {
+	ClientCert string   `json:"clientCert"`
+	ClientKey  string   `json:"clientKey"`
+	RootCAs    []string `json:"rootCas"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
