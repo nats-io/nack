@@ -1,0 +1,17 @@
+---
+apiVersion: jetstream.nats.io/v1beta1
+kind: Stream
+metadata:
+  name: mystream
+spec:
+  name: mystream
+  subjects: ["orders.*"]
+  storage: memory
+  maxAge: 1h
+  replicas: 1
+  servers:
+  - nats://foo.org
+  creds: /etc/jetstream/my.creds
+  tls:
+    clientCert: /etc/jetstream/cert.pem
+    clientKey: /etc/jetstream/key.pem
