@@ -160,6 +160,21 @@ spec:
                       type: string
                     externalDeliverPrefix:
                       type: string
+              tls:
+                description: A client's TLS certs and keys.
+                type: object
+                properties:
+                  clientCert:
+                    description: A client's cert filepath. Should be mounted.
+                    type: string
+                  clientCert:
+                    description: A client's key filepath. Should be mounted.
+                    type: string
+                  rootCas:
+                    description: A list of filepaths to CAs. Should be mounted.
+                    type: array
+                    items:
+                      type: string
           status:
             type: object
             properties:
@@ -307,6 +322,21 @@ spec:
               heartbeatInterval:
                 description: The interval used to deliver idle heartbeats for push-based consumers, in Go's time.Duration format.
                 type: string
+              tls:
+                description: A client's TLS certs and keys.
+                type: object
+                properties:
+                  clientCert:
+                    description: A client's cert filepath. Should be mounted.
+                    type: string
+                  clientCert:
+                    description: A client's key filepath. Should be mounted.
+                    type: string
+                  rootCas:
+                    description: A list of filepaths to CAs. Should be mounted.
+                    type: array
+                    items:
+                      type: string
           status:
             type: object
             properties:
