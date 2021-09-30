@@ -484,27 +484,27 @@ func getDuplicates(v string) (time.Duration, error) {
 }
 
 func getStreamSource(ss *apis.StreamSource) (*jsmapi.StreamSource, error) {
-		jss := &jsmapi.StreamSource{
-			Name:          ss.Name,
-			FilterSubject: ss.FilterSubject,
-		}
+	jss := &jsmapi.StreamSource{
+		Name:          ss.Name,
+		FilterSubject: ss.FilterSubject,
+	}
 
-		if ss.OptStartSeq > 0 {
-			jss.OptStartSeq = uint64(ss.OptStartSeq)
-		} else if ss.OptStartTime != "" {
-			t, err := time.Parse(ss.OptStartTime, time.RFC3339)
-			if err != nil {
-				return nil, err
-			}
-			jss.OptStartTime = &t
+	if ss.OptStartSeq > 0 {
+		jss.OptStartSeq = uint64(ss.OptStartSeq)
+	} else if ss.OptStartTime != "" {
+		t, err := time.Parse(ss.OptStartTime, time.RFC3339)
+		if err != nil {
+			return nil, err
 		}
+		jss.OptStartTime = &t
+	}
 
-		if ss.ExternalAPIPrefix != "" || ss.ExternalDeliverPrefix != "" {
-			jss.External = &jsmapi.ExternalStream{
-				ApiPrefix:     ss.ExternalAPIPrefix,
-				DeliverPrefix: ss.ExternalDeliverPrefix,
-			}
+	if ss.ExternalAPIPrefix != "" || ss.ExternalDeliverPrefix != "" {
+		jss.External = &jsmapi.ExternalStream{
+			ApiPrefix:     ss.ExternalAPIPrefix,
+			DeliverPrefix: ss.ExternalDeliverPrefix,
 		}
+	}
 
 	return jss, nil
 }
