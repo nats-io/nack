@@ -71,7 +71,8 @@ type Options struct {
 	NATSCertificate string
 	NATSKey         string
 
-	Namespace       string
+	Namespace  string
+	CRDConnect bool
 
 	Recorder record.EventRecorder
 }
@@ -171,43 +172,45 @@ func NewController(opt Options) *Controller {
 }
 
 func (c *Controller) Run() error {
-	// Connect to NATS.
-	opts := make([]nats.Option, 0)
+	if !c.opts.CRDConnect {
+		// Connect to NATS.
+		opts := make([]nats.Option, 0)
 
-	opts = append(opts, nats.Name(c.opts.NATSClientName))
+		opts = append(opts, nats.Name(c.opts.NATSClientName))
 
-	// Use JWT/NKEYS based credentials if present.
-	if c.opts.NATSCredentials != "" {
-		opts = append(opts, nats.UserCredentials(c.opts.NATSCredentials))
-	} else if c.opts.NATSNKey != "" {
-		opt, err := nats.NkeyOptionFromSeed(c.opts.NATSNKey)
-		if err != nil {
-			return nil
+		// Use JWT/NKEYS based credentials if present.
+		if c.opts.NATSCredentials != "" {
+			opts = append(opts, nats.UserCredentials(c.opts.NATSCredentials))
+		} else if c.opts.NATSNKey != "" {
+			opt, err := nats.NkeyOptionFromSeed(c.opts.NATSNKey)
+			if err != nil {
+				return nil
+			}
+			opts = append(opts, opt)
 		}
-		opts = append(opts, opt)
-	}
 
-	if c.opts.NATSCertificate != "" && c.opts.NATSKey != "" {
-		opts = append(opts, nats.ClientCert(c.opts.NATSCertificate, c.opts.NATSKey))
-	}
+		if c.opts.NATSCertificate != "" && c.opts.NATSKey != "" {
+			opts = append(opts, nats.ClientCert(c.opts.NATSCertificate, c.opts.NATSKey))
+		}
 
-	if c.opts.NATSCA != "" {
-		opts = append(opts, nats.RootCAs(c.opts.NATSCA))
-	}
+		if c.opts.NATSCA != "" {
+			opts = append(opts, nats.RootCAs(c.opts.NATSCA))
+		}
 
-	// Always attempt to have a connection to NATS.
-	opts = append(opts, nats.MaxReconnects(-1))
+		// Always attempt to have a connection to NATS.
+		opts = append(opts, nats.MaxReconnects(-1))
 
-	nc, err := nats.Connect(c.opts.NATSServerURL, opts...)
-	if err != nil {
-		return fmt.Errorf("failed to connect to nats: %w", err)
+		nc, err := nats.Connect(c.opts.NATSServerURL, opts...)
+		if err != nil {
+			return fmt.Errorf("failed to connect to nats: %w", err)
+		}
+		c.nc = nc
+		jm, err := jsm.New(c.nc)
+		if err != nil {
+			return err
+		}
+		c.jm = jm
 	}
-	c.nc = nc
-	jm, err := jsm.New(c.nc)
-	if err != nil {
-		return err
-	}
-	c.jm = jm
 
 	defer utilruntime.HandleCrash()
 

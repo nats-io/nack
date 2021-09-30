@@ -72,7 +72,7 @@ func (c *Controller) processStream(ns, name string, jsmc jsmClient) (err error) 
 
 	natsClientUtil := func(op operator) error {
 		servers := spec.Servers
-		if len(servers) != 0 {
+		if c.opts.CRDConnect {
 			// Create a new client
 			opts := make([]nats.Option, 0)
 			opts = append(opts, nats.Name(fmt.Sprintf("%s-str-%s-%d", c.opts.NATSClientName, spec.Name, str.Generation)))

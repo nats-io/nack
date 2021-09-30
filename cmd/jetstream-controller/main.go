@@ -18,10 +18,11 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"os"
 	"os/signal"
 	"syscall"
+
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/nats-io/nack/controllers/jetstream"
 	clientset "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned"
@@ -55,7 +56,8 @@ func run() error {
 	cert := flag.String("tlscert", "", "NATS TLS public certificate")
 	key := flag.String("tlskey", "", "NATS TLS private key")
 	ca := flag.String("tlsca", "", "NATS TLS certificate authority chain")
-	server := flag.String("s", "", "NATS Server URL") // required
+	server := flag.String("s", "", "NATS Server URL")
+	crdConnect := flag.Bool("crd-connect", false, "If true, then NATS connections will be made from CRD config, not global config")
 	flag.Parse()
 
 	if *version {
@@ -109,6 +111,7 @@ func run() error {
 		KubeIface:       kc,
 		JetstreamIface:  jc,
 		Namespace:       *namespace,
+		CRDConnect:      *crdConnect,
 	})
 
 	klog.Infof("Starting %s %s...", os.Args[0], Version)
