@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nats-client-box
+  namespace: "default"
+  labels:
+    app: nats-client-box
+    chart: nats-0.9.0
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nats-client-box
+  template:
+    metadata:
+      labels:
+        app: nats-client-box
+    spec:
+      volumes:
+      - name: nats-server-tls-clients-volume
+        secret:
+          secretName: nats-sys-tls
+      - name: nats-account-a-volume
+        secret:
+          secretName: nack-a-tls
+      containers:
+      - name: nats-box
+        image: natsio/nats-box:0.6.0
+        imagePullPolicy: IfNotPresent
+        resources:
+          null
+        env:
+        - name: NATS_URL
+          value: nats
+        lifecycle:
+          postStart:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - cp /etc/nats-certs/clients/nats-server-tls/* /usr/local/share/ca-certificates && update-ca-certificates
+        command:
+         - "tail"
+         - "-f"
+         - "/dev/null"
+        volumeMounts:
+        #######################
+        #                     #
+        #  TLS Volumes Mounts #
+        #                     #
+        #######################
+        - name: nats-server-tls-clients-volume
+          mountPath: /etc/nats-certs/clients/nats-server-tls
+        - name: nats-account-a-volume
+          mountPath: /etc/nats-certs/clients/nack-a-tls

@@ -1,0 +1,14 @@
+apiVersion: jetstream.nats.io/v1beta2
+kind: Stream
+metadata:
+  name: mystream
+spec:
+  name: mystream
+  servers:
+  - nats://acme.org:4222
+  tls:
+    clientCert: /etc/certs/client/foo/client-cert.pem
+    clientKey: /etc/certs/client/foo/client-key.pem
+    rootCas:
+    - /etc/certs/ca/foo/ca-cert.pem
+  creds: /etc/jsc-creds/my.creds

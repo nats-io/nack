@@ -17,20 +17,20 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	jsm "github.com/nats-io/jsm.go"
 	jsmapi "github.com/nats-io/jsm.go/api"
-	apis "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta1"
-	typed "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/typed/jetstream/v1beta1"
+	apis "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
+	typed "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/typed/jetstream/v1beta2"
+	"github.com/nats-io/nats.go"
 
 	k8sapi "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	k8smeta "k8s.io/apimachinery/pkg/apis/meta/v1"
-)
-
-const (
-	streamFinalizerKey = "streamfinalizer.jetstream.nats.io"
 )
 
 func (c *Controller) runStreamQueue() {
@@ -56,6 +56,46 @@ func (c *Controller) processStream(ns, name string, jsmc jsmClient) (err error) 
 	spec := str.Spec
 	ifc := c.ji.Streams(str.Namespace)
 
+	var (
+		remoteClientCert string
+		remoteClientKey  string
+		remoteRootCA     string
+		accServers       []string
+	)
+	if spec.Account != "" && c.opts.CRDConnect {
+		// Lookup the account.
+		acc, err := c.accLister.Accounts(ns).Get(spec.Account)
+		if err != nil {
+			return err
+		}
+
+		// Lookup the TLS secrets
+		if acc.Spec.TLS != nil && acc.Spec.TLS.Secret != nil {
+			secretName := acc.Spec.TLS.Secret.Name
+			secret, err := c.ki.Secrets(ns).Get(c.ctx, secretName, k8smeta.GetOptions{})
+			if err != nil {
+				return err
+			}
+
+			// Write this to the cacheDir
+			accDir := filepath.Join(c.cacheDir, ns, spec.Account)
+			if err := os.MkdirAll(accDir, 0755); err != nil {
+				return err
+			}
+
+			remoteClientCert = filepath.Join(accDir, acc.Spec.TLS.ClientCert)
+			remoteClientKey = filepath.Join(accDir, acc.Spec.TLS.ClientKey)
+			remoteRootCA = filepath.Join(accDir, acc.Spec.TLS.RootCAs)
+			accServers = acc.Spec.Servers
+
+			for k, v := range secret.Data {
+				if err := os.WriteFile(filepath.Join(accDir, k), v, 0644); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
 	defer func() {
 		if err == nil {
 			return
@@ -66,10 +106,75 @@ func (c *Controller) processStream(ns, name string, jsmc jsmClient) (err error) 
 		}
 	}()
 
+	type operator func(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err error)
+
+	natsClientUtil := func(op operator) error {
+		servers := spec.Servers
+		if c.opts.CRDConnect {
+			// Create a new client
+			opts := make([]nats.Option, 0)
+			opts = append(opts, nats.Name(fmt.Sprintf("%s-str-%s-%d", c.opts.NATSClientName, spec.Name, str.Generation)))
+			// Use JWT/NKEYS based credentials if present.
+			if spec.Creds != "" {
+				opts = append(opts, nats.UserCredentials(spec.Creds))
+			} else if spec.Nkey != "" {
+				opt, err := nats.NkeyOptionFromSeed(spec.Nkey)
+				if err != nil {
+					return err
+				}
+				opts = append(opts, opt)
+			}
+			if spec.TLS.ClientCert != "" && spec.TLS.ClientKey != "" {
+				opts = append(opts, nats.ClientCert(spec.TLS.ClientCert, spec.TLS.ClientKey))
+			}
+
+			// Use fetched secrets for the account and server if defined.
+			if remoteClientCert != "" && remoteClientKey != "" {
+				opts = append(opts, nats.ClientCert(remoteClientCert, remoteClientKey))
+			}
+			if remoteRootCA != "" {
+				opts = append(opts, nats.RootCAs(remoteRootCA))
+			}
+
+			if len(spec.TLS.RootCAs) > 0 {
+				opts = append(opts, nats.RootCAs(spec.TLS.RootCAs...))
+			}
+
+			opts = append(opts, nats.MaxReconnects(-1))
+
+			natsServers := strings.Join(append(servers, accServers...), ",")
+			newNc, err := nats.Connect(natsServers, opts...)
+			if err != nil {
+				return fmt.Errorf("failed to connect to nats-servers(%s): %w", natsServers, err)
+			}
+
+			c.normalEvent(str, "Connecting", "Connecting to new nats-servers")
+			newJm, err := jsm.New(newNc)
+			if err != nil {
+				return err
+			}
+			newJsmc := &realJsmClient{nc: newNc, jm: newJm}
+
+			if err := op(c.ctx, newJsmc, spec); err != nil {
+				return err
+			}
+			newJsmc.Close()
+		} else {
+			if err := op(c.ctx, jsmc, spec); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
 	deleteOK := str.GetDeletionTimestamp() != nil
 	newGeneration := str.Generation != str.Status.ObservedGeneration
-	strOK, err := streamExists(c.ctx, jsmc, spec.Name)
-	if err != nil {
+	strOK := true
+	err = natsClientUtil(streamExists)
+	var apierr jsmapi.ApiError
+	if errors.As(err, &apierr) && apierr.NotFoundError() {
+		strOK = false
+	} else if err != nil {
 		return err
 	}
 	updateOK := (strOK && !deleteOK && newGeneration)
@@ -78,15 +183,9 @@ func (c *Controller) processStream(ns, name string, jsmc jsmClient) (err error) 
 	switch {
 	case createOK:
 		c.normalEvent(str, "Creating", fmt.Sprintf("Creating stream %q", spec.Name))
-		if err := createStream(c.ctx, jsmc, spec); err != nil {
+		if err := natsClientUtil(createStream); err != nil {
 			return err
 		}
-
-		res, err := setStreamFinalizer(c.ctx, str, ifc)
-		if err != nil {
-			return err
-		}
-		str = res
 
 		if _, err := setStreamOK(c.ctx, str, ifc); err != nil {
 			return err
@@ -94,15 +193,9 @@ func (c *Controller) processStream(ns, name string, jsmc jsmClient) (err error) 
 		c.normalEvent(str, "Created", fmt.Sprintf("Created stream %q", spec.Name))
 	case updateOK:
 		c.normalEvent(str, "Updating", fmt.Sprintf("Updating stream %q", spec.Name))
-		if err := updateStream(c.ctx, jsmc, spec); err != nil {
+		if err := natsClientUtil(updateStream); err != nil {
 			return err
 		}
-
-		res, err := setStreamFinalizer(c.ctx, str, ifc)
-		if err != nil {
-			return err
-		}
-		str = res
 
 		if _, err := setStreamOK(c.ctx, str, ifc); err != nil {
 			return err
@@ -111,11 +204,7 @@ func (c *Controller) processStream(ns, name string, jsmc jsmClient) (err error) 
 		return nil
 	case deleteOK:
 		c.normalEvent(str, "Deleting", fmt.Sprintf("Deleting stream %q", spec.Name))
-		if err := deleteStream(c.ctx, jsmc, spec.Name); err != nil {
-			return err
-		}
-
-		if _, err := clearStreamFinalizer(c.ctx, str, ifc); err != nil {
+		if err := natsClientUtil(deleteStream); err != nil {
 			return err
 		}
 	default:
@@ -125,22 +214,15 @@ func (c *Controller) processStream(ns, name string, jsmc jsmClient) (err error) 
 	return nil
 }
 
-func streamExists(ctx context.Context, c jsmClient, name string) (ok bool, err error) {
+func streamExists(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err error) {
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("failed to check if stream exists: %w", err)
 		}
 	}()
 
-	var apierr jsmapi.ApiError
-	_, err = c.LoadStream(ctx, name)
-	if errors.As(err, &apierr) && apierr.NotFoundError() {
-		return false, nil
-	} else if err != nil {
-		return false, err
-	}
-
-	return true, nil
+	_, err = c.LoadStream(ctx, spec.Name)
+	return err
 }
 
 func createStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err error) {
@@ -293,7 +375,8 @@ func updateStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 	})
 }
 
-func deleteStream(ctx context.Context, c jsmClient, name string) (err error) {
+func deleteStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err error) {
+	name := spec.Name
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("failed to delete stream %q: %w", name, err)
@@ -359,34 +442,6 @@ func setStreamOK(ctx context.Context, s *apis.Stream, i typed.StreamInterface) (
 	return res, nil
 }
 
-func setStreamFinalizer(ctx context.Context, o *apis.Stream, i typed.StreamInterface) (*apis.Stream, error) {
-	o.SetFinalizers(addFinalizer(o.GetFinalizers(), streamFinalizerKey))
-
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	res, err := i.Update(ctx, o, k8smeta.UpdateOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to set %q stream finalizers: %w", o.GetName(), err)
-	}
-
-	return res, nil
-}
-
-func clearStreamFinalizer(ctx context.Context, o *apis.Stream, i typed.StreamInterface) (*apis.Stream, error) {
-	o.SetFinalizers(removeFinalizer(o.GetFinalizers(), streamFinalizerKey))
-
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	res, err := i.Update(ctx, o, k8smeta.UpdateOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to clear %q stream finalizers: %w", o.GetName(), err)
-	}
-
-	return res, nil
-}
-
 func getMaxAge(v string) (time.Duration, error) {
 	if v == "" {
 		return time.Duration(0), nil
@@ -433,27 +488,27 @@ func getDuplicates(v string) (time.Duration, error) {
 }
 
 func getStreamSource(ss *apis.StreamSource) (*jsmapi.StreamSource, error) {
-		jss := &jsmapi.StreamSource{
-			Name:          ss.Name,
-			FilterSubject: ss.FilterSubject,
-		}
+	jss := &jsmapi.StreamSource{
+		Name:          ss.Name,
+		FilterSubject: ss.FilterSubject,
+	}
 
-		if ss.OptStartSeq > 0 {
-			jss.OptStartSeq = uint64(ss.OptStartSeq)
-		} else if ss.OptStartTime != "" {
-			t, err := time.Parse(ss.OptStartTime, time.RFC3339)
-			if err != nil {
-				return nil, err
-			}
-			jss.OptStartTime = &t
+	if ss.OptStartSeq > 0 {
+		jss.OptStartSeq = uint64(ss.OptStartSeq)
+	} else if ss.OptStartTime != "" {
+		t, err := time.Parse(ss.OptStartTime, time.RFC3339)
+		if err != nil {
+			return nil, err
 		}
+		jss.OptStartTime = &t
+	}
 
-		if ss.ExternalAPIPrefix != "" || ss.ExternalDeliverPrefix != "" {
-			jss.External = &jsmapi.ExternalStream{
-				ApiPrefix:     ss.ExternalAPIPrefix,
-				DeliverPrefix: ss.ExternalDeliverPrefix,
-			}
+	if ss.ExternalAPIPrefix != "" || ss.ExternalDeliverPrefix != "" {
+		jss.External = &jsmapi.ExternalStream{
+			ApiPrefix:     ss.ExternalAPIPrefix,
+			DeliverPrefix: ss.ExternalDeliverPrefix,
 		}
+	}
 
 	return jss, nil
 }

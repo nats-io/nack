@@ -1,0 +1,11 @@
+---
+apiVersion: jetstream.nats.io/v1beta2
+kind: Stream
+metadata:
+  name: foo
+spec:
+  name: foo
+  subjects: ["foo", "foo.>"]
+  storage: file
+  replicas: 1
+  account: a

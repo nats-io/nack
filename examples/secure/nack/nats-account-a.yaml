@@ -1,0 +1,15 @@
+---
+apiVersion: jetstream.nats.io/v1beta2
+kind: Account
+metadata:
+  name: a
+spec:
+  name: a
+  servers:
+  - nats://nats:4222
+  tls:
+    secret:
+      name: nack-a-tls
+    ca: "ca.crt"
+    cert: "tls.crt"
+    key: "tls.key"

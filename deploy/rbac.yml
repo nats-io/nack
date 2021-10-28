@@ -19,6 +19,14 @@ rules:
   - update
   - patch
 - apiGroups:
+  - ''
+  resources:
+  - secrets
+  verbs:
+  - get
+  - watch
+  - list
+- apiGroups:
   - jetstream.nats.io
   resources:
   - streams
@@ -27,6 +35,7 @@ rules:
   - consumers/status
   - streamtemplates
   - streamtemplates/status
+  - accounts
   verbs:
   - create
   - get

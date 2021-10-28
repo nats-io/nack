@@ -1,0 +1,50 @@
+auth:
+  enabled: true
+  timeout: "5s"
+  basic:
+    systemAccount: SYS
+    accounts:
+      SYS:
+        users:
+          - user: CN=nats-sys-user
+      A:
+        jetstream: true
+        users:
+          - user: CN=nack-a
+      B:
+        jetstream: true
+        users:
+          - user: CN=nack-b
+nats:
+  image: nats:2.6.2-alpine
+
+  logging:
+    debug: true
+
+  # NATS Server TLS
+  tls:
+    secret:
+      name: nats-server-tls
+    ca: "ca.crt"
+    cert: "tls.crt"
+    key: "tls.key"
+    verifyAndMap: true
+    timeout: "5s"
+
+  # JetStream setup
+  jetstream:
+    enabled: true
+
+    memStorage:
+      enabled: true
+      size: 2Gi
+
+    fileStorage:
+      enabled: true
+      size: 1Gi
+      storageDirectory: /data/
+      # storageClassName: default
+
+cluster:
+  enabled: true
+  replicas: 3

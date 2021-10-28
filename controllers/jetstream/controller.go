@@ -1,4 +1,4 @@
-// Copyright 2020 The NATS Authors
+// Copyright 2020-2021 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -18,17 +18,18 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"os"
 
 	"github.com/nats-io/jsm.go"
 	jsmapi "github.com/nats-io/jsm.go/api"
 	"github.com/nats-io/nats.go"
 
-	apis "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta1"
+	apis "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 	clientset "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned"
 	scheme "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/scheme"
-	typed "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/typed/jetstream/v1beta1"
+	typed "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/typed/jetstream/v1beta2"
 	informers "github.com/nats-io/nack/pkg/jetstream/generated/informers/externalversions"
-	listers "github.com/nats-io/nack/pkg/jetstream/generated/listers/jetstream/v1beta1"
+	listers "github.com/nats-io/nack/pkg/jetstream/generated/listers/jetstream/v1beta2"
 
 	k8sapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -71,7 +72,8 @@ type Options struct {
 	NATSCertificate string
 	NATSKey         string
 
-	Namespace       string
+	Namespace  string
+	CRDConnect bool
 
 	Recorder record.EventRecorder
 }
@@ -83,32 +85,32 @@ type Controller struct {
 	jm   *jsm.Manager
 
 	ki              k8styped.CoreV1Interface
-	ji              typed.JetstreamV1beta1Interface
+	ji              typed.JetstreamV1beta2Interface
 	informerFactory informers.SharedInformerFactory
 	rec             record.EventRecorder
-
-	natsName string
 
 	strLister listers.StreamLister
 	strSynced cache.InformerSynced
 	strQueue  workqueue.RateLimitingInterface
 
-	strTmplLister listers.StreamTemplateLister
-	strTmplSynced cache.InformerSynced
-	strTmplQueue  workqueue.RateLimitingInterface
-
 	cnsLister listers.ConsumerLister
 	cnsSynced cache.InformerSynced
 	cnsQueue  workqueue.RateLimitingInterface
+
+	accLister listers.AccountLister
+
+	// cacheDir is where the downloaded TLS certs from the server
+	// will be stored temporarily.
+	cacheDir string
 }
 
 func NewController(opt Options) *Controller {
 	resyncPeriod := 30 * time.Second
 	informerFactory := informers.NewSharedInformerFactoryWithOptions(opt.JetstreamIface, resyncPeriod, informers.WithNamespace(opt.Namespace))
 
-	streamInformer := informerFactory.Jetstream().V1beta1().Streams()
-	streamTmplInformer := informerFactory.Jetstream().V1beta1().StreamTemplates()
-	consumerInformer := informerFactory.Jetstream().V1beta1().Consumers()
+	streamInformer := informerFactory.Jetstream().V1beta2().Streams()
+	consumerInformer := informerFactory.Jetstream().V1beta2().Consumers()
+	accountInformer := informerFactory.Jetstream().V1beta2().Accounts()
 
 	if opt.Recorder == nil {
 		utilruntime.Must(scheme.AddToScheme(k8sscheme.Scheme))
@@ -127,9 +129,8 @@ func NewController(opt Options) *Controller {
 		opt.NATSClientName = "jetstream-controller"
 	}
 
-	ji := opt.JetstreamIface.JetstreamV1beta1()
+	ji := opt.JetstreamIface.JetstreamV1beta2()
 	streamQueue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Streams")
-	streamTmplQueue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Streams")
 	consumerQueue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Consumers")
 
 	streamInformer.Informer().AddEventHandler(eventHandlers(
@@ -137,15 +138,15 @@ func NewController(opt Options) *Controller {
 		streamQueue,
 	))
 
-	streamTmplInformer.Informer().AddEventHandler(eventHandlers(
-		opt.Ctx,
-		streamTmplQueue,
-	))
-
 	consumerInformer.Informer().AddEventHandler(eventHandlers(
 		opt.Ctx,
 		consumerQueue,
 	))
+
+	cacheDir, err := os.MkdirTemp(".", "nack")
+	if err != nil {
+		panic(err)
+	}
 
 	return &Controller{
 		ctx:  opt.Ctx,
@@ -160,59 +161,59 @@ func NewController(opt Options) *Controller {
 		strSynced: streamInformer.Informer().HasSynced,
 		strQueue:  streamQueue,
 
-		strTmplLister: streamTmplInformer.Lister(),
-		strTmplSynced: streamTmplInformer.Informer().HasSynced,
-		strTmplQueue:  streamTmplQueue,
-
 		cnsLister: consumerInformer.Lister(),
 		cnsSynced: consumerInformer.Informer().HasSynced,
 		cnsQueue:  consumerQueue,
+
+		accLister: accountInformer.Lister(),
+		cacheDir:  cacheDir,
 	}
 }
 
 func (c *Controller) Run() error {
-	// Connect to NATS.
-	opts := make([]nats.Option, 0)
+	if !c.opts.CRDConnect {
+		// Connect to NATS.
+		opts := make([]nats.Option, 0)
 
-	opts = append(opts, nats.Name(c.opts.NATSClientName))
+		opts = append(opts, nats.Name(c.opts.NATSClientName))
 
-	// Use JWT/NKEYS based credentials if present.
-	if c.opts.NATSCredentials != "" {
-		opts = append(opts, nats.UserCredentials(c.opts.NATSCredentials))
-	} else if c.opts.NATSNKey != "" {
-		opt, err := nats.NkeyOptionFromSeed(c.opts.NATSNKey)
-		if err != nil {
-			return nil
+		// Use JWT/NKEYS based credentials if present.
+		if c.opts.NATSCredentials != "" {
+			opts = append(opts, nats.UserCredentials(c.opts.NATSCredentials))
+		} else if c.opts.NATSNKey != "" {
+			opt, err := nats.NkeyOptionFromSeed(c.opts.NATSNKey)
+			if err != nil {
+				return nil
+			}
+			opts = append(opts, opt)
 		}
-		opts = append(opts, opt)
-	}
 
-	if c.opts.NATSCertificate != "" && c.opts.NATSKey != "" {
-		opts = append(opts, nats.ClientCert(c.opts.NATSCertificate, c.opts.NATSKey))
-	}
+		if c.opts.NATSCertificate != "" && c.opts.NATSKey != "" {
+			opts = append(opts, nats.ClientCert(c.opts.NATSCertificate, c.opts.NATSKey))
+		}
 
-	if c.opts.NATSCA != "" {
-		opts = append(opts, nats.RootCAs(c.opts.NATSCA))
-	}
+		if c.opts.NATSCA != "" {
+			opts = append(opts, nats.RootCAs(c.opts.NATSCA))
+		}
 
-	// Always attempt to have a connection to NATS.
-	opts = append(opts, nats.MaxReconnects(-1))
+		// Always attempt to have a connection to NATS.
+		opts = append(opts, nats.MaxReconnects(-1))
 
-	nc, err := nats.Connect(c.opts.NATSServerURL, opts...)
-	if err != nil {
-		return fmt.Errorf("failed to connect to nats: %w", err)
+		nc, err := nats.Connect(c.opts.NATSServerURL, opts...)
+		if err != nil {
+			return fmt.Errorf("failed to connect to nats: %w", err)
+		}
+		c.nc = nc
+		jm, err := jsm.New(c.nc)
+		if err != nil {
+			return err
+		}
+		c.jm = jm
 	}
-	c.nc = nc
-	jm, err := jsm.New(c.nc)
-	if err != nil {
-		return err
-	}
-	c.jm = jm
 
 	defer utilruntime.HandleCrash()
 
 	defer c.strQueue.ShutDown()
-	defer c.strTmplQueue.ShutDown()
 	defer c.cnsQueue.ShutDown()
 
 	c.informerFactory.Start(c.ctx.Done())
@@ -220,15 +221,11 @@ func (c *Controller) Run() error {
 	if !cache.WaitForCacheSync(c.ctx.Done(), c.strSynced) {
 		return fmt.Errorf("failed to wait for stream cache sync")
 	}
-	if !cache.WaitForCacheSync(c.ctx.Done(), c.strTmplSynced) {
-		return fmt.Errorf("failed to wait for stream template cache sync")
-	}
 	if !cache.WaitForCacheSync(c.ctx.Done(), c.cnsSynced) {
 		return fmt.Errorf("failed to wait for consumer cache sync")
 	}
 
 	go wait.Until(c.runStreamQueue, time.Second, c.ctx.Done())
-	go wait.Until(c.runStreamTemplateQueue, time.Second, c.ctx.Done())
 	go wait.Until(c.runConsumerQueue, time.Second, c.ctx.Done())
 
 	<-c.ctx.Done()
@@ -278,28 +275,6 @@ func getStorageType(s string) (jsmapi.StorageType, error) {
 	default:
 		return 0, fmt.Errorf("invalid jetstream storage option: %s", s)
 	}
-}
-
-func addFinalizer(fs []string, key string) []string {
-	for _, f := range fs {
-		if f == key {
-			return fs
-		}
-	}
-
-	return append(fs, key)
-}
-
-func removeFinalizer(fs []string, key string) []string {
-	var filtered []string
-	for _, f := range fs {
-		if f == key {
-			continue
-		}
-		filtered = append(filtered, f)
-	}
-
-	return filtered
 }
 
 func enqueueWork(q workqueue.RateLimitingInterface, item interface{}) (err error) {

@@ -1,5 +1,5 @@
 ---
-apiVersion: jetstream.nats.io/v1beta1
+apiVersion: jetstream.nats.io/v1beta2
 kind: Stream
 metadata:
   name: mystream

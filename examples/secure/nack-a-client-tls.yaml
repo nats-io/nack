@@ -1,0 +1,17 @@
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: nack-a-tls
+spec:
+  secretName: nack-a-tls
+  duration: 2160h # 90 days
+  renewBefore: 240h # 10 days
+  issuerRef:
+    name: nats-ca
+    kind: Issuer
+  usages:
+    - digital signature
+    - key encipherment
+    - client auth
+  commonName: nack-a

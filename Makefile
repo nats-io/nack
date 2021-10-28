@@ -8,9 +8,10 @@ repoDirty := $(shell git diff --quiet || echo "-dirty")
 
 VERSION ?= version-not-set
 linkerVars := -X main.BuildTime=$(now) -X main.GitInfo=$(gitBranch)-$(gitCommit)$(repoDirty) -X main.Version=$(VERSION)
+drepo ?= natsio
 
 jetstreamGenIn:= $(shell grep -l -R -F "// +k8s:" pkg/jetstream/apis)
-jetstreamSrc := $(shell find cmd/jetstream-controller pkg/jetstream controllers/jetstream -name "*.go")
+jetstreamSrc := $(shell find cmd/jetstream-controller pkg/jetstream controllers/jetstream -name "*.go") pkg/jetstream/apis/jetstream/v1beta2/zz_generated.deepcopy.go
 
 configReloaderSrc := $(shell find cmd/nats-server-config-reloader/ pkg/natsreloader/ -name "*.go")
 
@@ -26,16 +27,16 @@ vendor: go.mod go.sum
 	go mod vendor
 	touch $@
 
-pkg/jetstream/generated pkg/jetstream/apis/jetstream/v1beta1/zz_generated.deepcopy.go: vendor $(jetstreamGenIn) pkg/k8scodegen/file-header.txt
+pkg/jetstream/generated pkg/jetstream/apis/jetstream/v1beta2/zz_generated.deepcopy.go: vendor $(jetstreamGenIn) pkg/k8scodegen/file-header.txt
 	rm -rf pkg/jetstream/generated
 	GOFLAGS='' bash vendor/k8s.io/code-generator/generate-groups.sh all \
 		github.com/nats-io/nack/pkg/jetstream/generated \
 		github.com/nats-io/nack/pkg/jetstream/apis \
-		"jetstream:v1beta1" \
+		"jetstream:v1beta2" \
 		--output-base . \
 		--go-header-file pkg/k8scodegen/file-header.txt
 	mv github.com/nats-io/nack/pkg/jetstream/generated pkg/jetstream/generated
-	mv github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta1/zz_generated.deepcopy.go pkg/jetstream/apis/jetstream/v1beta1/zz_generated.deepcopy.go
+	mv github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2/zz_generated.deepcopy.go pkg/jetstream/apis/jetstream/v1beta2/zz_generated.deepcopy.go
 	rm -rf github.com
 
 jetstream-controller: $(jetstreamSrc) vendor
@@ -52,7 +53,7 @@ jetstream-controller.docker: $(jetstreamSrc) vendor
 .PHONY: jetstream-controller-docker
 jetstream-controller-docker:
 ifneq ($(ver),)
-	docker build --tag natsio/jetstream-controller:$(ver) \
+	docker build --tag $(drepo)/jetstream-controller:$(ver) \
 		--build-arg VERSION=$(ver) \
 		--file docker/jetstream-controller/Dockerfile .
 else
@@ -66,7 +67,7 @@ jetstream-controller-dockerx:
 ifneq ($(ver),)
 	# Ensure 'docker buildx ls' shows correct platforms.
 	docker buildx build \
-		--tag natsio/jetstream-controller:$(ver) --tag natsio/jetstream-controller:latest \
+		--tag $(drepo)/jetstream-controller:$(ver) --tag $(drepo)/jetstream-controller:latest \
 		--build-arg VERSION=$(ver) \
 		--platform linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64/v8 \
 		--file docker/jetstream-controller/Dockerfile \
@@ -91,7 +92,7 @@ nats-server-config-reloader.docker: $(configReloaderSrc) vendor
 .PHONY: nats-server-config-reloader-docker
 nats-server-config-reloader-docker:
 ifneq ($(ver),)
-	docker build --tag natsio/nats-server-config-reloader:$(ver) \
+	docker build --tag $(drepo)/nats-server-config-reloader:$(ver) \
 		--build-arg VERSION=$(ver) \
 		--file docker/nats-server-config-reloader/Dockerfile .
 else
@@ -105,7 +106,7 @@ nats-server-config-reloader-dockerx:
 ifneq ($(ver),)
 	# Ensure 'docker buildx ls' shows correct platforms.
 	docker buildx build \
-		--tag natsio/nats-server-config-reloader:$(ver) --tag natsio/nats-server-config-reloader:latest \
+		--tag $(drepo)/nats-server-config-reloader:$(ver) --tag $(drepo)/nats-server-config-reloader:latest \
 		--build-arg VERSION=$(ver) \
 		--platform linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64/v8 \
 		--file docker/nats-server-config-reloader/Dockerfile \
@@ -130,7 +131,7 @@ nats-boot-config.docker: $(bootConfigSrc) vendor
 .PHONY: nats-boot-config-docker
 nats-boot-config-docker:
 ifneq ($(ver),)
-	docker build --tag natsio/nats-boot-config:$(ver) \
+	docker build --tag $(drepo)/nats-boot-config:$(ver) \
 		--build-arg VERSION=$(ver) \
 		--file docker/nats-boot-config/Dockerfile .
 else
@@ -144,7 +145,7 @@ nats-boot-config-dockerx:
 ifneq ($(ver),)
 	# Ensure 'docker buildx ls' shows correct platforms.
 	docker buildx build \
-		--tag natsio/nats-boot-config:$(ver) --tag natsio/nats-boot-config:latest \
+		--tag $(drepo)/nats-boot-config:$(ver) --tag $(drepo)/nats-boot-config:latest \
 		--build-arg VERSION=$(ver) \
 		--platform linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64/v8 \
 		--file docker/nats-boot-config/Dockerfile \

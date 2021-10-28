@@ -15,9 +15,6 @@ type jsmClient interface {
 	LoadStream(ctx context.Context, name string) (jsmStream, error)
 	NewStream(ctx context.Context, name string, opts []jsm.StreamOption) (jsmStream, error)
 
-	LoadStreamTemplate(ctx context.Context, name string) (jsmDeleter, error)
-	NewStreamTemplate(ctx context.Context, cnf jsmapi.StreamTemplateConfig) (jsmDeleter, error)
-
 	LoadConsumer(ctx context.Context, stream, consumer string) (jsmDeleter, error)
 	NewConsumer(ctx context.Context, stream string, opts []jsm.ConsumerOption) (jsmDeleter, error)
 }
@@ -53,7 +50,7 @@ func (c *realJsmClient) Connect(servers string, opts ...nats.Option) error {
 }
 
 func (c *realJsmClient) Close() {
-	c.nc.Drain()
+	_ = c.nc.Drain()
 }
 
 func (c *realJsmClient) LoadStream(_ context.Context, name string) (jsmStream, error) {
@@ -62,14 +59,6 @@ func (c *realJsmClient) LoadStream(_ context.Context, name string) (jsmStream, e
 
 func (c *realJsmClient) NewStream(_ context.Context, name string, opts []jsm.StreamOption) (jsmStream, error) {
 	return c.jm.NewStream(name, opts...)
-}
-
-func (c *realJsmClient) LoadStreamTemplate(_ context.Context, name string) (jsmDeleter, error) {
-	return c.jm.LoadStreamTemplate(name)
-}
-
-func (c *realJsmClient) NewStreamTemplate(_ context.Context, cnf jsmapi.StreamTemplateConfig) (jsmDeleter, error) {
-	return c.jm.NewStreamTemplate(cnf.Name, cnf.MaxStreams, *cnf.Config)
 }
 
 func (c *realJsmClient) LoadConsumer(_ context.Context, stream, consumer string) (jsmDeleter, error) {
@@ -108,11 +97,6 @@ type mockJsmClient struct {
 	newStream     jsmStream
 	newStreamErr  error
 
-	loadStreamTemplate    jsmDeleter
-	loadStreamTemplateErr error
-	newStreamTemplate     jsmDeleter
-	newStreamTemplateErr  error
-
 	loadConsumer    jsmDeleter
 	loadConsumerErr error
 	newConsumer     jsmDeleter
@@ -131,14 +115,6 @@ func (c *mockJsmClient) LoadStream(ctx context.Context, name string) (jsmStream,
 
 func (c *mockJsmClient) NewStream(ctx context.Context, name string, opt []jsm.StreamOption) (jsmStream, error) {
 	return c.newStream, c.newStreamErr
-}
-
-func (c *mockJsmClient) LoadStreamTemplate(ctx context.Context, name string) (jsmDeleter, error) {
-	return c.loadStreamTemplate, c.loadStreamTemplateErr
-}
-
-func (c *mockJsmClient) NewStreamTemplate(ctx context.Context, cnf jsmapi.StreamTemplateConfig) (jsmDeleter, error) {
-	return c.newStreamTemplate, c.newStreamTemplateErr
 }
 
 func (c *mockJsmClient) LoadConsumer(ctx context.Context, stream, consumer string) (jsmDeleter, error) {
