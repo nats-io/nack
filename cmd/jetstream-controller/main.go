@@ -36,7 +36,7 @@ import (
 var (
 	BuildTime = "build-time-not-set"
 	GitInfo   = "gitinfo-not-set"
-	Version   = "version-not-set"
+	Version   = "0.6.0"
 )
 
 func main() {
@@ -114,7 +114,7 @@ func run() error {
 		CRDConnect:      *crdConnect,
 	})
 
-	klog.Infof("Starting %s %s...", os.Args[0], Version)
+	klog.Infof("Starting %s v%s...", os.Args[0], Version)
 	go handleSignals(cancel)
 	return ctrl.Run()
 }
