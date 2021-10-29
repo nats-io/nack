@@ -480,26 +480,6 @@ spec:
               heartbeatInterval:
                 description: The interval used to deliver idle heartbeats for push-based consumers, in Go's time.Duration format.
                 type: string
-          status:
-            type: object
-            properties:
-              observedGeneration:
-                type: integer
-              conditions:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    type:
-                      type: string
-                    status:
-                      type: string
-                    lastTransitionTime:
-                      type: string
-                    reason:
-                      type: string
-                    message:
-                      type: string
               tls:
                 description: A client's TLS certs and keys.
                 type: object
@@ -533,6 +513,26 @@ spec:
                 description: Name of the account to which the Consumer belongs.
                 type: string
                 pattern: '^[^.*>]*$'
+          status:
+            type: object
+            properties:
+              observedGeneration:
+                type: integer
+              conditions:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                    status:
+                      type: string
+                    lastTransitionTime:
+                      type: string
+                    reason:
+                      type: string
+                    message:
+                      type: string
     additionalPrinterColumns:
     - name: State
       type: string
