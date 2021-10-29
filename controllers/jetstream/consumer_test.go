@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	jsmapi "github.com/nats-io/jsm.go/api"
-	apis "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta1"
+	apis "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 	clientsetfake "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/fake"
 
 	k8smeta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,12 +44,11 @@ func TestProcessConsumer(t *testing.T) {
 
 		ns, name := "default", "my-consumer"
 
-		informer := ctrl.informerFactory.Jetstream().V1beta1().Consumers()
+		informer := ctrl.informerFactory.Jetstream().V1beta2().Consumers()
 		err := informer.Informer().GetStore().Add(&apis.Consumer{
 			ObjectMeta: k8smeta.ObjectMeta{
 				Namespace:  ns,
 				Name:       name,
-				Finalizers: []string{consumerFinalizerKey},
 				Generation: 1,
 			},
 			Spec: apis.ConsumerSpec{
@@ -101,12 +100,11 @@ func TestProcessConsumer(t *testing.T) {
 
 		ns, name := "default", "my-consumer"
 
-		informer := ctrl.informerFactory.Jetstream().V1beta1().Consumers()
+		informer := ctrl.informerFactory.Jetstream().V1beta2().Consumers()
 		err := informer.Informer().GetStore().Add(&apis.Consumer{
 			ObjectMeta: k8smeta.ObjectMeta{
 				Namespace:  ns,
 				Name:       name,
-				Finalizers: []string{consumerFinalizerKey},
 				Generation: 2,
 			},
 			Spec: apis.ConsumerSpec{
@@ -158,13 +156,12 @@ func TestProcessConsumer(t *testing.T) {
 		ts := k8smeta.Unix(1600216923, 0)
 		ns, name := "default", "my-consumer"
 
-		informer := ctrl.informerFactory.Jetstream().V1beta1().Consumers()
+		informer := ctrl.informerFactory.Jetstream().V1beta2().Consumers()
 		err := informer.Informer().GetStore().Add(&apis.Consumer{
 			ObjectMeta: k8smeta.ObjectMeta{
 				Namespace:         ns,
 				Name:              name,
 				DeletionTimestamp: &ts,
-				Finalizers:        []string{consumerFinalizerKey},
 			},
 			Spec: apis.ConsumerSpec{
 				DurableName: name,
@@ -211,12 +208,11 @@ func TestProcessConsumer(t *testing.T) {
 
 		ns, name := "default", "my-consumer"
 
-		informer := ctrl.informerFactory.Jetstream().V1beta1().Consumers()
+		informer := ctrl.informerFactory.Jetstream().V1beta2().Consumers()
 		err := informer.Informer().GetStore().Add(&apis.Consumer{
 			ObjectMeta: k8smeta.ObjectMeta{
 				Namespace:  ns,
 				Name:       name,
-				Finalizers: []string{consumerFinalizerKey},
 				Generation: 1,
 			},
 			Spec: apis.ConsumerSpec{

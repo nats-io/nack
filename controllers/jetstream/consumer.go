@@ -4,21 +4,21 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/nats-io/jsm.go"
 	jsmapi "github.com/nats-io/jsm.go/api"
-	apis "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta1"
-	typed "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/typed/jetstream/v1beta1"
+	apis "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
+	typed "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/typed/jetstream/v1beta2"
+	"github.com/nats-io/nats.go"
 
 	k8sapi "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	k8smeta "k8s.io/apimachinery/pkg/apis/meta/v1"
-)
-
-const (
-	consumerFinalizerKey = "consumerfinalizer.jetstream.nats.io"
 )
 
 func (c *Controller) runConsumerQueue() {
@@ -44,6 +44,46 @@ func (c *Controller) processConsumer(ns, name string, jsmc jsmClient) (err error
 	spec := cns.Spec
 	ifc := c.ji.Consumers(ns)
 
+	var (
+		remoteClientCert string
+		remoteClientKey  string
+		remoteRootCA     string
+		accServers       []string
+	)
+	if spec.Account != "" && c.opts.CRDConnect {
+		// Lookup the account.
+		acc, err := c.accLister.Accounts(ns).Get(spec.Account)
+		if err != nil {
+			return err
+		}
+
+		// Lookup the TLS secrets
+		if acc.Spec.TLS != nil && acc.Spec.TLS.Secret != nil {
+			secretName := acc.Spec.TLS.Secret.Name
+			secret, err := c.ki.Secrets(ns).Get(c.ctx, secretName, k8smeta.GetOptions{})
+			if err != nil {
+				return err
+			}
+
+			// Write this to the cacheDir
+			accDir := filepath.Join(c.cacheDir, ns, spec.Account)
+			if err := os.MkdirAll(accDir, 0755); err != nil {
+				return err
+			}
+
+			remoteClientCert = filepath.Join(accDir, acc.Spec.TLS.ClientCert)
+			remoteClientKey = filepath.Join(accDir, acc.Spec.TLS.ClientKey)
+			remoteRootCA = filepath.Join(accDir, acc.Spec.TLS.RootCAs)
+			accServers = acc.Spec.Servers
+
+			for k, v := range secret.Data {
+				if err := os.WriteFile(filepath.Join(accDir, k), v, 0644); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
 	defer func() {
 		if err == nil {
 			return
@@ -54,10 +94,75 @@ func (c *Controller) processConsumer(ns, name string, jsmc jsmClient) (err error
 		}
 	}()
 
+	type operator func(ctx context.Context, c jsmClient, spec apis.ConsumerSpec) (err error)
+
+	natsClientUtil := func(op operator) error {
+		servers := spec.Servers
+		if c.opts.CRDConnect {
+			// Create a new client
+			opts := make([]nats.Option, 0)
+			opts = append(opts, nats.Name(fmt.Sprintf("%s-con-%s-%d", c.opts.NATSClientName, spec.DurableName, cns.Generation)))
+			// Use JWT/NKEYS based credentials if present.
+			if spec.Creds != "" {
+				opts = append(opts, nats.UserCredentials(spec.Creds))
+			} else if spec.Nkey != "" {
+				opt, err := nats.NkeyOptionFromSeed(spec.Nkey)
+				if err != nil {
+					return err
+				}
+				opts = append(opts, opt)
+			}
+			if spec.TLS.ClientCert != "" && spec.TLS.ClientKey != "" {
+				opts = append(opts, nats.ClientCert(spec.TLS.ClientCert, spec.TLS.ClientKey))
+			}
+
+			// Use fetched secrets for the account and server if defined.
+			if remoteClientCert != "" && remoteClientKey != "" {
+				opts = append(opts, nats.ClientCert(remoteClientCert, remoteClientKey))
+			}
+			if remoteRootCA != "" {
+				opts = append(opts, nats.RootCAs(remoteRootCA))
+			}
+
+			if len(spec.TLS.RootCAs) > 0 {
+				opts = append(opts, nats.RootCAs(spec.TLS.RootCAs...))
+			}
+
+			opts = append(opts, nats.MaxReconnects(-1))
+
+			natsServers := strings.Join(append(servers, accServers...), ",")
+			newNc, err := nats.Connect(natsServers, opts...)
+			if err != nil {
+				return fmt.Errorf("failed to connect to leaf nats(%s): %w", natsServers, err)
+			}
+
+			c.normalEvent(cns, "Connecting", "Connecting to new nats-servers")
+			newJm, err := jsm.New(newNc)
+			if err != nil {
+				return err
+			}
+			newJsmc := &realJsmClient{nc: newNc, jm: newJm}
+
+			if err := op(c.ctx, newJsmc, spec); err != nil {
+				return err
+			}
+			newJsmc.Close()
+		} else {
+			if err := op(c.ctx, jsmc, spec); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
 	deleteOK := cns.GetDeletionTimestamp() != nil
 	newGeneration := cns.Generation != cns.Status.ObservedGeneration
-	consumerOK, err := consumerExists(c.ctx, jsmc, spec.StreamName, spec.DurableName)
-	if err != nil {
+	consumerOK := true
+	err = natsClientUtil(consumerExists)
+	var apierr jsmapi.ApiError
+	if errors.As(err, &apierr) && apierr.NotFoundError() {
+		consumerOK = false
+	} else if err != nil {
 		return err
 	}
 	updateOK := (consumerOK && !deleteOK && newGeneration)
@@ -67,15 +172,9 @@ func (c *Controller) processConsumer(ns, name string, jsmc jsmClient) (err error
 	case createOK:
 		c.normalEvent(cns, "Creating",
 			fmt.Sprintf("Creating consumer %q on stream %q", spec.DurableName, spec.StreamName))
-		if err := createConsumer(c.ctx, jsmc, spec); err != nil {
+		if err := natsClientUtil(createConsumer); err != nil {
 			return err
 		}
-
-		res, err := setConsumerFinalizer(c.ctx, cns, ifc)
-		if err != nil {
-			return err
-		}
-		cns = res
 
 		if _, err := setConsumerOK(c.ctx, cns, ifc); err != nil {
 			return err
@@ -87,11 +186,7 @@ func (c *Controller) processConsumer(ns, name string, jsmc jsmClient) (err error
 			fmt.Sprintf("Consumer updates (%q on %q) are not allowed, recreate to update", spec.DurableName, spec.StreamName))
 	case deleteOK:
 		c.normalEvent(cns, "Deleting", fmt.Sprintf("Deleting consumer %q on stream %q", spec.DurableName, spec.StreamName))
-		if err := deleteConsumer(c.ctx, jsmc, spec.StreamName, spec.DurableName); err != nil {
-			return err
-		}
-
-		if _, err := clearConsumerFinalizer(c.ctx, cns, ifc); err != nil {
+		if err := natsClientUtil(deleteConsumer); err != nil {
 			return err
 		}
 	default:
@@ -101,22 +196,15 @@ func (c *Controller) processConsumer(ns, name string, jsmc jsmClient) (err error
 	return nil
 }
 
-func consumerExists(ctx context.Context, c jsmClient, stream, consumer string) (ok bool, err error) {
+func consumerExists(ctx context.Context, c jsmClient, spec apis.ConsumerSpec) (err error) {
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("failed to check if consumer exists: %w", err)
 		}
 	}()
 
-	var apierr jsmapi.ApiError
-	_, err = c.LoadConsumer(ctx, stream, consumer)
-	if errors.As(err, &apierr) && apierr.NotFoundError() {
-		return false, nil
-	} else if err != nil {
-		return false, err
-	}
-
-	return true, nil
+	_, err = c.LoadConsumer(ctx, spec.StreamName, spec.DurableName)
+	return err
 }
 
 func createConsumer(ctx context.Context, c jsmClient, spec apis.ConsumerSpec) (err error) {
@@ -223,7 +311,8 @@ func createConsumer(ctx context.Context, c jsmClient, spec apis.ConsumerSpec) (e
 	return err
 }
 
-func deleteConsumer(ctx context.Context, c jsmClient, stream, consumer string) (err error) {
+func deleteConsumer(ctx context.Context, c jsmClient, spec apis.ConsumerSpec) (err error) {
+	stream, consumer := spec.StreamName, spec.DurableName
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("failed to delete consumer %q on stream %q: %w", consumer, stream, err)
@@ -284,34 +373,6 @@ func setConsumerErrored(ctx context.Context, s *apis.Consumer, sif typed.Consume
 	res, err := sif.UpdateStatus(ctx, sc, k8smeta.UpdateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to set consumer errored status: %w", err)
-	}
-
-	return res, nil
-}
-
-func setConsumerFinalizer(ctx context.Context, s *apis.Consumer, i typed.ConsumerInterface) (*apis.Consumer, error) {
-	s.SetFinalizers(addFinalizer(s.GetFinalizers(), consumerFinalizerKey))
-
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	res, err := i.Update(ctx, s, k8smeta.UpdateOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to set finalizers for consumer %q: %w", s.Spec.DurableName, err)
-	}
-
-	return res, nil
-}
-
-func clearConsumerFinalizer(ctx context.Context, s *apis.Consumer, i typed.ConsumerInterface) (*apis.Consumer, error) {
-	s.SetFinalizers(removeFinalizer(s.GetFinalizers(), consumerFinalizerKey))
-
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	res, err := i.Update(ctx, s, k8smeta.UpdateOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to clear finalizers for consumer %q: %w", s.Spec.DurableName, err)
 	}
 
 	return res, nil

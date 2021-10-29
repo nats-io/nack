@@ -18,7 +18,7 @@ package versioned
 import (
 	"fmt"
 
-	jetstreamv1beta1 "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/typed/jetstream/v1beta1"
+	jetstreamv1beta2 "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/typed/jetstream/v1beta2"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
@@ -26,19 +26,19 @@ import (
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
-	JetstreamV1beta1() jetstreamv1beta1.JetstreamV1beta1Interface
+	JetstreamV1beta2() jetstreamv1beta2.JetstreamV1beta2Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	jetstreamV1beta1 *jetstreamv1beta1.JetstreamV1beta1Client
+	jetstreamV1beta2 *jetstreamv1beta2.JetstreamV1beta2Client
 }
 
-// JetstreamV1beta1 retrieves the JetstreamV1beta1Client
-func (c *Clientset) JetstreamV1beta1() jetstreamv1beta1.JetstreamV1beta1Interface {
-	return c.jetstreamV1beta1
+// JetstreamV1beta2 retrieves the JetstreamV1beta2Client
+func (c *Clientset) JetstreamV1beta2() jetstreamv1beta2.JetstreamV1beta2Interface {
+	return c.jetstreamV1beta2
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -62,7 +62,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	}
 	var cs Clientset
 	var err error
-	cs.jetstreamV1beta1, err = jetstreamv1beta1.NewForConfig(&configShallowCopy)
+	cs.jetstreamV1beta2, err = jetstreamv1beta2.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +78,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
-	cs.jetstreamV1beta1 = jetstreamv1beta1.NewForConfigOrDie(c)
+	cs.jetstreamV1beta2 = jetstreamv1beta2.NewForConfigOrDie(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &cs
@@ -87,7 +87,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
-	cs.jetstreamV1beta1 = jetstreamv1beta1.New(c)
+	cs.jetstreamV1beta2 = jetstreamv1beta2.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs

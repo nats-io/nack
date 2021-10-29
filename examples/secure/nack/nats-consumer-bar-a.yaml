@@ -1,0 +1,10 @@
+---
+apiVersion: jetstream.nats.io/v1beta2
+kind: Consumer
+metadata:
+  name: bar
+spec:
+  streamName: foo
+  durableName: bar
+  ackPolicy: explicit
+  account: a

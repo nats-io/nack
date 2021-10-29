@@ -3,12 +3,11 @@ package jetstream
 import (
 	"fmt"
 	"os"
-	"reflect"
 	"testing"
 	"time"
 
 	jsmapi "github.com/nats-io/jsm.go/api"
-	apis "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta1"
+	apis "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 
 	k8sapis "k8s.io/api/core/v1"
 	k8smeta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -57,36 +56,6 @@ func TestGetStorageType(t *testing.T) {
 				t.Fatalf("got=%v; want=%v", got, c.wantType)
 			}
 		})
-	}
-}
-
-func TestAddFinalizer(t *testing.T) {
-	t.Parallel()
-
-	fs := []string{"foo", "bar"}
-	fs = addFinalizer(fs, "fizz")
-	fs = addFinalizer(fs, "fizz")
-	fs = addFinalizer(fs, "fizz")
-
-	want := []string{"foo", "bar", "fizz"}
-	if !reflect.DeepEqual(fs, want) {
-		t.Error("unexpected finalizers")
-		t.Fatalf("got=%v; want=%v", fs, want)
-	}
-}
-
-func TestRemoveFinalizer(t *testing.T) {
-	t.Parallel()
-
-	fs := []string{"foo", "bar"}
-	fs = removeFinalizer(fs, "bar")
-	fs = removeFinalizer(fs, "bar")
-	fs = removeFinalizer(fs, "bar")
-
-	want := []string{"foo"}
-	if !reflect.DeepEqual(fs, want) {
-		t.Error("unexpected finalizers")
-		t.Fatalf("got=%v; want=%v", fs, want)
 	}
 }
 
@@ -312,49 +281,6 @@ func TestShouldEnqueue(t *testing.T) {
 				},
 				Spec: apis.StreamSpec{
 					Name: "bar",
-				},
-			},
-			want: true,
-		},
-		{
-			name: "stream template deleted",
-			prev: &apis.StreamTemplate{
-				ObjectMeta: k8smeta.ObjectMeta{
-					Namespace: "default",
-					Name:      "obj-name",
-				},
-			},
-			next: &apis.StreamTemplate{
-				ObjectMeta: k8smeta.ObjectMeta{
-					Namespace:         "default",
-					Name:              "obj-name",
-					DeletionTimestamp: &ts,
-				},
-			},
-			want: true,
-		},
-		{
-			name: "stream template spec changed",
-			prev: &apis.StreamTemplate{
-				ObjectMeta: k8smeta.ObjectMeta{
-					Namespace: "default",
-					Name:      "obj-name",
-				},
-				Spec: apis.StreamTemplateSpec{
-					StreamSpec: apis.StreamSpec{
-						Name: "foo",
-					},
-				},
-			},
-			next: &apis.StreamTemplate{
-				ObjectMeta: k8smeta.ObjectMeta{
-					Namespace: "default",
-					Name:      "obj-name",
-				},
-				Spec: apis.StreamTemplateSpec{
-					StreamSpec: apis.StreamSpec{
-						Name: "bar",
-					},
 				},
 			},
 			want: true,
