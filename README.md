@@ -1,7 +1,7 @@
 <img width="800" alt="nack-large" src="https://user-images.githubusercontent.com/26195/92535603-71ad9a80-f1ec-11ea-8959-cdc22b31b84a.png">
 
 [![License][License-Image]][License-Url]
-[![Version](https://d25lcipzij17d.cloudfront.net/badge.svg?id=go&type=5&v=0.3.0)](https://github.com/nats-io/nack/releases/tag/v0.3.0)
+[![Version](https://d25lcipzij17d.cloudfront.net/badge.svg?id=go&type=5&v=0.6.0)](https://github.com/nats-io/nack/releases/tag/v0.6.0)
 
 [License-Url]: https://www.apache.org/licenses/LICENSE-2.0
 [License-Image]: https://img.shields.io/badge/License-Apache2-blue.svg
@@ -14,36 +14,18 @@ The JetStream controllers allows you to manage [NATS JetStream](https://github.c
 
 ### Getting started
 
-First, we'll need to NATS cluster that has enabled JetStream.  You can install one as follows:
+First install the JetStream CRDs:
 
 ```sh
-# Creates cluster of NATS Servers that are not JetStream enabled
-$ kubectl apply -f https://raw.githubusercontent.com/nats-io/k8s/master/nats-server/simple-nats.yml
-
-# Creates NATS Server with JetStream enabled as a leafnode connection
-$ kubectl apply -f https://raw.githubusercontent.com/nats-io/k8s/master/nats-server/nats-js-leaf.yml
+$ kubectl apply -f https://nats-io.github.io/k8s/nack/crds.yml
 ```
 
-Now install the JetStream CRDs and Controller:
-
-```sh
-$ kubectl apply -f https://raw.githubusercontent.com/nats-io/nack/main/deploy/crds.yml
-customresourcedefinition.apiextensions.k8s.io/streams.jetstream.nats.io configured
-customresourcedefinition.apiextensions.k8s.io/consumers.jetstream.nats.io configured
-customresourcedefinition.apiextensions.k8s.io/streamtemplates.jetstream.nats.io configured
-
-$ kubectl apply -f https://raw.githubusercontent.com/nats-io/nack/main/deploy/rbac.yml
-$ kubectl apply -f https://raw.githubusercontent.com/nats-io/nack/main/deploy/deployment.yml
-```
-
-#### Installing with Helm
-
-You can also use Helm to install:
+Now install with Helm:
 
 ```
 helm repo add nats https://nats-io.github.io/k8s/helm/charts/
-helm install nats nats/nats --set nats.image=synadia/nats-server:nightly --set=nats.jetstream.enabled=true
-helm install nack nats/nack --set=jetstream.nats.url=nats://nats:4222
+helm install nats nats/nats --set=nats.jetstream.enabled=true
+helm install nack nats/nack
 ```
 
 #### Creating Streams and Consumers
@@ -52,7 +34,7 @@ Let's create a a stream and a couple of consumers:
 
 ```yaml
 ---
-apiVersion: jetstream.nats.io/v1beta1
+apiVersion: jetstream.nats.io/v1beta2
 kind: Stream
 metadata:
   name: mystream
@@ -62,7 +44,7 @@ spec:
   storage: memory
   maxAge: 1h
 ---
-apiVersion: jetstream.nats.io/v1beta1
+apiVersion: jetstream.nats.io/v1beta2
 kind: Consumer
 metadata:
   name: my-push-consumer
@@ -74,7 +56,7 @@ spec:
   ackPolicy: none
   replayPolicy: instant
 ---
-apiVersion: jetstream.nats.io/v1beta1
+apiVersion: jetstream.nats.io/v1beta2
 kind: Consumer
 metadata:
   name: my-pull-consumer
