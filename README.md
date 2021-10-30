@@ -17,7 +17,7 @@ The JetStream controllers allows you to manage [NATS JetStream](https://github.c
 First install the JetStream CRDs:
 
 ```sh
-$ kubectl apply -f https://nats-io.github.io/k8s/nack/crds.yml
+$ kubectl apply -f https://raw.githubusercontent.com/nats-io/nack/v0.6.0/deploy/crds.yml
 ```
 
 Now install with Helm:
