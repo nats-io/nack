@@ -141,14 +141,17 @@ func (r *Reloader) Run(ctx context.Context) error {
 			r.ConfigFiles)
 	}
 
-WaitForEvent:
+	var triggerName string
+	var updatedFiles bool
+
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
 		case event := <-configWatcher.Events:
-			log.Printf("Event: %+v \n", event)
-			touchedInfo, err := os.Stat(event.Name)
+			triggerName = event.Name
+
+			_, err := os.Stat(event.Name)
 			if err != nil {
 				// Beware that this means that we won't reconfigure if a file
 				// is permanently removed.  We want to support transient
@@ -160,42 +163,38 @@ WaitForEvent:
 				continue
 			}
 
+			updatedFiles = false
 			for _, configFile := range r.ConfigFiles {
-				configInfo, err := os.Stat(configFile)
-				if err != nil {
-					log.Printf("Error: %s\n", err)
-					continue WaitForEvent
-				}
-				if !os.SameFile(touchedInfo, configInfo) {
-					continue
-				}
-
 				h := sha256.New()
 				f, err := os.Open(configFile)
 				if err != nil {
 					log.Printf("Error: %s\n", err)
-					continue WaitForEvent
+					continue
 				}
 				if _, err := io.Copy(h, f); err != nil {
 					log.Printf("Error: %s\n", err)
-					continue WaitForEvent
+					continue
 				}
 				digest := h.Sum(nil)
 				lastConfigHash, ok := lastConfigAppliedCache[configFile]
 				if ok && bytes.Equal(lastConfigHash, digest) {
 					// No meaningful change or this is the first time we've checked
-					continue WaitForEvent
+					continue
 				}
 				lastConfigAppliedCache[configFile] = digest
 
 				log.Printf("changed config; file=%q existing=%v total-files=%d",
 					configFile, ok, len(lastConfigAppliedCache))
 
+				updatedFiles = true
+
 				// We only get an event for one file at a time, we can stop checking
 				// config files here and continue with our business.
 				break
 			}
-
+			if !updatedFiles {
+				continue
+			}
 		case err := <-configWatcher.Errors:
 			log.Printf("Error: %s\n", err)
 			continue
@@ -205,7 +204,7 @@ WaitForEvent:
 		// otherwise give up and wait for next event.
 	TryReload:
 		for {
-			log.Println("Sending signal to server to reload configuration")
+			log.Println("Sending signal to server to reload configuration due to:", triggerName)
 			err := r.proc.Signal(syscall.SIGHUP)
 			if err != nil {
 				log.Printf("Error during reload: %s\n", err)
