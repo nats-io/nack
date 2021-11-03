@@ -3,7 +3,6 @@ package natsreloadertest
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/signal"
 	"sync"
@@ -22,7 +21,7 @@ someOtherThing = "bar"
 func TestReloader(t *testing.T) {
 	// Setup a pidfile that points to us
 	pid := os.Getpid()
-	pidfile, err := ioutil.TempFile(os.TempDir(), "nats-pid-")
+	pidfile, err := os.CreateTemp(os.TempDir(), "nats-pid-")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,7 +40,7 @@ func TestReloader(t *testing.T) {
 
 	var configFiles []*os.File
 	for i := 0; i < 2; i++ {
-		configFile, err := ioutil.TempFile(os.TempDir(), "nats-conf-")
+		configFile, err := os.CreateTemp(os.TempDir(), "nats-conf-")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -94,6 +93,17 @@ func TestReloader(t *testing.T) {
 				time.Sleep(10 * time.Millisecond)
 			}
 		}
+
+		// Create some random file in the same directory, shouldn't trigger an
+		// additional server signal.
+		configFile, err := os.CreateTemp(os.TempDir(), "foo")
+		if err != nil {
+			t.Log(err)
+			return
+		}
+		defer os.Remove(configFile.Name())
+		time.Sleep(100 * time.Millisecond)
+
 		cancel()
 	}()
 
