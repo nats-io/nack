@@ -165,6 +165,119 @@ delivered: 1 / consumer seq: 2 / stream seq: 2 / ack: false
 order 2
 ```
 
+### Getting Started with Accounts
+
+You can create an Account resource with the following CRD. The Account resource
+can be used to specify server and TLS information.
+
+```yaml
+---
+apiVersion: jetstream.nats.io/v1beta2
+kind: Account
+metadata:
+  name: a
+spec:
+  name: a
+  servers:
+  - nats://nats:4222
+  tls:
+    secret:
+      name: nack-a-tls
+    ca: "ca.crt"
+    cert: "tls.crt"
+    key: "tls.key"
+```
+
+You can then link an Account to a Stream so that the Stream uses the Account
+information for its creation.
+
+```yaml
+---
+apiVersion: jetstream.nats.io/v1beta2
+kind: Stream
+metadata:
+  name: foo
+spec:
+  name: foo
+  subjects: ["foo", "foo.>"]
+  storage: file
+  replicas: 1
+  account: a # <-- Create stream using account A information
+```
+
+The following is an example of how to get Accounts working with a custom NATS
+Server URL and TLS certificates.
+
+```sh
+# Install cert-manager
+kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.6.0/cert-manager.yaml
+
+# Install TLS certs
+cd examples/secure
+# Install certificate issuer
+kubectl apply -f issuer.yaml
+# Install account A cert
+kubectl apply -f nack-a-client-tls.yaml
+# Install server cert
+kubectl apply -f server-tls.yaml
+# Install nats-box cert
+kubectl apply -f client-tls.yaml
+
+# Install NATS cluster
+helm install -f nats-helm.yaml nats nats/nats
+# Verify pods are healthy
+kubectl get pods
+
+# Install nats-box to run nats cli later
+kubectl apply -f nats-client-box.yaml
+
+# Install JetStream Controller from nack
+helm install --set jetstream.enabled=true jetstream-controller nats/nack
+# Install CRDs
+kubectl apply -f ../../deploy/crds.yml
+# Verify pods are healthy
+kubectl get pods
+
+# Create account A resource
+kubectl apply -f nack/nats-account-a.yaml
+
+# Create stream using account A
+kubectl apply -f nack/nats-stream-foo-a.yaml
+# Create consumer using account A
+kubectl apply -f nack/nats-consumer-bar-a.yaml
+```
+
+After Accounts, Streams, and Consumers are created, let's log into the nats-box
+container to run the management CLI.
+
+```sh
+# Get container shell
+kubectl exec -it nats-client-box-abc-123 -- sh
+# Change to TLS directory
+cd /etc/nats-certs/clients/nack-a-tls
+```
+
+There should now be some Streams available, verify with `nats` command.
+
+```sh
+# List streams
+nats --tlscert tls.crt --tlskey tls.key --tlsca ca.crt -s tls://nats.default.svc.cluster.local stream ls
+```
+
+You can now publish messages on a Stream.
+
+```sh
+# Push message
+nats --tlscert tls.crt --tlskey tls.key --tlsca ca.crt -s tls://nats.default.svc.cluster.local pub foo hi
+```
+
+And pull messages from a Consumer.
+
+```sh
+# Pull message
+nats --tlscert tls.crt --tlskey tls.key --tlsca ca.crt -s tls://nats.default.svc.cluster.local consumer next foo bar
+```
+
 ### Local Development
 
 ```sh
