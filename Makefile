@@ -159,13 +159,67 @@ endif
 .PHONY: build
 build: jetstream-controller nats-server-config-reloader nats-boot-config
 
+tools/minikube:
+	mkdir -p $(dir $@)
+	curl -L -o $@ https://storage.googleapis.com/minikube/releases/v1.22.0/minikube-linux-amd64
+	chmod u+x $@
+tools/kubectl:
+	mkdir -p $(dir $@)
+	curl -L -o $@ https://storage.googleapis.com/kubernetes-release/release/v1.22.2/bin/linux/amd64/kubectl
+	chmod u+x $@
+tools/kubeconfig.yaml:
+	mkdir -p $(dir $@)
+	touch $@
+	chmod 600 $@
+tools/golangci-lint:
+	mkdir -p $(dir $@)
+	curl -L https://github.com/golangci/golangci-lint/releases/download/v1.42.1/golangci-lint-1.42.1-linux-amd64.tar.gz \
+		| tar xz --strip=1 -C $(dir $@) golangci-lint-1.42.1-linux-amd64/golangci-lint
+	chmod u+x $@
+tools/helm:
+	mkdir -p $(dir $@)
+	curl -L https://get.helm.sh/helm-v3.7.0-linux-amd64.tar.gz \
+		| tar xz --strip=1 -C $(dir $@) linux-amd64/helm
+	chmod u+x $@
+
 .PHONY: test
 test:
 	go vet ./controllers/... ./pkg/natsreloader/...
 	go test -race -cover -count=1 -timeout 10s ./controllers/... ./pkg/natsreloader/...
+
+.PHONY: lint
+lint: tools/golangci-lint
+	$< run ./controllers/...
 
 .PHONY: clean
 clean:
 	rm -f jetstream-controller jetstream-controller.docker \
 		nats-server-config-reloader nats-server-config-reloader.docker \
 		nats-boot-config nats-boot-config.docker
+
+.PHONY: minikube-start
+minikube-start: tools/kubeconfig.yaml tools/minikube
+	KUBECONFIG=$(word 1,$^) $(word 2,$^) start --vm-driver=docker --kubernetes-version=v1.22.2 \
+		--extra-config=apiserver.service-account-signing-key-file=/var/lib/minikube/certs/sa.key \
+		--extra-config=apiserver.service-account-key-file=/var/lib/minikube/certs/sa.pub \
+		--extra-config=apiserver.service-account-issuer=api \
+		--extra-config=apiserver.service-account-api-audiences=api
+
+.PHONY: minikube-stop
+minikube-stop: tools/kubeconfig.yaml tools/minikube
+	KUBECONFIG=$(word 1,$^) $(word 2,$^) stop
+
+.PHONY: minikube-delete
+minikube-delete: tools/kubeconfig.yaml tools/minikube
+	KUBECONFIG=$(word 1,$^) $(word 2,$^) delete
+
+.PHONY: test-integ
+test-integ: tools/kubeconfig.yaml tools/minikube tools/helm tools/kubectl
+	# Assuming running cluster. Use make minikube-start, if needed.
+
+	# Build JetStream Docker image inside of minikube cluster.
+	eval $$(KUBECONFIG=$(word 1,$^) $(word 2,$^) docker-env) && \
+		$(MAKE) jetstream-controller-docker drepo=localhost ver=0.0.0
+
+	# Tests use helm and kubectl.
+	TOOLDIR=$(dir $(realpath $<)) go test -v -count=1 ./testinteg/...
