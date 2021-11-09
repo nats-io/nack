@@ -189,7 +189,7 @@ test:
 
 .PHONY: lint
 lint: tools/golangci-lint
-	$< run ./controllers/...
+	$< run --timeout=5m ./controllers/...
 
 .PHONY: clean
 clean:
