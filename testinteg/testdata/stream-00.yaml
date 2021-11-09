@@ -1,0 +1,27 @@
+---
+apiVersion: jetstream.nats.io/v1beta2
+kind: Stream
+metadata:
+  name: stream-00
+spec:
+  description: hello
+  discard: new
+  duplicateWindow: 1h
+  maxAge: 1h
+  maxBytes: 1024
+  maxConsumers: 1
+  maxMsgs: 10
+  maxMsgSize: 1
+  maxMsgSize: 1024
+  maxMsgsPerSubject: 3
+  name: stream-00
+  noAck: true
+  placement:
+    cluster: mycluster
+    tags:
+    - mytag
+  replicas: 1
+  retention: workqueue
+  storage: memory
+  subjects:
+  - "orders.*"

@@ -1,0 +1,6 @@
+---
+jetstream:
+  enabled: true
+  image: localhost/jetstream-controller:0.0.0
+  nats:
+   url: nats://nats.default.svc.cluster.local:4222
