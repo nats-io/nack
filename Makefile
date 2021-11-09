@@ -218,8 +218,8 @@ test-integ: tools/kubeconfig.yaml tools/minikube tools/helm tools/kubectl
 	# Assuming running cluster. Use make minikube-start, if needed.
 
 	# Build JetStream Docker image inside of minikube cluster.
-	#eval $$(KUBECONFIG=$(word 1,$^) $(word 2,$^) docker-env) && \
-	#	$(MAKE) jetstream-controller-docker drepo=localhost ver=0.0.0
+	eval $$(KUBECONFIG=$(word 1,$^) $(word 2,$^) docker-env) && \
+		$(MAKE) jetstream-controller-docker drepo=localhost ver=0.0.0
 
 	# Tests use helm and kubectl.
 	TOOLDIR=$(dir $(realpath $<)) go test -v -count=1 ./testinteg/...

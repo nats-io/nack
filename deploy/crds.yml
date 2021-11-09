@@ -99,7 +99,7 @@ spec:
               maxMsgsPerSubject:
                 description: The maximum of messages per subject.
                 type: integer
-                default: 0
+                default: -1
               mirror:
                 description: A stream mirror.
                 type: object

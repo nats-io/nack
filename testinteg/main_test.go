@@ -53,22 +53,22 @@ func TestInstallStream(t *testing.T) {
 
 		func() {
 			if err := installStream(lw, streamName, streamPath); err != nil {
-				t.Fatal(err)
+				t.Fatalf("%s: %s", streamName, err)
 			}
 			defer errCheck(t, func() error { return uninstallStream(lw, streamPath) })
 
 			streamConfig, err := getStreamConfig(lw, streamName)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatalf("%s: %s", streamName, err)
 			}
 
 			streamSpec, err := getStreamSpec(lw, streamName)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatalf("%s: %s", streamName, err)
 			}
 
 			if err := equalStreamConfigSpec(streamConfig, streamSpec); err != nil {
-				t.Fatal(err)
+				t.Fatalf("%s: %s", streamName, err)
 			}
 		}()
 	}
@@ -131,8 +131,13 @@ func equalStreamConfigSpec(a nats.StreamConfig, b v1beta2.StreamSpec) error {
 	if strings.ToLower(a.Discard.String()) != strings.ToLower("discard"+b.Discard) {
 		diff("Discard", a.Discard, b.Discard)
 	}
-	if d, err := time.ParseDuration(b.MaxAge); err != nil || a.MaxAge != d {
+	if b.MaxAge == "" {
+		b.MaxAge = "0s"
+	}
+	if d, err := time.ParseDuration(b.MaxAge); err == nil && a.MaxAge != d {
 		diff("MaxAge", a.MaxAge, b.MaxAge)
+	} else if err != nil {
+		diff("MaxAge", a.MaxAge, err)
 	}
 	if a.MaxMsgsPerSubject != int64(b.MaxMsgsPerSubject) {
 		diff("MaxMsgsPerSubject", a.MaxMsgsPerSubject, b.MaxMsgsPerSubject)
@@ -149,8 +154,16 @@ func equalStreamConfigSpec(a nats.StreamConfig, b v1beta2.StreamSpec) error {
 	if a.NoAck != b.NoAck {
 		diff("NoAck", a.NoAck, b.NoAck)
 	}
-	if d, err := time.ParseDuration(b.DuplicateWindow); err != nil || a.Duplicates != d {
+
+	if b.DuplicateWindow == "" && a.Mirror != nil {
+		b.DuplicateWindow = "2m0s"
+	} else if b.DuplicateWindow == "" && a.Mirror == nil {
+		b.DuplicateWindow = "0s"
+	}
+	if d, err := time.ParseDuration(b.DuplicateWindow); err == nil && a.Duplicates != d {
 		diff("Duplicates", a.Duplicates, b.DuplicateWindow)
+	} else if err != nil {
+		diff("Duplicates", a.Duplicates, err)
 	}
 
 	if got, want := a.Placement != nil, b.Placement != nil; got != want {
