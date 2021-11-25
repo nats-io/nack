@@ -27,8 +27,7 @@ spec:
       - name: nats-box
         image: natsio/nats-box:0.6.0
         imagePullPolicy: IfNotPresent
-        resources:
-          null
+        resources: {}
         env:
         - name: NATS_URL
           value: nats

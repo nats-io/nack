@@ -7,7 +7,7 @@ spec:
   secretName: nack-b-tls
   duration: 2160h # 90 days
   renewBefore: 240h # 10 days
-  issuerRef:\
+  issuerRef:
     name: nats-ca
     kind: Issuer
   usages:
