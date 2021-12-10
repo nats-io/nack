@@ -311,7 +311,7 @@ configuration file.
 ### Installing with Helm
 
 For more information see the
-[Chart repo](https://github.com/nats-io/k8s/tree/master/helm/charts/nats).
+[Chart repo](https://github.com/nats-io/k8s/tree/main/helm/charts/nats).
 
 ```
 helm repo add nats https://nats-io.github.io/k8s/helm/charts/
