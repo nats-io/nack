@@ -874,5 +874,5 @@ spec:
                         description: Name of the secret with the creds.
                         type: string
                   file:
-                    description: Credentials file.
+                    description: Credentials file, generated with github.com/nats-io/nsc tool.
                     type: string
