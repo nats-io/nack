@@ -28,12 +28,6 @@ func (c *Controller) runConsumerQueue() {
 }
 
 func (c *Controller) processConsumer(ns, name string, jsmc jsmClient) (err error) {
-	defer func() {
-		if err != nil {
-			err = fmt.Errorf("failed to process consumer: %w", err)
-		}
-	}()
-
 	cns, err := c.cnsLister.Consumers(ns).Get(name)
 	if err != nil && k8serrors.IsNotFound(err) {
 		return nil
@@ -41,6 +35,17 @@ func (c *Controller) processConsumer(ns, name string, jsmc jsmClient) (err error
 		return err
 	}
 
+	return c.processConsumerObject(cns, jsmc)
+}
+
+func (c *Controller) processConsumerObject(cns *apis.Consumer, jsmc jsmClient) (err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("failed to process consumer: %w", err)
+		}
+	}()
+
+	ns := cns.Namespace
 	spec := cns.Spec
 	ifc := c.ji.Consumers(ns)
 

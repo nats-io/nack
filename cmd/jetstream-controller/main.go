@@ -21,6 +21,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -58,6 +59,7 @@ func run() error {
 	ca := flag.String("tlsca", "", "NATS TLS certificate authority chain")
 	server := flag.String("s", "", "NATS Server URL")
 	crdConnect := flag.Bool("crd-connect", false, "If true, then NATS connections will be made from CRD config, not global config")
+	cleanupPeriod := flag.Duration("cleanup-period", 30*time.Second, "Period to run object cleanup")
 	flag.Parse()
 
 	if *version {
@@ -112,6 +114,7 @@ func run() error {
 		JetstreamIface:  jc,
 		Namespace:       *namespace,
 		CRDConnect:      *crdConnect,
+		CleanupPeriod:   *cleanupPeriod,
 	})
 
 	klog.Infof("Starting %s v%s...", os.Args[0], Version)

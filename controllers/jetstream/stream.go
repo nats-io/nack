@@ -40,12 +40,6 @@ func (c *Controller) runStreamQueue() {
 }
 
 func (c *Controller) processStream(ns, name string, jsmc jsmClient) (err error) {
-	defer func() {
-		if err != nil {
-			err = fmt.Errorf("failed to process stream: %w", err)
-		}
-	}()
-
 	str, err := c.strLister.Streams(ns).Get(name)
 	if err != nil && k8serrors.IsNotFound(err) {
 		return nil
@@ -53,8 +47,19 @@ func (c *Controller) processStream(ns, name string, jsmc jsmClient) (err error) 
 		return err
 	}
 
+	return c.processStreamObject(str, jsmc)
+}
+
+func (c *Controller) processStreamObject(str *apis.Stream, jsmc jsmClient) (err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("failed to process stream: %w", err)
+		}
+	}()
+
 	spec := str.Spec
 	ifc := c.ji.Streams(str.Namespace)
+	ns := str.Namespace
 
 	var (
 		remoteClientCert string
