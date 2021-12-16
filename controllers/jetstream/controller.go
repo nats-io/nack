@@ -16,9 +16,9 @@ package jetstream
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
-	"os"
 
 	"github.com/nats-io/jsm.go"
 	jsmapi "github.com/nats-io/jsm.go/api"
@@ -34,6 +34,7 @@ import (
 	k8sapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	k8smeta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -72,8 +73,9 @@ type Options struct {
 	NATSCertificate string
 	NATSKey         string
 
-	Namespace  string
-	CRDConnect bool
+	Namespace     string
+	CRDConnect    bool
+	CleanupPeriod time.Duration
 
 	Recorder record.EventRecorder
 }
@@ -227,11 +229,111 @@ func (c *Controller) Run() error {
 
 	go wait.Until(c.runStreamQueue, time.Second, c.ctx.Done())
 	go wait.Until(c.runConsumerQueue, time.Second, c.ctx.Done())
+	go c.cleanupStreams()
+	go c.cleanupConsumers()
 
 	<-c.ctx.Done()
 
 	// Gracefully shutdown.
 	return nil
+}
+
+func deletedStreams(prev, cur map[string]*apis.Stream) []*apis.Stream {
+	var deleted []*apis.Stream
+	for name, ps := range prev {
+		if _, ok := cur[name]; !ok {
+			deleted = append(deleted, ps)
+		}
+	}
+	return deleted
+}
+
+func streamMap(ss []*apis.Stream) map[string]*apis.Stream {
+	m := make(map[string]*apis.Stream)
+	for _, s := range ss {
+		m[fmt.Sprintf("%s/%s", s.Namespace, s.Name)] = s
+	}
+	return m
+}
+
+func (c *Controller) cleanupStreams() error {
+	tick := time.NewTicker(c.opts.CleanupPeriod)
+	defer tick.Stop()
+
+	var prevStreams map[string]*apis.Stream
+	for {
+		select {
+		case <-c.ctx.Done():
+			return c.ctx.Err()
+		case <-tick.C:
+			streams, err := c.strLister.List(labels.Everything())
+			if err != nil {
+				klog.Infof("failed to list streams for cleanup: %s", err)
+				continue
+			}
+			sm := streamMap(streams)
+
+			for _, s := range deletedStreams(prevStreams, sm) {
+				t := k8smeta.NewTime(time.Now())
+				s.DeletionTimestamp = &t
+				if err := c.processStreamObject(s, &realJsmClient{jm: c.jm}); err != nil {
+					klog.Infof("failed to delete stream %s/%s: %s", s.Namespace, s.Name, err)
+					continue
+				}
+				klog.Infof("deleted stream %s/%s", s.Namespace, s.Name)
+			}
+			prevStreams = sm
+		}
+	}
+}
+
+func deletedConsumers(prev, cur map[string]*apis.Consumer) []*apis.Consumer {
+	var deleted []*apis.Consumer
+	for name, ps := range prev {
+		if _, ok := cur[name]; !ok {
+			deleted = append(deleted, ps)
+		}
+	}
+	return deleted
+}
+
+func consumerMap(cs []*apis.Consumer) map[string]*apis.Consumer {
+	m := make(map[string]*apis.Consumer)
+	for _, c := range cs {
+		m[fmt.Sprintf("%s/%s", c.Namespace, c.Name)] = c
+	}
+	return m
+}
+
+func (c *Controller) cleanupConsumers() error {
+	tick := time.NewTicker(c.opts.CleanupPeriod)
+	defer tick.Stop()
+
+	var prevConsumers map[string]*apis.Consumer
+	for {
+		select {
+		case <-c.ctx.Done():
+			return c.ctx.Err()
+		case <-tick.C:
+			consumers, err := c.cnsLister.List(labels.Everything())
+			if err != nil {
+				klog.Infof("failed to list consumers for cleanup: %s", err)
+				continue
+			}
+			cm := consumerMap(consumers)
+
+			for _, cns := range deletedConsumers(prevConsumers, cm) {
+				t := k8smeta.NewTime(time.Now())
+				cns.DeletionTimestamp = &t
+				if err := c.processConsumerObject(cns, &realJsmClient{jm: c.jm}); err != nil {
+					klog.Infof("failed to delete consumer %s/%s: %s", cns.Namespace, cns.Name, err)
+					continue
+				}
+				klog.Infof("deleted consumer %s/%s", cns.Namespace, cns.Name)
+			}
+			prevConsumers = cm
+		}
+	}
 }
 
 func (c *Controller) normalEvent(o runtime.Object, reason, message string) {
