@@ -17,3 +17,4 @@
 /nats-server-config-reloader.docker
 /nats-boot-config
 /nats-boot-config.docker
+/tools
