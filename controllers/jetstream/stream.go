@@ -255,6 +255,7 @@ func createStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 		jsm.Replicas(spec.Replicas),
 		jsm.DuplicateWindow(duplicates),
 		jsm.MaxAge(maxAge),
+		jsm.MaxBytes(int64(spec.MaxBytes)),
 	}
 
 	switch spec.Retention {
