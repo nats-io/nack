@@ -45,6 +45,7 @@ func main() {
 		showHelp    bool
 		showVersion bool
 		fileSet     StringSet
+		customSignal int
 	)
 
 	nconfig := &natsreloader.Config{}
@@ -59,6 +60,7 @@ func main() {
 	fs.Var(&fileSet, "config", "NATS Server Config File (may be repeated to specify more than one)")
 	fs.IntVar(&nconfig.MaxRetries, "max-retries", 5, "Max attempts to trigger reload")
 	fs.IntVar(&nconfig.RetryWaitSecs, "retry-wait-secs", 2, "Time to back off when reloading fails before retrying")
+	fs.IntVar(&customSignal, "signal", 1, "Signal to send to the NATS Server process (default SIGHUP 1)")
 
 	fs.Parse(os.Args[1:])
 
@@ -66,6 +68,7 @@ func main() {
 	if len(fileSet) == 0 {
 		nconfig.ConfigFiles = []string{"/etc/nats-config/gnatsd.conf"}
 	}
+	nconfig.Signal = syscall.Signal(customSignal)
 
 	switch {
 	case showHelp:
