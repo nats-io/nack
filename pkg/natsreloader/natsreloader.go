@@ -12,7 +12,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"syscall"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -24,6 +23,7 @@ type Config struct {
 	ConfigFiles   []string
 	MaxRetries    int
 	RetryWaitSecs int
+	Signal        os.Signal
 }
 
 // Reloader monitors the state from a single server config file
@@ -42,20 +42,12 @@ type Reloader struct {
 	quit func()
 }
 
-// Run starts the main loop.
-func (r *Reloader) Run(ctx context.Context) error {
-	ctx, cancel := context.WithCancel(ctx)
-	r.quit = func() {
-		cancel()
-	}
+func (r *Reloader) waitForProcess() error {
+	var proc *os.Process
+	var pid int
+	var attempts int = 0
 
-	var (
-		proc      *os.Process
-		pid       int
-		attempts  int
-		startTime time.Time
-	)
-	startTime = time.Now()
+	startTime := time.Now()
 	for {
 		pidfile, err := ioutil.ReadFile(r.PidFile)
 		if err != nil {
@@ -89,6 +81,20 @@ func (r *Reloader) Run(ctx context.Context) error {
 
 	r.pid = pid
 	r.proc = proc
+	return nil
+}
+
+// Run starts the main loop.
+func (r *Reloader) Run(ctx context.Context) error {
+	ctx, cancel := context.WithCancel(ctx)
+	r.quit = func() {
+		cancel()
+	}
+
+	err := r.waitForProcess()
+	if err != nil {
+		return err
+	}
 
 	configWatcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -109,7 +115,7 @@ func (r *Reloader) Run(ctx context.Context) error {
 		}
 	}
 
-	attempts = 0
+	attempts := 0
 	// lastConfigAppliedCache is the last config update
 	// applied by us
 	lastConfigAppliedCache := make(map[string][]byte)
@@ -204,8 +210,8 @@ func (r *Reloader) Run(ctx context.Context) error {
 		// otherwise give up and wait for next event.
 	TryReload:
 		for {
-			log.Println("Sending signal to server to reload configuration due to:", triggerName)
-			err := r.proc.Signal(syscall.SIGHUP)
+			log.Printf("Sending signal '%s' to server to reload configuration due to: %s", r.Signal.String(), triggerName)
+			err := r.proc.Signal(r.Signal)
 			if err != nil {
 				log.Printf("Error during reload: %s\n", err)
 				if attempts > r.MaxRetries {
