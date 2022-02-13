@@ -93,6 +93,10 @@ type StreamConfig struct {
 	Placement         *Placement      `json:"placement,omitempty"`
 	Mirror            *StreamSource   `json:"mirror,omitempty"`
 	Sources           []*StreamSource `json:"sources,omitempty"`
+	Sealed            bool            `json:"sealed,omitempty"`
+	DenyDelete        bool            `json:"deny_delete,omitempty"`
+	DenyPurge         bool            `json:"deny_purge,omitempty"`
+	AllowRollup       bool            `json:"allow_rollup_hdrs,omitempty"`
 }
 
 // Placement is used to guide placement of streams in clustered JetStream.
@@ -120,6 +124,7 @@ type ExternalStream struct {
 // apiError is included in all API responses if there was an error.
 type apiError struct {
 	Code        int    `json:"code"`
+	ErrorCode   int    `json:"err_code"`
 	Description string `json:"description,omitempty"`
 }
 
@@ -184,7 +189,7 @@ func (js *js) AccountInfo(opts ...JSOpt) (*AccountInfo, error) {
 		defer cancel()
 	}
 
-	resp, err := js.nc.RequestWithContext(o.ctx, js.apiSubj(apiAccountInfo), nil)
+	resp, err := js.apiRequestWithContext(o.ctx, js.apiSubj(apiAccountInfo), nil)
 	if err != nil {
 		// todo maybe nats server should never have no responder on this subject and always respond if they know there is no js to be had
 		if err == ErrNoResponders {
@@ -239,15 +244,15 @@ func (js *js) AddConsumer(stream string, cfg *ConsumerConfig, opts ...JSOpt) (*C
 
 	var ccSubj string
 	if cfg != nil && cfg.Durable != _EMPTY_ {
-		if strings.Contains(cfg.Durable, ".") {
-			return nil, ErrInvalidDurableName
+		if err := checkDurName(cfg.Durable); err != nil {
+			return nil, err
 		}
 		ccSubj = fmt.Sprintf(apiDurableCreateT, stream, cfg.Durable)
 	} else {
 		ccSubj = fmt.Sprintf(apiConsumerCreateT, stream)
 	}
 
-	resp, err := js.nc.RequestWithContext(o.ctx, js.apiSubj(ccSubj), req)
+	resp, err := js.apiRequestWithContext(o.ctx, js.apiSubj(ccSubj), req)
 	if err != nil {
 		if err == ErrNoResponders {
 			err = ErrJetStreamNotEnabled
@@ -260,6 +265,9 @@ func (js *js) AddConsumer(stream string, cfg *ConsumerConfig, opts ...JSOpt) (*C
 		return nil, err
 	}
 	if info.Error != nil {
+		if info.Error.ErrorCode == 10059 {
+			return nil, ErrStreamNotFound
+		}
 		if info.Error.Code == 404 {
 			return nil, ErrConsumerNotFound
 		}
@@ -289,7 +297,7 @@ func (js *js) DeleteConsumer(stream, consumer string, opts ...JSOpt) error {
 	}
 
 	dcSubj := js.apiSubj(fmt.Sprintf(apiConsumerDeleteT, stream, consumer))
-	r, err := js.nc.RequestWithContext(o.ctx, dcSubj, nil)
+	r, err := js.apiRequestWithContext(o.ctx, dcSubj, nil)
 	if err != nil {
 		return err
 	}
@@ -372,7 +380,7 @@ func (c *consumerLister) Next() bool {
 	}
 
 	clSubj := c.js.apiSubj(fmt.Sprintf(apiConsumerListT, c.stream))
-	r, err := c.js.nc.RequestWithContext(ctx, clSubj, req)
+	r, err := c.js.apiRequestWithContext(ctx, clSubj, req)
 	if err != nil {
 		c.err = err
 		return false
@@ -469,7 +477,7 @@ func (c *consumerNamesLister) Next() bool {
 	}
 
 	clSubj := c.js.apiSubj(fmt.Sprintf(apiConsumerNamesT, c.stream))
-	r, err := c.js.nc.RequestWithContext(ctx, clSubj, nil)
+	r, err := c.js.apiRequestWithContext(ctx, clSubj, nil)
 	if err != nil {
 		c.err = err
 		return false
@@ -557,7 +565,7 @@ func (js *js) AddStream(cfg *StreamConfig, opts ...JSOpt) (*StreamInfo, error) {
 	}
 
 	csSubj := js.apiSubj(fmt.Sprintf(apiStreamCreateT, cfg.Name))
-	r, err := js.nc.RequestWithContext(o.ctx, csSubj, req)
+	r, err := js.apiRequestWithContext(o.ctx, csSubj, req)
 	if err != nil {
 		return nil, err
 	}
@@ -588,7 +596,7 @@ func (js *js) StreamInfo(stream string, opts ...JSOpt) (*StreamInfo, error) {
 	}
 
 	csSubj := js.apiSubj(fmt.Sprintf(apiStreamInfoT, stream))
-	r, err := js.nc.RequestWithContext(o.ctx, csSubj, nil)
+	r, err := js.apiRequestWithContext(o.ctx, csSubj, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -672,7 +680,7 @@ func (js *js) UpdateStream(cfg *StreamConfig, opts ...JSOpt) (*StreamInfo, error
 	}
 
 	usSubj := js.apiSubj(fmt.Sprintf(apiStreamUpdateT, cfg.Name))
-	r, err := js.nc.RequestWithContext(o.ctx, usSubj, req)
+	r, err := js.apiRequestWithContext(o.ctx, usSubj, req)
 	if err != nil {
 		return nil, err
 	}
@@ -707,7 +715,7 @@ func (js *js) DeleteStream(name string, opts ...JSOpt) error {
 	}
 
 	dsSubj := js.apiSubj(fmt.Sprintf(apiStreamDeleteT, name))
-	r, err := js.nc.RequestWithContext(o.ctx, dsSubj, nil)
+	r, err := js.apiRequestWithContext(o.ctx, dsSubj, nil)
 	if err != nil {
 		return err
 	}
@@ -726,7 +734,8 @@ func (js *js) DeleteStream(name string, opts ...JSOpt) error {
 }
 
 type apiMsgGetRequest struct {
-	Seq uint64 `json:"seq"`
+	Seq     uint64 `json:"seq,omitempty"`
+	LastFor string `json:"last_by_subj,omitempty"`
 }
 
 // RawStreamMsg is a raw message stored in JetStream.
@@ -751,11 +760,20 @@ type storedMsg struct {
 type apiMsgGetResponse struct {
 	apiResponse
 	Message *storedMsg `json:"message,omitempty"`
-	Success bool       `json:"success,omitempty"`
+}
+
+// GetLastMsg retrieves the last raw stream message stored in JetStream by subject.
+func (js *js) GetLastMsg(name, subject string, opts ...JSOpt) (*RawStreamMsg, error) {
+	return js.getMsg(name, &apiMsgGetRequest{LastFor: subject}, opts...)
 }
 
 // GetMsg retrieves a raw stream message stored in JetStream by sequence number.
 func (js *js) GetMsg(name string, seq uint64, opts ...JSOpt) (*RawStreamMsg, error) {
+	return js.getMsg(name, &apiMsgGetRequest{Seq: seq}, opts...)
+}
+
+// Low level getMsg
+func (js *js) getMsg(name string, mreq *apiMsgGetRequest, opts ...JSOpt) (*RawStreamMsg, error) {
 	o, cancel, err := getJSContextOpts(js.opts, opts...)
 	if err != nil {
 		return nil, err
@@ -768,13 +786,13 @@ func (js *js) GetMsg(name string, seq uint64, opts ...JSOpt) (*RawStreamMsg, err
 		return nil, ErrStreamNameRequired
 	}
 
-	req, err := json.Marshal(&apiMsgGetRequest{Seq: seq})
+	req, err := json.Marshal(mreq)
 	if err != nil {
 		return nil, err
 	}
 
 	dsSubj := js.apiSubj(fmt.Sprintf(apiMsgGetT, name))
-	r, err := js.nc.RequestWithContext(o.ctx, dsSubj, req)
+	r, err := js.apiRequestWithContext(o.ctx, dsSubj, req)
 	if err != nil {
 		return nil, err
 	}
@@ -784,13 +802,16 @@ func (js *js) GetMsg(name string, seq uint64, opts ...JSOpt) (*RawStreamMsg, err
 		return nil, err
 	}
 	if resp.Error != nil {
-		return nil, errors.New(resp.Error.Description)
+		if resp.Error.Code == 404 && strings.Contains(resp.Error.Description, "message") {
+			return nil, ErrMsgNotFound
+		}
+		return nil, fmt.Errorf("nats: %s", resp.Error.Description)
 	}
 
 	msg := resp.Message
 
 	var hdr Header
-	if msg.Header != nil {
+	if len(msg.Header) > 0 {
 		hdr, err = decodeHeadersMsg(msg.Header)
 		if err != nil {
 			return nil, err
@@ -836,7 +857,7 @@ func (js *js) DeleteMsg(name string, seq uint64, opts ...JSOpt) error {
 	}
 
 	dsSubj := js.apiSubj(fmt.Sprintf(apiMsgDeleteT, name))
-	r, err := js.nc.RequestWithContext(o.ctx, dsSubj, req)
+	r, err := js.apiRequestWithContext(o.ctx, dsSubj, req)
 	if err != nil {
 		return err
 	}
@@ -850,6 +871,16 @@ func (js *js) DeleteMsg(name string, seq uint64, opts ...JSOpt) error {
 	return nil
 }
 
+// purgeRequest is optional request information to the purge API.
+type streamPurgeRequest struct {
+	// Purge up to but not including sequence.
+	Sequence uint64 `json:"seq,omitempty"`
+	// Subject to match against messages for the purge command.
+	Subject string `json:"filter,omitempty"`
+	// Number of messages to keep.
+	Keep uint64 `json:"keep,omitempty"`
+}
+
 type streamPurgeResponse struct {
 	apiResponse
 	Success bool   `json:"success,omitempty"`
@@ -857,7 +888,11 @@ type streamPurgeResponse struct {
 }
 
 // PurgeStream purges messages on a Stream.
-func (js *js) PurgeStream(name string, opts ...JSOpt) error {
+func (js *js) PurgeStream(stream string, opts ...JSOpt) error {
+	return js.purgeStream(stream, nil)
+}
+
+func (js *js) purgeStream(stream string, req *streamPurgeRequest, opts ...JSOpt) error {
 	o, cancel, err := getJSContextOpts(js.opts, opts...)
 	if err != nil {
 		return err
@@ -866,8 +901,15 @@ func (js *js) PurgeStream(name string, opts ...JSOpt) error {
 		defer cancel()
 	}
 
-	psSubj := js.apiSubj(fmt.Sprintf(apiStreamPurgeT, name))
-	r, err := js.nc.RequestWithContext(o.ctx, psSubj, nil)
+	var b []byte
+	if req != nil {
+		if b, err = json.Marshal(req); err != nil {
+			return err
+		}
+	}
+
+	psSubj := js.apiSubj(fmt.Sprintf(apiStreamPurgeT, stream))
+	r, err := js.apiRequestWithContext(o.ctx, psSubj, b)
 	if err != nil {
 		return err
 	}
@@ -932,7 +974,7 @@ func (s *streamLister) Next() bool {
 	}
 
 	slSubj := s.js.apiSubj(apiStreamList)
-	r, err := s.js.nc.RequestWithContext(ctx, slSubj, req)
+	r, err := s.js.apiRequestWithContext(ctx, slSubj, req)
 	if err != nil {
 		s.err = err
 		return false
@@ -1016,7 +1058,7 @@ func (l *streamNamesLister) Next() bool {
 		defer cancel()
 	}
 
-	r, err := l.js.nc.RequestWithContext(ctx, l.js.apiSubj(apiStreams), nil)
+	r, err := l.js.apiRequestWithContext(ctx, l.js.apiSubj(apiStreams), nil)
 	if err != nil {
 		l.err = err
 		return false
@@ -1094,7 +1136,7 @@ func getJSContextOpts(defs *jsOpts, opts ...JSOpt) (*jsOpts, context.CancelFunc,
 	if o.ctx == nil && o.wait > 0 {
 		o.ctx, cancel = context.WithTimeout(context.Background(), o.wait)
 	}
-	if o.pre == "" {
+	if o.pre == _EMPTY_ {
 		o.pre = defs.pre
 	}
 

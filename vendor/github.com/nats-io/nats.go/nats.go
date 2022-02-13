@@ -1,4 +1,4 @@
-// Copyright 2012-2021 The NATS Authors
+// Copyright 2012-2022 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -32,6 +32,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -46,7 +47,7 @@ import (
 
 // Default Constants
 const (
-	Version                   = "1.12.1"
+	Version                   = "1.13.0"
 	DefaultURL                = "nats://127.0.0.1:4222"
 	DefaultPort               = 4222
 	DefaultMaxReconnect       = 60
@@ -155,6 +156,8 @@ var (
 	ErrPullSubscribeToPushConsumer  = errors.New("nats: cannot pull subscribe to push based consumer")
 	ErrPullSubscribeRequired        = errors.New("nats: must use pull subscribe to bind to pull based consumer")
 	ErrConsumerNotActive            = errors.New("nats: consumer not active")
+	ErrMsgNotFound                  = errors.New("nats: message not found")
+	ErrMsgAlreadyAckd               = errors.New("nats: message was already acknowledged")
 )
 
 func init() {
@@ -477,8 +480,10 @@ const (
 	// NUID size
 	nuidSize = 22
 
-	// Default port used if none is specified in given URL(s)
-	defaultPortString = "4222"
+	// Default ports used if none is specified in given URL(s)
+	defaultWSPortString  = "80"
+	defaultWSSPortString = "443"
+	defaultPortString    = "4222"
 )
 
 // A Conn represents a bare connection to a nats-server.
@@ -677,6 +682,7 @@ type serverInfo struct {
 	ID           string   `json:"server_id"`
 	Name         string   `json:"server_name"`
 	Proto        int      `json:"proto"`
+	Version      string   `json:"version"`
 	Host         string   `json:"host"`
 	Port         int      `json:"port"`
 	Headers      bool     `json:"headers"`
@@ -1187,7 +1193,7 @@ func (nc *Conn) SetDiscoveredServersHandler(dscb ConnHandler) {
 	nc.Opts.DiscoveredServersCB = dscb
 }
 
-// SetClosedHandler will set the reconnect event handler.
+// SetClosedHandler will set the closed event handler.
 func (nc *Conn) SetClosedHandler(cb ConnHandler) {
 	if nc == nil {
 		return
@@ -1481,7 +1487,14 @@ func (nc *Conn) addURLToPool(sURL string, implicit, saveTLSName bool) error {
 		if sURL[len(sURL)-1] != ':' {
 			sURL += ":"
 		}
-		sURL += defaultPortString
+		switch u.Scheme {
+		case wsScheme:
+			sURL += defaultWSPortString
+		case wsSchemeTLS:
+			sURL += defaultWSSPortString
+		default:
+			sURL += defaultPortString
+		}
 	}
 
 	isWS := isWebsocketScheme(u)
@@ -1832,6 +1845,52 @@ func (nc *Conn) ConnectedServerName() string {
 		return _EMPTY_
 	}
 	return nc.info.Name
+}
+
+var semVerRe = regexp.MustCompile(`\Av?([0-9]+)\.?([0-9]+)?\.?([0-9]+)?`)
+
+func versionComponents(version string) (major, minor, patch int, err error) {
+	m := semVerRe.FindStringSubmatch(version)
+	if m == nil {
+		return 0, 0, 0, errors.New("invalid semver")
+	}
+	major, err = strconv.Atoi(m[1])
+	if err != nil {
+		return -1, -1, -1, err
+	}
+	minor, err = strconv.Atoi(m[2])
+	if err != nil {
+		return -1, -1, -1, err
+	}
+	patch, err = strconv.Atoi(m[3])
+	if err != nil {
+		return -1, -1, -1, err
+	}
+	return major, minor, patch, err
+}
+
+// Check for mininum server requirement.
+func (nc *Conn) serverMinVersion(major, minor, patch int) bool {
+	smajor, sminor, spatch, _ := versionComponents(nc.ConnectedServerVersion())
+	if smajor < major || (smajor == major && sminor < minor) || (smajor == major && sminor == minor && spatch < patch) {
+		return false
+	}
+	return true
+}
+
+// ConnectedServerVersion reports the connected server's version as a string
+func (nc *Conn) ConnectedServerVersion() string {
+	if nc == nil {
+		return _EMPTY_
+	}
+
+	nc.mu.RLock()
+	defer nc.mu.RUnlock()
+
+	if nc.status != CONNECTED {
+		return _EMPTY_
+	}
+	return nc.info.Version
 }
 
 // ConnectedClusterName reports the connected server's cluster name if any
@@ -2600,7 +2659,6 @@ func (nc *Conn) waitForMsgs(s *Subscription) {
 			delivered = s.delivered
 			if s.jsi != nil {
 				fcReply = s.checkForFlowControlResponse()
-				s.jsi.active = true
 			}
 		}
 		s.mu.Unlock()
@@ -2768,6 +2826,7 @@ func (nc *Conn) processMsg(data []byte) {
 
 	// Skip processing if this is a control message.
 	if !ctrlMsg {
+		var chanSubCheckFC bool
 		// Subscription internal stats (applicable only for non ChanSubscription's)
 		if sub.typ != ChanSubscription {
 			sub.pMsgs++
@@ -2784,6 +2843,8 @@ func (nc *Conn) processMsg(data []byte) {
 				(sub.pBytesLimit > 0 && sub.pBytes > sub.pBytesLimit) {
 				goto slowConsumer
 			}
+		} else if jsi != nil {
+			chanSubCheckFC = true
 		}
 
 		// We have two modes of delivery. One is the channel, used by channel
@@ -2811,15 +2872,26 @@ func (nc *Conn) processMsg(data []byte) {
 			// Store the ACK metadata from the message to
 			// compare later on with the received heartbeat.
 			sub.trackSequences(m.Reply)
+			if chanSubCheckFC {
+				// For ChanSubscription, since we can't call this when a message
+				// is "delivered" (since user is pull from their own channel),
+				// we have a go routine that does this check, however, we do it
+				// also here to make it much more responsive. The go routine is
+				// really to avoid stalling when there is no new messages coming.
+				fcReply = sub.checkForFlowControlResponse()
+			}
 		}
 	} else if ctrlType == jsCtrlFC && m.Reply != _EMPTY_ {
 		// This is a flow control message.
-		// If we have no pending, go ahead and send in place.
-		if sub.pMsgs <= 0 {
+		// We will schedule the send of the FC reply once we have delivered the
+		// DATA message that was received before this flow control message, which
+		// has sequence `jsi.fciseq`. However, it is possible that this message
+		// has already been delivered, in that case, we need to send the FC reply now.
+		if sub.getJSDelivered() >= jsi.fciseq {
 			fcReply = m.Reply
 		} else {
 			// Schedule a reply after the previous message is delivered.
-			sub.scheduleFlowControlResponse(sub.delivered+uint64(sub.pMsgs), m.Reply)
+			sub.scheduleFlowControlResponse(m.Reply)
 		}
 	}
 
@@ -2968,7 +3040,7 @@ func (nc *Conn) processInfo(info string) error {
 	if info == _EMPTY_ {
 		return nil
 	}
-	ncInfo := serverInfo{}
+	var ncInfo serverInfo
 	if err := json.Unmarshal([]byte(info), &ncInfo); err != nil {
 		return err
 	}
@@ -3666,8 +3738,13 @@ func (nc *Conn) respToken(respInbox string) string {
 }
 
 // Subscribe will express interest in the given subject. The subject
-// can have wildcards (partial:*, full:>). Messages will be delivered
-// to the associated MsgHandler.
+// can have wildcards.
+// There are two type of wildcards: * for partial, and > for full.
+// A subscription on subject time.*.east would receive messages sent to time.us.east and time.eu.east.
+// A subscription on subject time.us.> would receive messages sent to
+// time.us.east and time.us.east.atlanta, while time.us.* would only match time.us.east
+// since it can't match more than one token.
+// Messages will be delivered to the associated MsgHandler.
 func (nc *Conn) Subscribe(subj string, cb MsgHandler) (*Subscription, error) {
 	return nc.subscribe(subj, _EMPTY_, cb, nil, false, nil)
 }
@@ -3779,7 +3856,13 @@ func (nc *Conn) subscribeLocked(subj, queue string, cb MsgHandler, ch chan *Msg,
 		return nil, ErrBadSubscription
 	}
 
-	sub := &Subscription{Subject: subj, Queue: queue, mcb: cb, conn: nc, jsi: js}
+	sub := &Subscription{
+		Subject: subj,
+		Queue:   queue,
+		mcb:     cb,
+		conn:    nc,
+		jsi:     js,
+	}
 	// Set pending limits.
 	if ch != nil {
 		sub.pMsgsLimit = cap(ch)
@@ -3845,9 +3928,15 @@ func (nc *Conn) removeSub(s *Subscription) {
 	s.mch = nil
 
 	// If JS subscription then stop HB timer.
-	if jsi := s.jsi; jsi != nil && jsi.hbc != nil {
-		jsi.hbc.Stop()
-		jsi.hbc = nil
+	if jsi := s.jsi; jsi != nil {
+		if jsi.hbc != nil {
+			jsi.hbc.Stop()
+			jsi.hbc = nil
+		}
+		if jsi.csfct != nil {
+			jsi.csfct.Stop()
+			jsi.csfct = nil
+		}
 	}
 
 	// Mark as invalid
@@ -4069,6 +4158,20 @@ func (nc *Conn) unsubscribe(sub *Subscription, max int, drainMode bool) error {
 		nc.bw.appendString(fmt.Sprintf(unsubProto, s.sid, maxStr))
 		nc.kickFlusher()
 	}
+
+	// For JetStream subscriptions cancel the attached context if there is any.
+	var cancel func()
+	sub.mu.Lock()
+	jsi := sub.jsi
+	if jsi != nil {
+		cancel = jsi.cancel
+		jsi.cancel = nil
+	}
+	sub.mu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
+
 	return nil
 }
 
@@ -4186,7 +4289,6 @@ func (s *Subscription) processNextMsgDelivered(msg *Msg) error {
 	delivered := s.delivered
 	if s.jsi != nil {
 		fcReply = s.checkForFlowControlResponse()
-		s.jsi.active = true
 	}
 
 	if s.typ == SyncSubscription {
