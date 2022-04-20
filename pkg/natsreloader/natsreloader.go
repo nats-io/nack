@@ -133,6 +133,7 @@ func (r *Reloader) Run(ctx context.Context) error {
 		}
 		digest := h.Sum(nil)
 		lastConfigAppliedCache[configFile] = digest
+		f.Close()
 	}
 
 	// If the two pids don't match then os.FindProcess() has done something
