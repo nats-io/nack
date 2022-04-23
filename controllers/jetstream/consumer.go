@@ -225,6 +225,8 @@ func createConsumer(ctx context.Context, c jsmClient, spec apis.ConsumerSpec) (e
 		jsm.FilterStreamBySubject(spec.FilterSubject),
 		jsm.RateLimitBitsPerSecond(uint64(spec.RateLimitBps)),
 		jsm.MaxAckPending(uint(spec.MaxAckPending)),
+		jsm.MaxRequestBatch(uint(spec.MaxRequestBatch)),
+		jsm.MaxWaiting(uint(spec.MaxWaiting)),
 	}
 
 	if spec.MaxDeliver != 0 {
@@ -308,6 +310,39 @@ func createConsumer(ctx context.Context, c jsmClient, spec apis.ConsumerSpec) (e
 		}
 		opts = append(opts, func(o *jsmapi.ConsumerConfig) error {
 			o.Heartbeat = d
+			return nil
+		})
+	}
+
+	if spec.MaxRequestExpires != "" {
+		d, err := time.ParseDuration(spec.MaxRequestExpires)
+		if err != nil {
+			return err
+		}
+		opts = append(opts, func(o *jsmapi.ConsumerConfig) error {
+			o.MaxRequestExpires = d
+			return nil
+		})
+	}
+
+	if spec.HeadersOnly {
+		opts = append(opts, func(o *jsmapi.ConsumerConfig) error {
+			o.HeadersOnly = spec.HeadersOnly
+			return nil
+		})
+	}
+
+	if spec.BackOff != nil {
+		bo := make([]time.Duration, 0, len(spec.BackOff))
+		for _, b := range spec.BackOff {
+			d, err := time.ParseDuration(b)
+			if err != nil {
+				return err
+			}
+			bo = append(bo, d)
+		}
+		opts = append(opts, func(o *jsmapi.ConsumerConfig) error {
+			o.BackOff = bo
 			return nil
 		})
 	}

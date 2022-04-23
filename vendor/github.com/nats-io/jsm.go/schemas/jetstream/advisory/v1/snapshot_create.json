@@ -97,6 +97,13 @@
           "type": "string",
           "description": "The cluster name the server is connected to"
         },
+        "alts": {
+          "type": "array",
+          "items": {
+            "description": "List of alternative clusters that can be used as overflow for resource placement, in RTT order",
+            "type": "string"
+          }
+        },
         "jwt": {
           "type": "string",
           "description": "The JWT presented in the connection"

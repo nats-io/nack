@@ -5,8 +5,8 @@ go 1.16
 require (
 	github.com/fsnotify/fsnotify v1.5.0
 	github.com/google/gofuzz v1.2.0 // indirect
-	github.com/nats-io/jsm.go v0.0.26
-	github.com/nats-io/nats.go v1.12.1
+	github.com/nats-io/jsm.go v0.0.31
+	github.com/nats-io/nats.go v1.14.1-0.20220412004736-c75dfd54b52c
 	github.com/sirupsen/logrus v1.8.1
 	k8s.io/api v0.19.1
 	k8s.io/apimachinery v0.19.1

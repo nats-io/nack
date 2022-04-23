@@ -312,7 +312,7 @@ func (m *Manager) RestoreSnapshotFromDirectory(ctx context.Context, stream strin
 		dir:      dir,
 		dataFile: filepath.Join(dir, "stream.tar.s2"),
 		metaFile: filepath.Join(dir, "backup.json"),
-		chunkSz:  512 * 1024,
+		chunkSz:  64 * 1024,
 	}
 
 	for _, opt := range opts {
@@ -345,8 +345,12 @@ func (m *Manager) RestoreSnapshotFromDirectory(ctx context.Context, stream strin
 	}
 
 	// allow just stream name override
+	//
+	// this used to be allowed but turns out the server support for this was
+	// not up to scratch and fixing it would mean having to rebuild and re-checksum
+	// every message, so for now we error here instead
 	if req.Config.Name != stream {
-		req.Config.Name = stream
+		return nil, nil, fmt.Errorf("stream name may not be changed during restore")
 	}
 
 	inf, err := os.Open(sopts.dataFile)
@@ -386,7 +390,7 @@ func (m *Manager) RestoreSnapshotFromDirectory(ctx context.Context, stream strin
 	progress.notify()
 
 	nc := m.nc
-	var chunk [512 * 1024]byte
+	var chunk [64 * 1024]byte
 	var cresp *nats.Msg
 
 	for {
@@ -431,9 +435,6 @@ func (m *Manager) RestoreSnapshotFromDirectory(ctx context.Context, stream strin
 	if err != nil {
 		return nil, nil, err
 	}
-	if IsErrorResponse(cresp) {
-		return nil, nil, fmt.Errorf("restore failed: %q", cresp.Data)
-	}
 
 	kind, finalr, err := api.ParseMessage(cresp.Data)
 	if err != nil {
@@ -463,7 +464,7 @@ func (s *Stream) SnapshotToDirectory(ctx context.Context, dir string, opts ...Sn
 		metaFile:  filepath.Join(dir, "backup.json"),
 		jsck:      false,
 		consumers: false,
-		chunkSz:   512 * 1024,
+		chunkSz:   128 * 1024,
 	}
 
 	for _, opt := range opts {
@@ -491,7 +492,7 @@ func (s *Stream) SnapshotToDirectory(ctx context.Context, dir string, opts ...Sn
 	}
 	defer df.Close()
 
-	ib := nats.NewInbox()
+	ib := s.mgr.nc.NewRespInbox()
 	req := api.JSApiStreamSnapshotRequest{
 		DeliverSubject: ib,
 		NoConsumers:    !sopts.consumers,

@@ -23,9 +23,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nats-io/nats.go"
-
 	"github.com/nats-io/jsm.go/api"
+	"github.com/nats-io/nats.go"
 )
 
 // DefaultConsumer is the configuration that will be used to create new Consumers in NewConsumer
@@ -147,7 +146,7 @@ func (m *Manager) LoadOrNewConsumerFromDefault(stream string, name string, templ
 	}
 
 	c, err := m.LoadConsumer(stream, name)
-	if c == nil || err != nil {
+	if IsNatsError(err, 10014) {
 		return m.NewConsumerFromDefault(stream, template, opts...)
 	}
 
@@ -318,6 +317,14 @@ func StartAtTimeDelta(d time.Duration) ConsumerOption {
 	}
 }
 
+// DeliverHeadersOnly configures the consumer to only deliver existing header and the `Nats-Msg-Size` header, no bodies
+func DeliverHeadersOnly() ConsumerOption {
+	return func(o *api.ConsumerConfig) error {
+		o.HeadersOnly = true
+		return nil
+	}
+}
+
 func resetDeliverPolicy(o *api.ConsumerConfig) {
 	o.DeliverPolicy = api.DeliverAll
 	o.OptStartSeq = 0
@@ -454,6 +461,94 @@ func DeliverGroup(g string) ConsumerOption {
 		o.DeliverGroup = g
 		return nil
 	}
+}
+
+// MaxRequestBatch is the largest batch that can be specified when doing pulls against the consumer
+func MaxRequestBatch(max uint) ConsumerOption {
+	return func(o *api.ConsumerConfig) error {
+		o.MaxRequestBatch = int(max)
+		return nil
+	}
+}
+
+// MaxRequestExpires is the longest pull request expire the server will allow
+func MaxRequestExpires(max time.Duration) ConsumerOption {
+	return func(o *api.ConsumerConfig) error {
+		if max != 0 && max < time.Millisecond {
+			return fmt.Errorf("must be larger than 1ms")
+		}
+
+		o.MaxRequestExpires = max
+		return nil
+	}
+}
+
+// InactiveThreshold is the idle time an ephemeral consumer allows before it is removed
+func InactiveThreshold(t time.Duration) ConsumerOption {
+	return func(o *api.ConsumerConfig) error {
+		if t < 0 {
+			return fmt.Errorf("inactive threshold must be positive")
+		}
+
+		o.InactiveThreshold = t
+
+		return nil
+	}
+}
+
+// BackoffIntervals sets a series of intervals by which retries will be attempted for this consumr
+func BackoffIntervals(i ...time.Duration) ConsumerOption {
+	return func(o *api.ConsumerConfig) error {
+		if len(i) == 0 {
+			return fmt.Errorf("at least one interval is required")
+		}
+
+		o.BackOff = i
+
+		return nil
+	}
+}
+
+// BackoffPolicy sets a consumer policy
+func BackoffPolicy(policy []time.Duration) ConsumerOption {
+	return func(o *api.ConsumerConfig) error {
+		o.BackOff = policy
+		return nil
+	}
+}
+
+// LinearBackoffPolicy creates a backoff policy with linearly increasing steps between min and max
+func LinearBackoffPolicy(steps uint, min time.Duration, max time.Duration) ConsumerOption {
+	return func(o *api.ConsumerConfig) error {
+		p, err := LinearBackoffPeriods(steps, min, max)
+		if err != nil {
+			return err
+		}
+
+		o.BackOff = p
+
+		return nil
+	}
+}
+
+// UpdateConfiguration updates the consumer configuration
+// At present the description, ack wait, max deliver, sample frequency, max ack pending, max waiting and header only settings can be changed
+func (c *Consumer) UpdateConfiguration(opts ...ConsumerOption) error {
+	if !c.IsDurable() {
+		return fmt.Errorf("only durable consumers can be updated")
+	}
+
+	ncfg, err := NewConsumerConfiguration(*c.cfg, opts...)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.mgr.NewConsumerFromDefault(c.stream, *ncfg)
+	if err != nil {
+		return err
+	}
+
+	return c.Reset()
 }
 
 // Reset reloads the Consumer configuration from the JetStream server
@@ -712,6 +807,7 @@ func (c *Consumer) IsPullMode() bool                 { return c.cfg.DeliverSubje
 func (c *Consumer) IsPushMode() bool                 { return !c.IsPullMode() }
 func (c *Consumer) IsDurable() bool                  { return c.cfg.Durable != "" }
 func (c *Consumer) IsEphemeral() bool                { return !c.IsDurable() }
+func (c *Consumer) IsHeadersOnly() bool              { return c.cfg.HeadersOnly }
 func (c *Consumer) StreamName() string               { return c.stream }
 func (c *Consumer) DeliverySubject() string          { return c.cfg.DeliverSubject }
 func (c *Consumer) DurableName() string              { return c.cfg.Durable }
@@ -721,6 +817,7 @@ func (c *Consumer) DeliverPolicy() api.DeliverPolicy { return c.cfg.DeliverPolic
 func (c *Consumer) AckPolicy() api.AckPolicy         { return c.cfg.AckPolicy }
 func (c *Consumer) AckWait() time.Duration           { return c.cfg.AckWait }
 func (c *Consumer) MaxDeliver() int                  { return c.cfg.MaxDeliver }
+func (c *Consumer) Backoff() []time.Duration         { return c.cfg.BackOff }
 func (c *Consumer) FilterSubject() string            { return c.cfg.FilterSubject }
 func (c *Consumer) ReplayPolicy() api.ReplayPolicy   { return c.cfg.ReplayPolicy }
 func (c *Consumer) SampleFrequency() string          { return c.cfg.SampleFrequency }
@@ -730,6 +827,9 @@ func (c *Consumer) FlowControl() bool                { return c.cfg.FlowControl 
 func (c *Consumer) Heartbeat() time.Duration         { return c.cfg.Heartbeat }
 func (c *Consumer) DeliverGroup() string             { return c.cfg.DeliverGroup }
 func (c *Consumer) MaxWaiting() int                  { return c.cfg.MaxWaiting }
+func (c *Consumer) MaxRequestBatch() int             { return c.cfg.MaxRequestBatch }
+func (c *Consumer) MaxRequestExpires() time.Duration { return c.cfg.MaxRequestExpires }
+func (c *Consumer) InactiveThreshold() time.Duration { return c.cfg.InactiveThreshold }
 func (c *Consumer) StartTime() time.Time {
 	if c.cfg.OptStartTime == nil {
 		return time.Time{}

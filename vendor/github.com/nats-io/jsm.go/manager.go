@@ -86,6 +86,26 @@ func (m *Manager) JetStreamAccountInfo() (info *api.JetStreamAccountStats, err e
 	return resp.JetStreamAccountStats, nil
 }
 
+// IsStreamMaxBytesRequired determines if the JetStream account requires streams to set a byte limit
+func (m *Manager) IsStreamMaxBytesRequired() (bool, error) {
+	nfo, err := m.JetStreamAccountInfo()
+	if err != nil {
+		return false, err
+	}
+
+	if nfo.Limits.MaxBytesRequired {
+		return true, nil
+	}
+
+	for _, t := range nfo.Tiers {
+		if t.Limits.MaxBytesRequired {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 func (m *Manager) jsonRequest(subj string, req interface{}, response interface{}) (err error) {
 	var body []byte
 
@@ -143,13 +163,13 @@ type StreamNamesFilter struct {
 
 // StreamNames is a sorted list of all known Streams filtered by filter
 func (m *Manager) StreamNames(filter *StreamNamesFilter) (names []string, err error) {
-	var resp api.JSApiStreamNamesResponse
+	resp := func() apiIterableResponse { return &api.JSApiStreamNamesResponse{} }
 	req := &api.JSApiStreamNamesRequest{JSApiIterableRequest: api.JSApiIterableRequest{Offset: 0}}
 	if filter != nil {
 		req.Subject = filter.Subject
 	}
 
-	err = m.iterableRequest(api.JSApiStreamNames, req, &resp, func(page interface{}) error {
+	err = m.iterableRequest(api.JSApiStreamNames, req, resp, func(page interface{}) error {
 		apiresp, ok := page.(*api.JSApiStreamNamesResponse)
 		if !ok {
 			return fmt.Errorf("invalid response type from iterable request")
@@ -194,26 +214,26 @@ func (m *Manager) ReadLastMessageForSubject(stream string, sub string) (msg *api
 	return resp.Message, nil
 }
 
-func (m *Manager) iterableRequest(subj string, req apiIterableRequest, response apiIterableResponse, cb func(interface{}) error) (err error) {
+func (m *Manager) iterableRequest(subj string, req apiIterableRequest, response func() apiIterableResponse, cb func(interface{}) error) (err error) {
 	offset := 0
 	for {
 		req.SetOffset(offset)
-
-		err = m.jsonRequest(subj, req, response)
+		r := response()
+		err = m.jsonRequest(subj, req, r)
 		if err != nil {
 			return err
 		}
 
-		err = cb(response)
+		err = cb(r)
 		if err != nil {
 			return err
 		}
 
-		if response.LastPage() {
+		if r.LastPage() {
 			break
 		}
 
-		offset += response.ItemsLimit()
+		offset += r.ItemsLimit()
 	}
 
 	return nil
@@ -369,10 +389,12 @@ func (m *Manager) Consumers(stream string) (consumers []*Consumer, err error) {
 		return nil, fmt.Errorf("%q is not a valid stream name", stream)
 	}
 
-	var cinfo []*api.ConsumerInfo
+	var (
+		cinfo []*api.ConsumerInfo
+		resp  = func() apiIterableResponse { return &api.JSApiConsumerListResponse{} }
+	)
 
-	var resp api.JSApiConsumerListResponse
-	err = m.iterableRequest(fmt.Sprintf(api.JSApiConsumerListT, stream), &api.JSApiConsumerListRequest{JSApiIterableRequest: api.JSApiIterableRequest{Offset: 0}}, &resp, func(page interface{}) error {
+	err = m.iterableRequest(fmt.Sprintf(api.JSApiConsumerListT, stream), &api.JSApiConsumerListRequest{JSApiIterableRequest: api.JSApiIterableRequest{Offset: 0}}, resp, func(page interface{}) error {
 		apiresp, ok := page.(*api.JSApiConsumerListResponse)
 		if !ok {
 			return fmt.Errorf("invalid response type from iterable request")
@@ -398,8 +420,8 @@ func (m *Manager) Consumers(stream string) (consumers []*Consumer, err error) {
 
 // StreamTemplateNames is a sorted list of all known StreamTemplates
 func (m *Manager) StreamTemplateNames() (templates []string, err error) {
-	var resp api.JSApiStreamTemplateNamesResponse
-	err = m.iterableRequest(api.JSApiTemplateNames, &api.JSApiStreamTemplateNamesRequest{JSApiIterableRequest: api.JSApiIterableRequest{Offset: 0}}, &resp, func(page interface{}) error {
+	resp := func() apiIterableResponse { return &api.JSApiStreamTemplateNamesResponse{} }
+	err = m.iterableRequest(api.JSApiTemplateNames, &api.JSApiStreamTemplateNamesRequest{JSApiIterableRequest: api.JSApiIterableRequest{Offset: 0}}, resp, func(page interface{}) error {
 		apiresp, ok := page.(*api.JSApiStreamTemplateNamesResponse)
 		if !ok {
 			return fmt.Errorf("invalid response type from iterable request")
@@ -424,8 +446,7 @@ func (m *Manager) ConsumerNames(stream string) (names []string, err error) {
 		return nil, fmt.Errorf("%q is not a valid stream name", stream)
 	}
 
-	var resp api.JSApiConsumerNamesResponse
-	err = m.iterableRequest(fmt.Sprintf(api.JSApiConsumerNamesT, stream), &api.JSApiConsumerNamesRequest{JSApiIterableRequest: api.JSApiIterableRequest{Offset: 0}}, &resp, func(page interface{}) error {
+	err = m.iterableRequest(fmt.Sprintf(api.JSApiConsumerNamesT, stream), &api.JSApiConsumerNamesRequest{JSApiIterableRequest: api.JSApiIterableRequest{Offset: 0}}, func() apiIterableResponse { return &api.JSApiConsumerNamesResponse{} }, func(page interface{}) error {
 		apiresp, ok := page.(*api.JSApiConsumerNamesResponse)
 		if !ok {
 			return fmt.Errorf("invalid response type from iterable request")
@@ -445,9 +466,14 @@ func (m *Manager) ConsumerNames(stream string) (names []string, err error) {
 }
 
 // Streams is a sorted list of all known Streams
-func (m *Manager) Streams() (streams []*Stream, err error) {
-	var resp api.JSApiStreamListResponse
-	err = m.iterableRequest(api.JSApiStreamList, &api.JSApiStreamListRequest{JSApiIterableRequest: api.JSApiIterableRequest{Offset: 0}}, &resp, func(page interface{}) error {
+func (m *Manager) Streams() ([]*Stream, error) {
+	var (
+		streams []*Stream
+		err     error
+		resp    = func() apiIterableResponse { return &api.JSApiStreamListResponse{} }
+	)
+
+	err = m.iterableRequest(api.JSApiStreamList, &api.JSApiStreamListRequest{JSApiIterableRequest: api.JSApiIterableRequest{Offset: 0}}, resp, func(page interface{}) error {
 		apiresp, ok := page.(*api.JSApiStreamListResponse)
 		if !ok {
 			return fmt.Errorf("invalid response type from iterable request")

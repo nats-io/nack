@@ -78,6 +78,7 @@ type JSApiConsumerListResponse struct {
 	JSApiResponse
 	JSApiIterableResponse
 	Consumers []*ConsumerInfo `json:"consumers"`
+	Missing   []string        `json:"missing,omitempty"`
 }
 
 // io.nats.jetstream.api.v1.consumer_leader_stepdown_response
@@ -257,24 +258,29 @@ func (p DeliverPolicy) MarshalJSON() ([]byte, error) {
 //
 // NATS Schema Type io.nats.jetstream.api.v1.consumer_configuration
 type ConsumerConfig struct {
-	Description     string        `json:"description,omitempty"`
-	AckPolicy       AckPolicy     `json:"ack_policy"`
-	AckWait         time.Duration `json:"ack_wait,omitempty"`
-	DeliverPolicy   DeliverPolicy `json:"deliver_policy"`
-	DeliverSubject  string        `json:"deliver_subject,omitempty"`
-	DeliverGroup    string        `json:"deliver_group,omitempty"`
-	Durable         string        `json:"durable_name,omitempty"`
-	FilterSubject   string        `json:"filter_subject,omitempty"`
-	FlowControl     bool          `json:"flow_control,omitempty"`
-	Heartbeat       time.Duration `json:"idle_heartbeat,omitempty"`
-	MaxAckPending   int           `json:"max_ack_pending,omitempty"`
-	MaxDeliver      int           `json:"max_deliver,omitempty"`
-	MaxWaiting      int           `json:"max_waiting,omitempty"`
-	OptStartSeq     uint64        `json:"opt_start_seq,omitempty"`
-	OptStartTime    *time.Time    `json:"opt_start_time,omitempty"`
-	RateLimit       uint64        `json:"rate_limit_bps,omitempty"`
-	ReplayPolicy    ReplayPolicy  `json:"replay_policy"`
-	SampleFrequency string        `json:"sample_freq,omitempty"`
+	Description       string          `json:"description,omitempty"`
+	AckPolicy         AckPolicy       `json:"ack_policy"`
+	AckWait           time.Duration   `json:"ack_wait,omitempty"`
+	DeliverPolicy     DeliverPolicy   `json:"deliver_policy"`
+	DeliverSubject    string          `json:"deliver_subject,omitempty"`
+	DeliverGroup      string          `json:"deliver_group,omitempty"`
+	Durable           string          `json:"durable_name,omitempty"`
+	FilterSubject     string          `json:"filter_subject,omitempty"`
+	FlowControl       bool            `json:"flow_control,omitempty"`
+	Heartbeat         time.Duration   `json:"idle_heartbeat,omitempty"`
+	MaxAckPending     int             `json:"max_ack_pending,omitempty"`
+	MaxDeliver        int             `json:"max_deliver,omitempty"`
+	BackOff           []time.Duration `json:"backoff,omitempty"`
+	MaxWaiting        int             `json:"max_waiting,omitempty"`
+	OptStartSeq       uint64          `json:"opt_start_seq,omitempty"`
+	OptStartTime      *time.Time      `json:"opt_start_time,omitempty"`
+	RateLimit         uint64          `json:"rate_limit_bps,omitempty"`
+	ReplayPolicy      ReplayPolicy    `json:"replay_policy"`
+	SampleFrequency   string          `json:"sample_freq,omitempty"`
+	HeadersOnly       bool            `json:"headers_only,omitempty"`
+	MaxRequestBatch   int             `json:"max_batch,omitempty"`
+	MaxRequestExpires time.Duration   `json:"max_expires,omitempty"`
+	InactiveThreshold time.Duration   `json:"inactive_threshold,omitempty"`
 
 	// Don't add to general clients.
 	Direct bool `json:"direct,omitempty"`
@@ -310,6 +316,11 @@ type JSApiConsumerGetNextRequest struct {
 	Expires time.Duration `json:"expires,omitempty"`
 	Batch   int           `json:"batch,omitempty"`
 	NoWait  bool          `json:"no_wait,omitempty"`
+}
+
+// ConsumerNakOptions is for optional NAK parameters, e.g. delay.
+type ConsumerNakOptions struct {
+	Delay time.Duration `json:"delay"`
 }
 
 func jsonString(s string) string {

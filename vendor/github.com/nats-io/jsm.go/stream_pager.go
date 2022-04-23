@@ -97,7 +97,7 @@ func (p *StreamPager) start(stream string, mgr *Manager, opts ...PagerOption) er
 
 	var err error
 	p.q = make(chan *nats.Msg, p.pageSize)
-	p.sub, err = mgr.nc.ChanSubscribe(nats.NewInbox(), p.q)
+	p.sub, err = mgr.nc.ChanSubscribe(mgr.nc.NewRespInbox(), p.q)
 	if err != nil {
 		p.close()
 		return err
@@ -149,7 +149,8 @@ func (p *StreamPager) NextMsg(ctx context.Context) (msg *nats.Msg, last bool, er
 	case msg := <-p.q:
 		p.seen++
 
-		if msg.Header.Get("Status") == "404" {
+		status := msg.Header.Get("Status")
+		if status == "404" || status == "408" {
 			return nil, true, fmt.Errorf("last message reached")
 		}
 

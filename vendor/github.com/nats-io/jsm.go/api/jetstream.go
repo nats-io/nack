@@ -49,6 +49,16 @@ const (
 
 	// JSExpectedLastMsgId only stores the message if previous Nats-Msg-Id header value matches this
 	JSExpectedLastMsgId = "Nats-Expected-Last-Msg-Id"
+
+	// JSRollup is a header indicating the message being sent should be stored and all past messags should be discarded
+	// the value can be either `all` or `subject`
+	JSRollup = "Nats-Rollup"
+
+	// JSRollupAll is the value for JSRollup header to replace the entire stream
+	JSRollupAll = "all"
+
+	// JSRollupSubject is the value for JSRollup header to replace the a single subject
+	JSRollupSubject = "sub"
 )
 
 type JSApiIterableRequest struct {
@@ -76,13 +86,20 @@ type JSApiAccountInfoResponse struct {
 	*JetStreamAccountStats
 }
 
-type JetStreamAccountStats struct {
+type JetStreamTier struct {
 	Memory    uint64                 `json:"memory"`
 	Store     uint64                 `json:"storage"`
 	Streams   int                    `json:"streams"`
 	Consumers int                    `json:"consumers"`
-	API       JetStreamAPIStats      `json:"api"`
 	Limits    JetStreamAccountLimits `json:"limits"`
+}
+
+// JetStreamAccountStats returns current statistics about the account's JetStream usage.
+type JetStreamAccountStats struct {
+	JetStreamTier                          // in case tiers are used, reflects totals with limits not set
+	Domain        string                   `json:"domain,omitempty"`
+	API           JetStreamAPIStats        `json:"api"`
+	Tiers         map[string]JetStreamTier `json:"tiers,omitempty"` // indexed by tier name
 }
 
 type JetStreamAPIStats struct {
@@ -91,10 +108,14 @@ type JetStreamAPIStats struct {
 }
 
 type JetStreamAccountLimits struct {
-	MaxMemory    int64 `json:"max_memory"`
-	MaxStore     int64 `json:"max_storage"`
-	MaxStreams   int   `json:"max_streams"`
-	MaxConsumers int   `json:"max_consumers"`
+	MaxMemory            int64 `json:"max_memory"`
+	MaxStore             int64 `json:"max_storage"`
+	MaxStreams           int   `json:"max_streams"`
+	MaxConsumers         int   `json:"max_consumers"`
+	MaxAckPending        int   `json:"max_ack_pending"`
+	MemoryMaxStreamBytes int64 `json:"memory_max_stream_bytes"`
+	StoreMaxStreamBytes  int64 `json:"storage_max_stream_bytes"`
+	MaxBytesRequired     bool  `json:"max_bytes_required"`
 }
 
 type ApiError struct {

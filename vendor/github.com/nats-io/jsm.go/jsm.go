@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/nats-io/nats.go"
 
@@ -164,4 +165,53 @@ func IsNatsError(err error, code uint16) bool {
 	}
 
 	return false
+}
+
+// IsInternalStream indicates if a stream is considered 'internal' by the NATS team,
+// that is, it's a backing stream for KV, Object or MQTT state
+func IsInternalStream(s string) bool {
+	return IsKVBucketStream(s) || IsObjectBucketStream(s) || IsMQTTStateStream(s)
+}
+
+// IsKVBucketStream determines if a stream is a KV bucket
+func IsKVBucketStream(s string) bool {
+	return strings.HasPrefix(s, "KV_")
+}
+
+// IsObjectBucketStream determines if a stream is a Object bucket
+func IsObjectBucketStream(s string) bool {
+	return strings.HasPrefix(s, "OBJ_")
+}
+
+// IsMQTTStateStream determines if a stream holds internal MQTT state
+func IsMQTTStateStream(s string) bool {
+	return strings.HasPrefix(s, "$MQTT_")
+}
+
+// LinearBackoffPeriods creates a backoff policy without any jitter suitable for use in a consumer backoff policy
+//
+// The periods start from min and increase linearly until ~max
+func LinearBackoffPeriods(steps uint, min time.Duration, max time.Duration) ([]time.Duration, error) {
+	if steps == 0 {
+		return nil, fmt.Errorf("steps must be more than 0")
+	}
+	if min == 0 {
+		return nil, fmt.Errorf("minimum retry can not be 0")
+	}
+	if max == 0 {
+		return nil, fmt.Errorf("maximum retry can not be 0")
+	}
+
+	if max < min {
+		max, min = min, max
+	}
+
+	var res []time.Duration
+
+	stepSize := uint(max-min) / steps
+	for i := uint(0); i < steps; i += 1 {
+		res = append(res, min+time.Duration(i*stepSize).Round(time.Millisecond))
+	}
+
+	return res, nil
 }

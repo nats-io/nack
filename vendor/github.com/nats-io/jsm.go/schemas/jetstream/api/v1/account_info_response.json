@@ -39,6 +39,10 @@
           "type": "integer",
           "minimum": 0
         },
+        "domain": {
+          "description": "The JetStream domain this account is in",
+          "type": "string"
+        },
         "limits": {
           "type": "object",
           "additionalProperties": false,
@@ -68,6 +72,117 @@
               "type": "integer",
               "description": "The maximum number of Consumer an account can create",
               "minimum": -1
+            },
+            "max_bytes_required": {
+              "type": "boolean",
+              "description": "Indicates if Streams created in this account requires the max_bytes property set",
+              "default": false
+            },
+            "max_ack_pending": {
+              "type": "integer",
+              "description": "The maximum number of outstanding ACKs any consumer may configure"
+            },
+            "memory_max_stream_bytes": {
+              "type": "integer",
+              "description": "The maximum size any single memory stream may be",
+              "minimum": -1,
+              "default": -1
+            },
+            "storage_max_stream_bytes": {
+              "type": "integer",
+              "description": "The maximum size any single storage based stream may be",
+              "minimum": -1,
+              "default": -1
+            }
+          }
+        },
+        "tiers": {
+          "type": "object",
+          "patternProperties": {
+            ".*": {
+              "type": "object",
+              "required": [
+                "memory",
+                "storage",
+                "streams",
+                "limits",
+                "consumers"
+              ],
+              "properties": {
+                "memory": {
+                  "description": "Memory Storage being used for Stream Message storage",
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "storage": {
+                  "description": "File Storage being used for Stream Message storage",
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "streams": {
+                  "description": "Number of active Streams",
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "consumers": {
+                  "description": "Number of active Consumers",
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "limits": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "max_consumers",
+                    "max_memory",
+                    "max_storage",
+                    "max_streams"
+                  ],
+                  "properties": {
+                    "max_memory": {
+                      "type": "integer",
+                      "description": "The maximum amount of Memory storage Stream Messages may consume",
+                      "minimum": -1
+                    },
+                    "max_storage": {
+                      "type": "integer",
+                      "description": "The maximum amount of File storage Stream Messages may consume",
+                      "minimum": -1
+                    },
+                    "max_streams": {
+                      "type": "integer",
+                      "description": "The maximum number of Streams an account can create",
+                      "minimum": -1
+                    },
+                    "max_consumers": {
+                      "type": "integer",
+                      "description": "The maximum number of Consumer an account can create",
+                      "minimum": -1
+                    },
+                    "max_bytes_required": {
+                      "type": "boolean",
+                      "description": "Indicates if Streams created in this account requires the max_bytes property set",
+                      "default": false
+                    },
+                    "max_ack_pending": {
+                      "type": "integer",
+                      "description": "The maximum number of outstanding ACKs any consumer may configure"
+                    },
+                    "memory_max_stream_bytes": {
+                      "type": "integer",
+                      "description": "The maximum size any single memory stream may be",
+                      "minimum": -1,
+                      "default": -1
+                    },
+                    "storage_max_stream_bytes": {
+                      "type": "integer",
+                      "description": "The maximum size any single storage based stream may be",
+                      "minimum": -1,
+                      "default": -1
+                    }
+                  }
+                }
+              }
             }
           }
         },

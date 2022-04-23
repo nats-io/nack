@@ -70,337 +70,396 @@
         "streams"
       ],
       "properties": {
-        "consumers": {
+        "streams": {
+          "description": "Full Stream information for each known Stream",
           "type": "array",
           "items": {
-            "allOf": [
-              {
+            "type": "object",
+            "required": [
+              "config",
+              "state",
+              "created"
+            ],
+            "properties": {
+              "config": {
                 "type": "object",
-                "required": [
-                  "config",
-                  "state",
-                  "created"
-                ],
-                "properties": {
-                  "config": {
+                "description": "The active configuration for the Stream",
+                "allOf": [
+                  {
                     "type": "object",
-                    "description": "The active configuration for the Stream",
-                    "allOf": [
-                      {
+                    "required": [
+                      "retention",
+                      "max_consumers",
+                      "max_msgs",
+                      "max_bytes",
+                      "max_age",
+                      "storage",
+                      "num_replicas"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "name": {
+                        "description": "A unique name for the Stream, empty for Stream Templates.",
+                        "type": "string",
+                        "pattern": "^[^.*>]*$",
+                        "minLength": 0
+                      },
+                      "description": {
+                        "description": "A short description of the purpose of this stream",
+                        "type": "string",
+                        "maxLength": 4096
+                      },
+                      "subjects": {
+                        "description": "A list of subjects to consume, supports wildcards. Must be empty when a mirror is configured. May be empty when sources are configured.",
+                        "type": "array",
+                        "minLength": 0,
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "retention": {
+                        "description": "How messages are retained in the Stream, once this is exceeded old messages are removed.",
+                        "type": "string",
+                        "enum": [
+                          "limits",
+                          "interest",
+                          "workqueue"
+                        ],
+                        "default": "limits"
+                      },
+                      "max_consumers": {
+                        "description": "How many Consumers can be defined for a given Stream. -1 for unlimited.",
+                        "minimum": -1,
+                        "default": -1,
+                        "$comment": "integer with a dynamic bit size depending on the platform the cluster runs on, can be up to 64bit",
+                        "type": "integer",
+                        "maximum": 9223372036854775807
+                      },
+                      "max_msgs": {
+                        "description": "How many messages may be in a Stream, oldest messages will be removed if the Stream exceeds this size. -1 for unlimited.",
+                        "minimum": -1,
+                        "default": -1,
+                        "$comment": "signed 64 bit integer",
+                        "type": "integer",
+                        "maximum": 9223372036854775807
+                      },
+                      "max_msgs_per_subject": {
+                        "description": "For wildcard streams ensure that for every unique subject this many messages are kept - a per subject retention limit",
+                        "minimum": -1,
+                        "default": -1,
+                        "$comment": "signed 64 bit integer",
+                        "type": "integer",
+                        "maximum": 9223372036854775807
+                      },
+                      "max_bytes": {
+                        "description": "How big the Stream may be, when the combined stream size exceeds this old messages are removed. -1 for unlimited.",
+                        "minimum": -1,
+                        "default": -1,
+                        "$comment": "signed 64 bit integer",
+                        "type": "integer",
+                        "maximum": 9223372036854775807
+                      },
+                      "max_age": {
+                        "description": "Maximum age of any message in the stream, expressed in nanoseconds. 0 for unlimited.",
+                        "minimum": 0,
+                        "default": 0,
+                        "$comment": "nanoseconds depicting a duration in time, signed 64 bit integer",
+                        "type": "integer",
+                        "maximum": 9223372036854775807
+                      },
+                      "max_msg_size": {
+                        "description": "The largest message that will be accepted by the Stream. -1 for unlimited.",
+                        "minimum": -1,
+                        "default": -1,
+                        "$comment": "signed 32 bit integer",
+                        "type": "integer",
+                        "maximum": 2147483647
+                      },
+                      "storage": {
+                        "description": "The storage backend to use for the Stream.",
+                        "type": "string",
+                        "enum": [
+                          "file",
+                          "memory"
+                        ],
+                        "default": "file"
+                      },
+                      "num_replicas": {
+                        "description": "How many replicas to keep for each message.",
+                        "minimum": 1,
+                        "default": 1,
+                        "maximum": 5,
+                        "$comment": "integer with a dynamic bit size depending on the platform the cluster runs on, can be up to 64bit",
+                        "type": "integer"
+                      },
+                      "no_ack": {
+                        "description": "Disables acknowledging messages that are received by the Stream.",
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "template_owner": {
+                        "description": "When the Stream is managed by a Stream Template this identifies the template that manages the Stream.",
+                        "type": "string"
+                      },
+                      "discard": {
+                        "description": "When a Stream reach it's limits either old messages are deleted or new ones are denied",
+                        "type": "string",
+                        "enum": [
+                          "old",
+                          "new"
+                        ],
+                        "default": "old"
+                      },
+                      "duplicate_window": {
+                        "description": "The time window to track duplicate messages for, expressed in nanoseconds. 0 for default",
+                        "minimum": 0,
+                        "default": 0,
+                        "$comment": "nanoseconds depicting a duration in time, signed 64 bit integer",
+                        "type": "integer",
+                        "maximum": 9223372036854775807
+                      },
+                      "placement": {
+                        "description": "Placement directives to consider when placing replicas of this stream, random placement when unset",
                         "type": "object",
                         "required": [
-                          "retention",
-                          "max_consumers",
-                          "max_msgs",
-                          "max_bytes",
-                          "max_age",
-                          "storage",
-                          "num_replicas"
+                          "cluster"
                         ],
-                        "additionalProperties": false,
                         "properties": {
-                          "name": {
-                            "description": "A unique name for the Stream, empty for Stream Templates.",
+                          "cluster": {
                             "type": "string",
-                            "pattern": "^[^.*>]*$",
-                            "minLength": 0
+                            "description": "The desired cluster name to place the stream"
                           },
-                          "description": {
-                            "description": "A short description of the purpose of this stream",
-                            "type": "string",
-                            "maxLength": 4096
-                          },
-                          "subjects": {
-                            "description": "A list of subjects to consume, supports wildcards. Must be empty when a mirror is configured. May be empty when sources are configured.",
+                          "tags": {
+                            "description": "Tags required on servers hosting this stream",
                             "type": "array",
-                            "minLength": 0,
                             "items": {
                               "type": "string"
                             }
-                          },
-                          "retention": {
-                            "description": "How messages are retained in the Stream, once this is exceeded old messages are removed.",
+                          }
+                        }
+                      },
+                      "mirror": {
+                        "description": "Maintains a 1:1 mirror of another stream with name matching this property.  When a mirror is configured subjects and sources must be empty.",
+                        "type": "object",
+                        "required": [
+                          "name"
+                        ],
+                        "properties": {
+                          "name": {
+                            "description": "Stream name",
                             "type": "string",
-                            "enum": [
-                              "limits",
-                              "interest",
-                              "workqueue"
-                            ],
-                            "default": "limits"
+                            "pattern": "^[^.*>]+$",
+                            "minLength": 1
                           },
-                          "max_consumers": {
-                            "description": "How many Consumers can be defined for a given Stream. -1 for unlimited.",
-                            "minimum": -1,
-                            "default": -1,
-                            "$comment": "integer with a dynamic bit size depending on the platform the cluster runs on, can be up to 64bit",
+                          "opt_start_seq": {
+                            "description": "Sequence to start replicating from",
+                            "$comment": "unsigned 64 bit integer",
                             "type": "integer",
-                            "maximum": 9223372036854775807
-                          },
-                          "max_msgs": {
-                            "description": "How many messages may be in a Stream, oldest messages will be removed if the Stream exceeds this size. -1 for unlimited.",
-                            "minimum": -1,
-                            "default": -1,
-                            "$comment": "signed 64 bit integer",
-                            "type": "integer",
-                            "maximum": 9223372036854775807
-                          },
-                          "max_msgs_per_subject": {
-                            "description": "For wildcard streams ensure that for every unique subject this many messages are kept - a per subject retention limit",
-                            "minimum": -1,
-                            "default": -1,
-                            "$comment": "signed 64 bit integer",
-                            "type": "integer",
-                            "maximum": 9223372036854775807
-                          },
-                          "max_bytes": {
-                            "description": "How big the Stream may be, when the combined stream size exceeds this old messages are removed. -1 for unlimited.",
-                            "minimum": -1,
-                            "default": -1,
-                            "$comment": "signed 64 bit integer",
-                            "type": "integer",
-                            "maximum": 9223372036854775807
-                          },
-                          "max_age": {
-                            "description": "Maximum age of any message in the stream, expressed in nanoseconds. 0 for unlimited.",
                             "minimum": 0,
-                            "default": 0,
-                            "$comment": "nanoseconds depicting a duration in time, signed 64 bit integer",
-                            "type": "integer",
-                            "maximum": 9223372036854775807
+                            "maximum": 18446744073709551615
                           },
-                          "max_msg_size": {
-                            "description": "The largest message that will be accepted by the Stream. -1 for unlimited.",
-                            "minimum": -1,
-                            "default": -1,
-                            "$comment": "signed 32 bit integer",
-                            "type": "integer",
-                            "maximum": 2147483647
-                          },
-                          "storage": {
-                            "description": "The storage backend to use for the Stream.",
+                          "opt_start_time": {
+                            "description": "Time stamp to start replicating from",
+                            "$comment": "A point in time in RFC3339 format including timezone, though typically in UTC",
                             "type": "string",
-                            "enum": [
-                              "file",
-                              "memory"
-                            ],
-                            "default": "file"
+                            "format": "date-time"
                           },
-                          "num_replicas": {
-                            "description": "How many replicas to keep for each message.",
-                            "minimum": 1,
-                            "default": 1,
-                            "maximum": 5,
-                            "$comment": "integer with a dynamic bit size depending on the platform the cluster runs on, can be up to 64bit",
-                            "type": "integer"
-                          },
-                          "no_ack": {
-                            "description": "Disables acknowledging messages that are received by the Stream.",
-                            "type": "boolean",
-                            "default": false
-                          },
-                          "template_owner": {
-                            "description": "When the Stream is managed by a Stream Template this identifies the template that manages the Stream.",
+                          "filter_subject": {
+                            "description": "Replicate only a subset of messages based on filter",
                             "type": "string"
                           },
-                          "discard": {
-                            "description": "When a Stream reach it's limits either old messages are deleted or new ones are denied",
-                            "type": "string",
-                            "enum": [
-                              "old",
-                              "new"
-                            ],
-                            "default": "old"
-                          },
-                          "duplicate_window": {
-                            "description": "The time window to track duplicate messages for, expressed in nanoseconds. 0 for default",
-                            "minimum": 0,
-                            "default": 0,
-                            "$comment": "nanoseconds depicting a duration in time, signed 64 bit integer",
-                            "type": "integer",
-                            "maximum": 9223372036854775807
-                          },
-                          "placement": {
-                            "description": "Placement directives to consider when placing replicas of this stream, random placement when unset",
-                            "type": "object",
+                          "external": {
                             "required": [
-                              "cluster"
+                              "api"
                             ],
+                            "type": "object",
+                            "description": "Configuration referencing a stream source in another account or JetStream domain",
                             "properties": {
-                              "cluster": {
+                              "api": {
                                 "type": "string",
-                                "description": "The desired cluster name to place the stream",
-                                "minLength": 1
+                                "description": "The subject prefix that imports the other account/domain $JS.API.CONSUMER.> subjects"
                               },
-                              "tags": {
-                                "description": "Tags required on servers hosting this stream",
-                                "type": "array",
-                                "items": {
-                                  "type": "string"
-                                }
+                              "deliver": {
+                                "type": "string",
+                                "description": "The delivery subject to use for the push consumer"
                               }
                             }
-                          },
-                          "mirror": {
-                            "description": "Maintains a 1:1 mirror of another stream with name matching this property.  When a mirror is configured subjects and sources must be empty.",
-                            "type": "object",
-                            "required": [
-                              "name"
-                            ],
-                            "properties": {
-                              "name": {
-                                "description": "Stream name",
-                                "type": "string",
-                                "pattern": "^[^.*>]+$",
-                                "minLength": 1
-                              },
-                              "opt_start_seq": {
-                                "description": "Sequence to start replicating from",
-                                "$comment": "unsigned 64 bit integer",
-                                "type": "integer",
-                                "minimum": 0,
-                                "maximum": 18446744073709551615
-                              },
-                              "opt_start_time": {
-                                "description": "Time stamp to start replicating from",
-                                "$comment": "A point in time in RFC3339 format including timezone, though typically in UTC",
-                                "type": "string",
-                                "format": "date-time"
-                              },
-                              "filter_subject": {
-                                "description": "Replicate only a subset of messages based on filter",
-                                "type": "string"
-                              },
-                              "external": {
-                                "required": [
-                                  "api"
-                                ],
-                                "type": "object",
-                                "description": "Configuration referencing a stream source in another account or JetStream domain",
-                                "properties": {
-                                  "api": {
-                                    "type": "string",
-                                    "description": "The subject prefix that imports the other account/domain $JS.API.CONSUMER.> subjects"
-                                  },
-                                  "deliver": {
-                                    "type": "string",
-                                    "description": "The delivery subject to use for the push consumer"
-                                  }
-                                }
-                              }
-                            }
-                          },
-                          "sources": {
-                            "type": "array",
-                            "description": "List of Stream names to replicate into this Stream",
-                            "items": {
-                              "type": "object",
-                              "description": "Defines a source where streams should be replicated from",
+                          }
+                        }
+                      },
+                      "sources": {
+                        "type": "array",
+                        "description": "List of Stream names to replicate into this Stream",
+                        "items": {
+                          "type": "object",
+                          "description": "Defines a source where streams should be replicated from",
+                          "required": [
+                            "name"
+                          ],
+                          "properties": {
+                            "name": {
+                              "description": "Stream name",
+                              "type": "string",
+                              "pattern": "^[^.*>]+$",
+                              "minLength": 1
+                            },
+                            "opt_start_seq": {
+                              "description": "Sequence to start replicating from",
+                              "$comment": "unsigned 64 bit integer",
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 18446744073709551615
+                            },
+                            "opt_start_time": {
+                              "description": "Time stamp to start replicating from",
+                              "$comment": "A point in time in RFC3339 format including timezone, though typically in UTC",
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "filter_subject": {
+                              "description": "Replicate only a subset of messages based on filter",
+                              "type": "string"
+                            },
+                            "external": {
                               "required": [
-                                "name"
+                                "api"
                               ],
+                              "type": "object",
+                              "description": "Configuration referencing a stream source in another account or JetStream domain",
                               "properties": {
-                                "name": {
-                                  "description": "Stream name",
+                                "api": {
                                   "type": "string",
-                                  "pattern": "^[^.*>]+$",
-                                  "minLength": 1
+                                  "description": "The subject prefix that imports the other account/domain $JS.API.CONSUMER.> subjects"
                                 },
-                                "opt_start_seq": {
-                                  "description": "Sequence to start replicating from",
-                                  "$comment": "unsigned 64 bit integer",
-                                  "type": "integer",
-                                  "minimum": 0,
-                                  "maximum": 18446744073709551615
-                                },
-                                "opt_start_time": {
-                                  "description": "Time stamp to start replicating from",
-                                  "$comment": "A point in time in RFC3339 format including timezone, though typically in UTC",
+                                "deliver": {
                                   "type": "string",
-                                  "format": "date-time"
-                                },
-                                "filter_subject": {
-                                  "description": "Replicate only a subset of messages based on filter",
-                                  "type": "string"
-                                },
-                                "external": {
-                                  "required": [
-                                    "api"
-                                  ],
-                                  "type": "object",
-                                  "description": "Configuration referencing a stream source in another account or JetStream domain",
-                                  "properties": {
-                                    "api": {
-                                      "type": "string",
-                                      "description": "The subject prefix that imports the other account/domain $JS.API.CONSUMER.> subjects"
-                                    },
-                                    "deliver": {
-                                      "type": "string",
-                                      "description": "The delivery subject to use for the push consumer"
-                                    }
-                                  }
+                                  "description": "The delivery subject to use for the push consumer"
                                 }
                               }
                             }
                           }
                         }
+                      },
+                      "sealed": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Sealed streams do not allow messages to be deleted via limits or API, sealed streams can not be unsealed via configuration update. Can only be set on already created streams via the Update API"
+                      },
+                      "deny_delete": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Restricts the ability to delete messages from a stream via the API. Cannot be changed once set to true"
+                      },
+                      "deny_purge": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Restricts the ability to purge messages from a stream via the API. Cannot be change once set to true"
+                      },
+                      "allow_rollup_hdrs": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Allows the use of the Nats-Rollup header to replace all contents of a stream, or subject in a stream, with a single new message"
                       }
-                    ]
-                  },
-                  "state": {
+                    }
+                  }
+                ]
+              },
+              "state": {
+                "type": "object",
+                "description": "Detail about the current State of the Stream",
+                "allOf": [
+                  {
                     "type": "object",
-                    "description": "Detail about the current State of the Stream",
-                    "allOf": [
-                      {
+                    "additionalProperties": false,
+                    "required": [
+                      "messages",
+                      "bytes",
+                      "first_seq",
+                      "last_seq",
+                      "consumer_count"
+                    ],
+                    "properties": {
+                      "messages": {
+                        "description": "Number of messages stored in the Stream",
+                        "minimum": 0,
+                        "$comment": "unsigned 64 bit integer",
+                        "type": "integer",
+                        "maximum": 18446744073709551615
+                      },
+                      "bytes": {
+                        "description": "Combined size of all messages in the Stream",
+                        "minimum": 0,
+                        "$comment": "unsigned 64 bit integer",
+                        "type": "integer",
+                        "maximum": 18446744073709551615
+                      },
+                      "first_seq": {
+                        "description": "Sequence number of the first message in the Stream",
+                        "minimum": 0,
+                        "$comment": "unsigned 64 bit integer",
+                        "type": "integer",
+                        "maximum": 18446744073709551615
+                      },
+                      "first_ts": {
+                        "type": "string",
+                        "description": "The timestamp of the first message in the Stream"
+                      },
+                      "last_seq": {
+                        "description": "Sequence number of the last message in the Stream",
+                        "minimum": 0,
+                        "$comment": "unsigned 64 bit integer",
+                        "type": "integer",
+                        "maximum": 18446744073709551615
+                      },
+                      "last_ts": {
+                        "type": "string",
+                        "description": "The timestamp of the last message in the Stream"
+                      },
+                      "deleted": {
+                        "description": "IDs of messages that were deleted using the Message Delete API or Interest based streams removing messages out of order",
+                        "type": "array",
+                        "minLength": 0,
+                        "items": {
+                          "minimum": 0,
+                          "$comment": "unsigned 64 bit integer",
+                          "type": "integer",
+                          "maximum": 18446744073709551615
+                        }
+                      },
+                      "subjects": {
+                        "description": "Subjects and their message counts when a subjects_filter was set",
                         "type": "object",
-                        "additionalProperties": false,
-                        "required": [
-                          "messages",
-                          "bytes",
-                          "first_seq",
-                          "last_seq",
-                          "consumer_count"
-                        ],
+                        "additionalProperties": {
+                          "$comment": "unsigned 64 bit integer",
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 18446744073709551615
+                        }
+                      },
+                      "num_subjects": {
+                        "description": "The number of unique subjects held in the stream",
+                        "minimum": 0,
+                        "$comment": "integer with a dynamic bit size depending on the platform the cluster runs on, can be up to 64bit",
+                        "type": "integer",
+                        "maximum": 9223372036854775807
+                      },
+                      "num_deleted": {
+                        "description": "The number of deleted messages",
+                        "minimum": 0,
+                        "$comment": "integer with a dynamic bit size depending on the platform the cluster runs on, can be up to 64bit",
+                        "type": "integer",
+                        "maximum": 9223372036854775807
+                      },
+                      "lost": {
+                        "type": "object",
+                        "description": "Records messages that were damaged and unrecoverable",
                         "properties": {
-                          "messages": {
-                            "description": "Number of messages stored in the Stream",
-                            "minimum": 0,
-                            "$comment": "unsigned 64 bit integer",
-                            "type": "integer",
-                            "maximum": 18446744073709551615
-                          },
-                          "bytes": {
-                            "description": "Combined size of all messages in the Stream",
-                            "minimum": 0,
-                            "$comment": "unsigned 64 bit integer",
-                            "type": "integer",
-                            "maximum": 18446744073709551615
-                          },
-                          "first_seq": {
-                            "description": "Sequence number of the first message in the Stream",
-                            "minimum": 0,
-                            "$comment": "unsigned 64 bit integer",
-                            "type": "integer",
-                            "maximum": 18446744073709551615
-                          },
-                          "first_ts": {
-                            "type": "string",
-                            "description": "The timestamp of the first message in the Stream"
-                          },
-                          "last_seq": {
-                            "description": "Sequence number of the last message in the Stream",
-                            "minimum": 0,
-                            "$comment": "unsigned 64 bit integer",
-                            "type": "integer",
-                            "maximum": 18446744073709551615
-                          },
-                          "last_ts": {
-                            "type": "string",
-                            "description": "The timestamp of the last message in the Stream"
-                          },
-                          "deleted": {
-                            "description": "IDs of messages that were deleted using the Message Delete API or Interest based streams removing messages out of order",
-                            "type": "array",
-                            "minLength": 0,
+                          "msgs": {
+                            "type": [
+                              "array",
+                              "null"
+                            ],
+                            "description": "The messages that were lost",
                             "items": {
                               "minimum": 0,
                               "$comment": "unsigned 64 bit integer",
@@ -408,254 +467,261 @@
                               "maximum": 18446744073709551615
                             }
                           },
-                          "num_deleted": {
-                            "description": "The number of deleted messages",
-                            "minimum": 0,
-                            "$comment": "integer with a dynamic bit size depending on the platform the cluster runs on, can be up to 64bit",
+                          "bytes": {
+                            "description": "The number of bytes that were lost",
+                            "$comment": "unsigned 64 bit integer",
                             "type": "integer",
-                            "maximum": 9223372036854775807
-                          },
-                          "lost": {
-                            "type": "object",
-                            "description": "Records messages that were damaged and unrecoverable",
-                            "properties": {
-                              "msgs": {
-                                "type": [
-                                  "array",
-                                  "null"
-                                ],
-                                "description": "The messages that were lost",
-                                "items": {
-                                  "minimum": 0,
-                                  "$comment": "unsigned 64 bit integer",
-                                  "type": "integer",
-                                  "maximum": 18446744073709551615
-                                }
-                              },
-                              "bytes": {
-                                "description": "The number of bytes that were lost",
-                                "$comment": "unsigned 64 bit integer",
-                                "type": "integer",
-                                "minimum": 0,
-                                "maximum": 18446744073709551615
-                              }
-                            }
-                          },
-                          "consumer_count": {
-                            "description": "Number of Consumers attached to the Stream",
                             "minimum": 0,
-                            "$comment": "integer with a dynamic bit size depending on the platform the cluster runs on, can be up to 64bit",
-                            "type": "integer",
-                            "maximum": 9223372036854775807
+                            "maximum": 18446744073709551615
                           }
                         }
-                      }
-                    ]
-                  },
-                  "created": {
-                    "description": "Timestamp when the stream was created",
-                    "$comment": "A point in time in RFC3339 format including timezone, though typically in UTC",
-                    "type": "string",
-                    "format": "date-time"
-                  },
-                  "cluster": {
-                    "type": "object",
-                    "properties": {
-                      "name": {
-                        "type": "string",
-                        "description": "The cluster name"
                       },
-                      "leader": {
-                        "type": "string",
-                        "description": "The server name of the RAFT leader"
-                      },
-                      "replicas": {
-                        "type": "array",
-                        "description": "The members of the RAFT cluster",
-                        "items": {
-                          "type": "object",
-                          "required": [
-                            "name",
-                            "current",
-                            "active"
-                          ],
-                          "properties": {
-                            "name": {
-                              "description": "The server name of the peer",
-                              "type": "string",
-                              "minimum": 1
-                            },
-                            "current": {
-                              "description": "Indicates if the server is up to date and synchronised",
-                              "type": "boolean",
-                              "default": false
-                            },
-                            "active": {
-                              "description": "Nanoseconds since this peer was last seen",
-                              "type": "number"
-                            },
-                            "offline": {
-                              "description": "Indicates the node is considered offline by the group",
-                              "type": "boolean",
-                              "default": false
-                            },
-                            "lag": {
-                              "description": "How many uncommitted operations this peer is behind the leader",
-                              "type": "integer",
-                              "minimum": 0
-                            }
-                          }
-                        }
-                      }
-                    }
-                  },
-                  "mirror": {
-                    "required": [
-                      "name",
-                      "lag",
-                      "active"
-                    ],
-                    "type": "object",
-                    "description": "Information about an upstream stream source in a mirror",
-                    "properties": {
-                      "name": {
-                        "type": "string",
-                        "description": "The name of the Stream being replicated"
-                      },
-                      "lag": {
-                        "description": "How many messages behind the mirror operation is",
+                      "consumer_count": {
+                        "description": "Number of Consumers attached to the Stream",
                         "minimum": 0,
-                        "$comment": "unsigned 64 bit integer",
-                        "type": "integer",
-                        "maximum": 18446744073709551615
-                      },
-                      "active": {
-                        "description": "When last the mirror had activity, in nanoseconds",
-                        "minimum": 0,
-                        "$comment": "nanoseconds depicting a duration in time, signed 64 bit integer",
+                        "$comment": "integer with a dynamic bit size depending on the platform the cluster runs on, can be up to 64bit",
                         "type": "integer",
                         "maximum": 9223372036854775807
-                      },
-                      "external": {
-                        "required": [
-                          "api"
-                        ],
-                        "type": "object",
-                        "description": "Configuration referencing a stream source in another account or JetStream domain",
-                        "properties": {
-                          "api": {
-                            "type": "string",
-                            "description": "The subject prefix that imports the other account/domain $JS.API.CONSUMER.> subjects"
-                          },
-                          "deliver": {
-                            "type": "string",
-                            "description": "The delivery subject to use for the push consumer"
-                          }
-                        }
-                      },
-                      "error": {
-                        "type": "object",
-                        "required": [
-                          "code"
-                        ],
-                        "properties": {
-                          "code": {
-                            "type": "integer",
-                            "description": "HTTP like error code in the 300 to 500 range",
-                            "minimum": 300,
-                            "maximum": 699
-                          },
-                          "description": {
-                            "type": "string",
-                            "description": "A human friendly description of the error"
-                          },
-                          "err_code": {
-                            "type": "integer",
-                            "description": "The NATS error code unique to each kind of error",
-                            "minimum": 0,
-                            "maximum": 65535
-                          }
-                        }
                       }
                     }
+                  }
+                ]
+              },
+              "created": {
+                "description": "Timestamp when the stream was created",
+                "$comment": "A point in time in RFC3339 format including timezone, though typically in UTC",
+                "type": "string",
+                "format": "date-time"
+              },
+              "cluster": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "The cluster name"
                   },
-                  "sources": {
+                  "leader": {
+                    "type": "string",
+                    "description": "The server name of the RAFT leader"
+                  },
+                  "replicas": {
                     "type": "array",
-                    "description": "Streams being sourced into this Stream",
+                    "description": "The members of the RAFT cluster",
                     "items": {
+                      "type": "object",
                       "required": [
                         "name",
-                        "lag",
+                        "current",
                         "active"
                       ],
-                      "type": "object",
-                      "description": "Information about an upstream stream source in a mirror",
                       "properties": {
                         "name": {
+                          "description": "The server name of the peer",
                           "type": "string",
-                          "description": "The name of the Stream being replicated"
+                          "minimum": 1
                         },
-                        "lag": {
-                          "description": "How many messages behind the mirror operation is",
-                          "minimum": 0,
-                          "$comment": "unsigned 64 bit integer",
-                          "type": "integer",
-                          "maximum": 18446744073709551615
+                        "current": {
+                          "description": "Indicates if the server is up to date and synchronised",
+                          "type": "boolean",
+                          "default": false
                         },
                         "active": {
-                          "description": "When last the mirror had activity, in nanoseconds",
-                          "minimum": 0,
-                          "$comment": "nanoseconds depicting a duration in time, signed 64 bit integer",
+                          "description": "Nanoseconds since this peer was last seen",
+                          "type": "number"
+                        },
+                        "offline": {
+                          "description": "Indicates the node is considered offline by the group",
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "lag": {
+                          "description": "How many uncommitted operations this peer is behind the leader",
                           "type": "integer",
-                          "maximum": 9223372036854775807
-                        },
-                        "external": {
-                          "required": [
-                            "api"
-                          ],
-                          "type": "object",
-                          "description": "Configuration referencing a stream source in another account or JetStream domain",
-                          "properties": {
-                            "api": {
-                              "type": "string",
-                              "description": "The subject prefix that imports the other account/domain $JS.API.CONSUMER.> subjects"
-                            },
-                            "deliver": {
-                              "type": "string",
-                              "description": "The delivery subject to use for the push consumer"
-                            }
-                          }
-                        },
-                        "error": {
-                          "type": "object",
-                          "required": [
-                            "code"
-                          ],
-                          "properties": {
-                            "code": {
-                              "type": "integer",
-                              "description": "HTTP like error code in the 300 to 500 range",
-                              "minimum": 300,
-                              "maximum": 699
-                            },
-                            "description": {
-                              "type": "string",
-                              "description": "A human friendly description of the error"
-                            },
-                            "err_code": {
-                              "type": "integer",
-                              "description": "The NATS error code unique to each kind of error",
-                              "minimum": 0,
-                              "maximum": 65535
-                            }
-                          }
+                          "minimum": 0
                         }
                       }
                     }
                   }
                 }
+              },
+              "mirror": {
+                "required": [
+                  "name",
+                  "lag",
+                  "active"
+                ],
+                "type": "object",
+                "description": "Information about an upstream stream source in a mirror",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "The name of the Stream being replicated"
+                  },
+                  "lag": {
+                    "description": "How many messages behind the mirror operation is",
+                    "minimum": 0,
+                    "$comment": "unsigned 64 bit integer",
+                    "type": "integer",
+                    "maximum": 18446744073709551615
+                  },
+                  "active": {
+                    "description": "When last the mirror had activity, in nanoseconds. Value will be -1 when there has been no activity.",
+                    "minimum": -1,
+                    "$comment": "nanoseconds depicting a duration in time, signed 64 bit integer",
+                    "type": "integer",
+                    "maximum": 9223372036854775807
+                  },
+                  "external": {
+                    "required": [
+                      "api"
+                    ],
+                    "type": "object",
+                    "description": "Configuration referencing a stream source in another account or JetStream domain",
+                    "properties": {
+                      "api": {
+                        "type": "string",
+                        "description": "The subject prefix that imports the other account/domain $JS.API.CONSUMER.> subjects"
+                      },
+                      "deliver": {
+                        "type": "string",
+                        "description": "The delivery subject to use for the push consumer"
+                      }
+                    }
+                  },
+                  "error": {
+                    "type": "object",
+                    "required": [
+                      "code"
+                    ],
+                    "properties": {
+                      "code": {
+                        "type": "integer",
+                        "description": "HTTP like error code in the 300 to 500 range",
+                        "minimum": 300,
+                        "maximum": 699
+                      },
+                      "description": {
+                        "type": "string",
+                        "description": "A human friendly description of the error"
+                      },
+                      "err_code": {
+                        "type": "integer",
+                        "description": "The NATS error code unique to each kind of error",
+                        "minimum": 0,
+                        "maximum": 65535
+                      }
+                    }
+                  }
+                }
+              },
+              "sources": {
+                "type": "array",
+                "description": "Streams being sourced into this Stream",
+                "items": {
+                  "required": [
+                    "name",
+                    "lag",
+                    "active"
+                  ],
+                  "type": "object",
+                  "description": "Information about an upstream stream source in a mirror",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "The name of the Stream being replicated"
+                    },
+                    "lag": {
+                      "description": "How many messages behind the mirror operation is",
+                      "minimum": 0,
+                      "$comment": "unsigned 64 bit integer",
+                      "type": "integer",
+                      "maximum": 18446744073709551615
+                    },
+                    "active": {
+                      "description": "When last the mirror had activity, in nanoseconds. Value will be -1 when there has been no activity.",
+                      "minimum": -1,
+                      "$comment": "nanoseconds depicting a duration in time, signed 64 bit integer",
+                      "type": "integer",
+                      "maximum": 9223372036854775807
+                    },
+                    "external": {
+                      "required": [
+                        "api"
+                      ],
+                      "type": "object",
+                      "description": "Configuration referencing a stream source in another account or JetStream domain",
+                      "properties": {
+                        "api": {
+                          "type": "string",
+                          "description": "The subject prefix that imports the other account/domain $JS.API.CONSUMER.> subjects"
+                        },
+                        "deliver": {
+                          "type": "string",
+                          "description": "The delivery subject to use for the push consumer"
+                        }
+                      }
+                    },
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "integer",
+                          "description": "HTTP like error code in the 300 to 500 range",
+                          "minimum": 300,
+                          "maximum": 699
+                        },
+                        "description": {
+                          "type": "string",
+                          "description": "A human friendly description of the error"
+                        },
+                        "err_code": {
+                          "type": "integer",
+                          "description": "The NATS error code unique to each kind of error",
+                          "minimum": 0,
+                          "maximum": 65535
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "alternates": {
+                "type": "array",
+                "description": "List of mirrors sorted by priority",
+                "items": {
+                  "type": "object",
+                  "description": "An alternate location to read mirrored data",
+                  "required": [
+                    "name",
+                    "cluster"
+                  ],
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "The mirror stream name"
+                    },
+                    "cluster": {
+                      "type": "string",
+                      "description": "The name of the cluster holding the stream"
+                    },
+                    "domain": {
+                      "type": "string",
+                      "description": "The domain holding the string"
+                    }
+                  }
+                }
               }
-            ]
+            }
+          }
+        },
+        "missing": {
+          "description": "In clustered environments gathering Stream info might time out, this list would be a list of Streams for which information was not obtainable",
+          "type": "array",
+          "items": {
+            "type": "string"
           }
         }
       }

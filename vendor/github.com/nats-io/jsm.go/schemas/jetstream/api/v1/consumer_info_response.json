@@ -198,7 +198,7 @@
             },
             "max_ack_pending": {
               "description": "The maximum number of messages without acknowledgement that can be outstanding, once this limit is reached message delivery will be suspended",
-              "default": 20000,
+              "default": 1000,
               "$comment": "integer with a dynamic bit size depending on the platform the cluster runs on, can be up to 64bit",
               "type": "integer",
               "maximum": 9223372036854775807,
@@ -227,6 +227,42 @@
               "type": "boolean",
               "description": "Creates a special consumer that does not touch the Raft layers, not for general use by clients, internal use only",
               "default": false
+            },
+            "headers_only": {
+              "type": "boolean",
+              "default": false,
+              "description": "Delivers only the headers of messages in the stream and not the bodies. Additionally adds Nats-Msg-Size header to indicate the size of the removed payload"
+            },
+            "max_batch": {
+              "type": "integer",
+              "description": "The largest batch property that may be specified when doing a pull on a Pull Consumer",
+              "default": 0
+            },
+            "max_expires": {
+              "description": "The maximum expires value that may be set when doing a pull on a Pull Consumer",
+              "default": 0,
+              "$comment": "nanoseconds depicting a duration in time, signed 64 bit integer",
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": -9223372036854775807
+            },
+            "inactive_threshold": {
+              "description": "Duration that instructs the server to cleanup ephemeral consumers that are inactive for that long",
+              "default": 0,
+              "$comment": "nanoseconds depicting a duration in time, signed 64 bit integer",
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": -9223372036854775807
+            },
+            "backoff": {
+              "description": "List of durations in Go format that represents a retry time scale for NaK'd messages or those being normaly retried",
+              "type": "array",
+              "items": {
+                "$comment": "nanoseconds depicting a duration in time, signed 64 bit integer",
+                "type": "integer",
+                "maximum": 9223372036854775807,
+                "minimum": -9223372036854775807
+              }
             }
           }
         },

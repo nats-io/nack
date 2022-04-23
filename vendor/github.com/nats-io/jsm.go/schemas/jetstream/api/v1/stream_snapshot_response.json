@@ -186,8 +186,7 @@
               "properties": {
                 "cluster": {
                   "type": "string",
-                  "description": "The desired cluster name to place the stream",
-                  "minLength": 1
+                  "description": "The desired cluster name to place the stream"
                 },
                 "tags": {
                   "description": "Tags required on servers hosting this stream",
@@ -299,6 +298,26 @@
                   }
                 }
               }
+            },
+            "sealed": {
+              "type": "boolean",
+              "default": false,
+              "description": "Sealed streams do not allow messages to be deleted via limits or API, sealed streams can not be unsealed via configuration update. Can only be set on already created streams via the Update API"
+            },
+            "deny_delete": {
+              "type": "boolean",
+              "default": false,
+              "description": "Restricts the ability to delete messages from a stream via the API. Cannot be changed once set to true"
+            },
+            "deny_purge": {
+              "type": "boolean",
+              "default": false,
+              "description": "Restricts the ability to purge messages from a stream via the API. Cannot be change once set to true"
+            },
+            "allow_rollup_hdrs": {
+              "type": "boolean",
+              "default": false,
+              "description": "Allows the use of the Nats-Rollup header to replace all contents of a stream, or subject in a stream, with a single new message"
             }
           }
         },
@@ -359,6 +378,23 @@
                 "type": "integer",
                 "maximum": 18446744073709551615
               }
+            },
+            "subjects": {
+              "description": "Subjects and their message counts when a subjects_filter was set",
+              "type": "object",
+              "additionalProperties": {
+                "$comment": "unsigned 64 bit integer",
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 18446744073709551615
+              }
+            },
+            "num_subjects": {
+              "description": "The number of unique subjects held in the stream",
+              "minimum": 0,
+              "$comment": "integer with a dynamic bit size depending on the platform the cluster runs on, can be up to 64bit",
+              "type": "integer",
+              "maximum": 9223372036854775807
             },
             "num_deleted": {
               "description": "The number of deleted messages",

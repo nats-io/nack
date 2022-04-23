@@ -111,7 +111,7 @@ func (m *Manager) LoadOrNewStreamFromDefault(name string, dflt api.StreamConfig,
 		o(&dflt)
 	}
 	s, err := m.LoadStream(name)
-	if s == nil || err != nil {
+	if IsNatsError(err, 10059) {
 		return m.NewStreamFromDefault(name, dflt)
 	}
 
@@ -167,7 +167,7 @@ func NewStreamConfiguration(template api.StreamConfig, opts ...StreamOption) (*a
 }
 
 func (m *Manager) loadConfigForStream(stream *Stream) (err error) {
-	info, err := m.loadStreamInfo(stream.cfg.Name)
+	info, err := m.loadStreamInfo(stream.cfg.Name, nil)
 	if err != nil {
 		return err
 	}
@@ -180,9 +180,9 @@ func (m *Manager) loadConfigForStream(stream *Stream) (err error) {
 	return nil
 }
 
-func (m *Manager) loadStreamInfo(stream string) (info *api.StreamInfo, err error) {
+func (m *Manager) loadStreamInfo(stream string, req *api.JSApiStreamInfoRequest) (info *api.StreamInfo, err error) {
 	var resp api.JSApiStreamInfoResponse
-	err = m.jsonRequest(fmt.Sprintf(api.JSApiStreamInfoT, stream), nil, &resp)
+	err = m.jsonRequest(fmt.Sprintf(api.JSApiStreamInfoT, stream), req, &resp)
 	if err != nil {
 		return nil, err
 	}
@@ -365,9 +365,36 @@ func Sources(streams ...*api.StreamSource) StreamOption {
 	}
 }
 
+func DenyDelete() StreamOption {
+	return func(o *api.StreamConfig) error {
+		o.DenyDelete = true
+
+		return nil
+	}
+}
+
+func DenyPurge() StreamOption {
+	return func(o *api.StreamConfig) error {
+		o.DenyPurge = true
+
+		return nil
+	}
+}
+
+func AllowRollup() StreamOption {
+	return func(o *api.StreamConfig) error {
+		o.RollupAllowed = true
+		return nil
+	}
+}
+
 // PageContents creates a StreamPager used to traverse the contents of the stream,
 // Close() should be called to dispose of the background consumer and resources
 func (s *Stream) PageContents(opts ...PagerOption) (*StreamPager, error) {
+	if s.Retention() == api.WorkQueuePolicy {
+		return nil, fmt.Errorf("work queue retention streams can not be paged")
+	}
+
 	pgr := &StreamPager{}
 	err := pgr.start(s.Name(), s.mgr, opts...)
 	if err != nil {
@@ -418,7 +445,7 @@ func (s *Stream) NewConsumerFromDefault(dflt api.ConsumerConfig, opts ...Consume
 	return s.mgr.NewConsumerFromDefault(s.Name(), dflt, opts...)
 }
 
-// LoadOrNewConsumer loads or creates a consumer based on these options that adjust supplied template
+// LoadOrNewConsumerFromDefault loads or creates a consumer based on these options that adjust supplied template
 func (s *Stream) LoadOrNewConsumerFromDefault(name string, deflt api.ConsumerConfig, opts ...ConsumerOption) (consumer *Consumer, err error) {
 	return s.mgr.LoadOrNewConsumerFromDefault(s.Name(), name, deflt, opts...)
 }
@@ -456,8 +483,17 @@ func (s *Stream) LatestInformation() (info *api.StreamInfo, err error) {
 }
 
 // Information loads the current stream information
-func (s *Stream) Information() (info *api.StreamInfo, err error) {
-	info, err = s.mgr.loadStreamInfo(s.Name())
+func (s *Stream) Information(req ...api.JSApiStreamInfoRequest) (info *api.StreamInfo, err error) {
+	if len(req) > 1 {
+		return nil, fmt.Errorf("only one request info is accepted")
+	}
+
+	var ireq api.JSApiStreamInfoRequest
+	if len(req) == 1 {
+		ireq = req[0]
+	}
+
+	info, err = s.mgr.loadStreamInfo(s.Name(), &ireq)
 	if err != nil {
 		return nil, err
 	}
@@ -480,15 +516,11 @@ func (s *Stream) LatestState() (state api.StreamState, err error) {
 }
 
 // State retrieves the Stream State
-func (s *Stream) State() (stats api.StreamState, err error) {
-	info, err := s.mgr.loadStreamInfo(s.Name())
+func (s *Stream) State(req ...api.JSApiStreamInfoRequest) (stats api.StreamState, err error) {
+	info, err := s.Information(req...)
 	if err != nil {
-		return stats, err
+		return api.StreamState{}, err
 	}
-
-	s.Lock()
-	s.lastInfo = info
-	s.Unlock()
 
 	return info.State, nil
 }
@@ -506,6 +538,14 @@ func (s *Stream) Delete() error {
 	}
 
 	return nil
+}
+
+// Seal updates a stream so that messages can not be added or removed using the API and limits will not be processed - messages will never age out.
+// A sealed stream can not be unsealed.
+func (s *Stream) Seal() error {
+	cfg := s.Configuration()
+	cfg.Sealed = true
+	return s.UpdateConfiguration(cfg)
 }
 
 // Purge deletes messages from the Stream, an optional JSApiStreamPurgeRequest can be supplied to limit the purge to a subset of messages
@@ -619,6 +659,27 @@ func (s *Stream) IsMirror() bool { return s.cfg.Mirror != nil }
 // could be synced to this stream and it would not be reported by this property
 func (s *Stream) IsSourced() bool { return len(s.cfg.Sources) > 0 }
 
+// IsInternal indicates if a stream is considered 'internal' by the NATS team,
+// that is, it's a backing stream for KV, Object or MQTT state
+func (s *Stream) IsInternal() bool {
+	return IsInternalStream(s.Name())
+}
+
+// IsKVBucket determines if a stream is a KV bucket
+func (s *Stream) IsKVBucket() bool {
+	return IsKVBucketStream(s.Name())
+}
+
+// IsObjectBucket determines if a stream is a Object bucket
+func (s *Stream) IsObjectBucket() bool {
+	return IsObjectBucketStream(s.Name())
+}
+
+// IsMQTTState determines if a stream holds internal MQTT state
+func (s *Stream) IsMQTTState() bool {
+	return IsMQTTStateStream(s.Name())
+}
+
 func (s *Stream) Configuration() api.StreamConfig { return *s.cfg }
 func (s *Stream) Name() string                    { return s.cfg.Name }
 func (s *Stream) Description() string             { return s.cfg.Description }
@@ -637,3 +698,7 @@ func (s *Stream) Template() string                { return s.cfg.Template }
 func (s *Stream) DuplicateWindow() time.Duration  { return s.cfg.Duplicates }
 func (s *Stream) Mirror() *api.StreamSource       { return s.cfg.Mirror }
 func (s *Stream) Sources() []*api.StreamSource    { return s.cfg.Sources }
+func (s *Stream) Sealed() bool                    { return s.cfg.Sealed }
+func (s *Stream) DeleteAllow() bool               { return !s.cfg.DenyDelete }
+func (s *Stream) PurgeAllowed() bool              { return !s.cfg.DenyPurge }
+func (s *Stream) RollupAllowed() bool             { return s.cfg.RollupAllowed }

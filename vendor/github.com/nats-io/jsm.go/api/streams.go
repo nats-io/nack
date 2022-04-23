@@ -61,7 +61,8 @@ type PubAck struct {
 
 // io.nats.jetstream.api.v1.stream_info_request
 type JSApiStreamInfoRequest struct {
-	DeletedDetails bool `json:"deleted_details,omitempty"`
+	DeletedDetails bool   `json:"deleted_details,omitempty"`
+	SubjectsFilter string `json:"subjects_filter,omitempty"`
 }
 
 // io.nats.jetstream.api.v1.stream_create_request
@@ -88,6 +89,7 @@ type JSApiStreamListResponse struct {
 	JSApiResponse
 	JSApiIterableResponse
 	Streams []*StreamInfo `json:"streams"`
+	Missing []string      `json:"missing,omitempty"`
 }
 
 // io.nats.jetstream.api.v1.stream_list_request
@@ -351,25 +353,29 @@ func (p RetentionPolicy) MarshalJSON() ([]byte, error) {
 //
 // NATS Schema Type io.nats.jetstream.api.v1.stream_configuration
 type StreamConfig struct {
-	Name         string          `json:"name"`
-	Description  string          `json:"description,omitempty"`
-	Subjects     []string        `json:"subjects,omitempty"`
-	Retention    RetentionPolicy `json:"retention"`
-	MaxConsumers int             `json:"max_consumers"`
-	MaxMsgsPer   int64           `json:"max_msgs_per_subject"`
-	MaxMsgs      int64           `json:"max_msgs"`
-	MaxBytes     int64           `json:"max_bytes"`
-	MaxAge       time.Duration   `json:"max_age"`
-	MaxMsgSize   int32           `json:"max_msg_size,omitempty"`
-	Storage      StorageType     `json:"storage"`
-	Discard      DiscardPolicy   `json:"discard"`
-	Replicas     int             `json:"num_replicas"`
-	NoAck        bool            `json:"no_ack,omitempty"`
-	Template     string          `json:"template_owner,omitempty"`
-	Duplicates   time.Duration   `json:"duplicate_window,omitempty"`
-	Placement    *Placement      `json:"placement,omitempty"`
-	Mirror       *StreamSource   `json:"mirror,omitempty"`
-	Sources      []*StreamSource `json:"sources,omitempty"`
+	Name          string          `json:"name"`
+	Description   string          `json:"description,omitempty"`
+	Subjects      []string        `json:"subjects,omitempty"`
+	Retention     RetentionPolicy `json:"retention"`
+	MaxConsumers  int             `json:"max_consumers"`
+	MaxMsgsPer    int64           `json:"max_msgs_per_subject"`
+	MaxMsgs       int64           `json:"max_msgs"`
+	MaxBytes      int64           `json:"max_bytes"`
+	MaxAge        time.Duration   `json:"max_age"`
+	MaxMsgSize    int32           `json:"max_msg_size,omitempty"`
+	Storage       StorageType     `json:"storage"`
+	Discard       DiscardPolicy   `json:"discard"`
+	Replicas      int             `json:"num_replicas"`
+	NoAck         bool            `json:"no_ack,omitempty"`
+	Template      string          `json:"template_owner,omitempty"`
+	Duplicates    time.Duration   `json:"duplicate_window,omitempty"`
+	Placement     *Placement      `json:"placement,omitempty"`
+	Mirror        *StreamSource   `json:"mirror,omitempty"`
+	Sources       []*StreamSource `json:"sources,omitempty"`
+	Sealed        bool            `json:"sealed"`
+	DenyDelete    bool            `json:"deny_delete"`
+	DenyPurge     bool            `json:"deny_purge"`
+	RollupAllowed bool            `json:"allow_rollup_hdrs"`
 }
 
 // Placement describes stream placement requirements for a stream
@@ -411,23 +417,32 @@ type ExternalStream struct {
 }
 
 type StreamInfo struct {
-	Config  StreamConfig        `json:"config"`
-	Created time.Time           `json:"created"`
-	State   StreamState         `json:"state"`
-	Cluster *ClusterInfo        `json:"cluster,omitempty"`
-	Mirror  *StreamSourceInfo   `json:"mirror,omitempty"`
-	Sources []*StreamSourceInfo `json:"sources,omitempty"`
+	Config     StreamConfig        `json:"config"`
+	Created    time.Time           `json:"created"`
+	State      StreamState         `json:"state"`
+	Cluster    *ClusterInfo        `json:"cluster,omitempty"`
+	Mirror     *StreamSourceInfo   `json:"mirror,omitempty"`
+	Sources    []*StreamSourceInfo `json:"sources,omitempty"`
+	Alternates []StreamAlternate   `json:"alternates,omitempty"`
+}
+
+type StreamAlternate struct {
+	Name    string `json:"name"`
+	Domain  string `json:"domain,omitempty"`
+	Cluster string `json:"cluster"`
 }
 
 type StreamState struct {
-	Msgs       uint64          `json:"messages"`
-	Bytes      uint64          `json:"bytes"`
-	FirstSeq   uint64          `json:"first_seq"`
-	FirstTime  time.Time       `json:"first_ts"`
-	LastSeq    uint64          `json:"last_seq"`
-	LastTime   time.Time       `json:"last_ts"`
-	NumDeleted int             `json:"num_deleted,omitempty"`
-	Deleted    []uint64        `json:"deleted,omitempty"`
-	Lost       *LostStreamData `json:"lost,omitempty"`
-	Consumers  int             `json:"consumer_count"`
+	Msgs        uint64            `json:"messages"`
+	Bytes       uint64            `json:"bytes"`
+	FirstSeq    uint64            `json:"first_seq"`
+	FirstTime   time.Time         `json:"first_ts"`
+	LastSeq     uint64            `json:"last_seq"`
+	LastTime    time.Time         `json:"last_ts"`
+	NumDeleted  int               `json:"num_deleted,omitempty"`
+	Deleted     []uint64          `json:"deleted,omitempty"`
+	NumSubjects int               `json:"num_subjects,omitempty"`
+	Subjects    map[string]uint64 `json:"subjects,omitempty"`
+	Lost        *LostStreamData   `json:"lost,omitempty"`
+	Consumers   int               `json:"consumer_count"`
 }

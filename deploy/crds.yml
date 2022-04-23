@@ -513,6 +513,26 @@ spec:
                 description: Name of the account to which the Consumer belongs.
                 type: string
                 pattern: '^[^.*>]*$'
+              headersOnly:
+                description: Only deliver existing header and the `Nats-Msg-Size` header, no bodies
+                type: boolean
+                default: false
+              maxRequestBatch:
+                description: The largest batch that can be specified when doing pulls against the consumer
+                type: integer
+              maxRequestExpires:
+                description: The longest pull request expire the server will allow
+                type: string
+                default: '' 
+              maxWaiting:
+                description: Number of outstanding pulls that are allowed on any one consumer.  Pulls made that exceeds this limit are discarded.
+                type: integer
+              backoff:
+                description: Series of intervals by which retries will be attempted for this consumr
+                type: array
+                items:
+                  type: string
+                default: []
           status:
             type: object
             properties:

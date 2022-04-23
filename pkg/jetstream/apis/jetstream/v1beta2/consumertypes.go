@@ -45,6 +45,11 @@ type ConsumerSpec struct {
 	StreamName        string   `json:"streamName"`
 	TLS               TLS      `json:"tls"`
 	Account           string   `json:"account"`
+	HeadersOnly       bool     `json:"headersOnly"`
+	MaxRequestBatch   int      `json:"maxRequestBatch"`
+	MaxRequestExpires string   `json:"maxRequestExpires"`
+	MaxWaiting        int      `json:"maxWaiting"`
+	BackOff           []string `json:"backoff"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
