@@ -1,4 +1,4 @@
-FROM golang:1.15 AS build
+FROM golang:1.18 AS build
 COPY . /go/src/nack
 WORKDIR /go/src/nack
 ARG VERSION

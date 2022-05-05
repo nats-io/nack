@@ -18,3 +18,5 @@
 /nats-boot-config
 /nats-boot-config.docker
 /tools
+
+.idea
