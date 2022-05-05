@@ -1,4 +1,3 @@
-export GOFLAGS := -mod=vendor
 export GO111MODULE := on
 
 now := $(shell date -u +%Y-%m-%dT%H:%M:%S%z)
@@ -23,13 +22,9 @@ default:
 	#   make nats-server-config-reloader
 	#   make nats-boot-config
 
-vendor: go.mod go.sum
-	go mod vendor
-	touch $@
-
-pkg/jetstream/generated pkg/jetstream/apis/jetstream/v1beta2/zz_generated.deepcopy.go: vendor $(jetstreamGenIn) pkg/k8scodegen/file-header.txt
+pkg/jetstream/generated pkg/jetstream/apis/jetstream/v1beta2/zz_generated.deepcopy.go: $(jetstreamGenIn) pkg/k8scodegen/file-header.txt
 	rm -rf pkg/jetstream/generated
-	GOFLAGS='' bash vendor/k8s.io/code-generator/generate-groups.sh all \
+	GOFLAGS='' bash `go list -m -f '{{.Dir}}' k8s.io/code-generator`/generate-groups.sh all \
 		github.com/nats-io/nack/pkg/jetstream/generated \
 		github.com/nats-io/nack/pkg/jetstream/apis \
 		"jetstream:v1beta2" \
@@ -39,12 +34,12 @@ pkg/jetstream/generated pkg/jetstream/apis/jetstream/v1beta2/zz_generated.deepco
 	mv github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2/zz_generated.deepcopy.go pkg/jetstream/apis/jetstream/v1beta2/zz_generated.deepcopy.go
 	rm -rf github.com
 
-jetstream-controller: $(jetstreamSrc) vendor
+jetstream-controller: $(jetstreamSrc)
 	go build -race -o $@ \
 		-ldflags "$(linkerVars)" \
 		github.com/nats-io/nack/cmd/jetstream-controller
 
-jetstream-controller.docker: $(jetstreamSrc) vendor
+jetstream-controller.docker: $(jetstreamSrc)
 	CGO_ENABLED=0 GOOS=linux go build -o $@ \
 		-ldflags "-s -w $(linkerVars)" \
 		-tags timetzdata \
@@ -78,12 +73,12 @@ else
 	exit 1
 endif
 
-nats-server-config-reloader: $(configReloaderSrc) vendor
+nats-server-config-reloader: $(configReloaderSrc)
 	go build -race -o $@ \
 		-ldflags "$(linkerVars)" \
 		github.com/nats-io/nack/cmd/nats-server-config-reloader
 
-nats-server-config-reloader.docker: $(configReloaderSrc) vendor
+nats-server-config-reloader.docker: $(configReloaderSrc)
 	CGO_ENABLED=0 GOOS=linux go build -o $@ \
 		-ldflags "-s -w $(linkerVars)" \
 		-tags timetzdata \
@@ -117,12 +112,12 @@ else
 	exit 1
 endif
 
-nats-boot-config: $(bootConfigSrc) vendor
+nats-boot-config: $(bootConfigSrc)
 	go build -race -o $@ \
 		-ldflags "$(linkerVars)" \
 		github.com/nats-io/nack/cmd/nats-boot-config
 
-nats-boot-config.docker: $(bootConfigSrc) vendor
+nats-boot-config.docker: $(bootConfigSrc)
 	CGO_ENABLED=0 GOOS=linux go build -o $@ \
 		-ldflags "-s -w $(linkerVars)" \
 		-tags timetzdata \
