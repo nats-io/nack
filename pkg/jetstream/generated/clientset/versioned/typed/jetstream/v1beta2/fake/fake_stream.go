@@ -114,7 +114,7 @@ func (c *FakeStreams) UpdateStatus(ctx context.Context, stream *v1beta2.Stream, 
 // Delete takes name of the stream and deletes it. Returns an error if one occurs.
 func (c *FakeStreams) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(streamsResource, c.ns, name), &v1beta2.Stream{})
+		Invokes(testing.NewDeleteActionWithOptions(streamsResource, c.ns, name, opts), &v1beta2.Stream{})
 
 	return err
 }

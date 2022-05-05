@@ -16,6 +16,11 @@ configReloaderSrc := $(shell find cmd/nats-server-config-reloader/ pkg/natsreloa
 
 bootConfigSrc := $(shell find cmd/nats-boot-config/ pkg/bootconfig/ -name "*.go")
 
+# You might override this so as to use a more recent version, to update old
+# generated imports, and so migrate away from old import paths and get back to
+# a consistent import tree.
+codeGeneratorDir ?= $(shell go list -m -f '{{.Dir}}' k8s.io/code-generator)
+
 default:
 	# Try these (read Makefile for more recipes):
 	#   make jetstream-controller
@@ -24,7 +29,7 @@ default:
 
 pkg/jetstream/generated pkg/jetstream/apis/jetstream/v1beta2/zz_generated.deepcopy.go: $(jetstreamGenIn) pkg/k8scodegen/file-header.txt
 	rm -rf pkg/jetstream/generated
-	GOFLAGS='' bash `go list -m -f '{{.Dir}}' k8s.io/code-generator`/generate-groups.sh all \
+	GOFLAGS='' bash $(codeGeneratorDir)/generate-groups.sh all \
 		github.com/nats-io/nack/pkg/jetstream/generated \
 		github.com/nats-io/nack/pkg/jetstream/apis \
 		"jetstream:v1beta2" \
