@@ -19,7 +19,7 @@ bootConfigSrc := $(shell find cmd/nats-boot-config/ pkg/bootconfig/ -name "*.go"
 # You might override this so as to use a more recent version, to update old
 # generated imports, and so migrate away from old import paths and get back to
 # a consistent import tree.
-codeGeneratorDir ?= $(shell go list -m -f '{{.Dir}}' k8s.io/code-generator)
+codeGeneratorDir ?=
 
 default:
 	# Try these (read Makefile for more recipes):
@@ -27,9 +27,9 @@ default:
 	#   make nats-server-config-reloader
 	#   make nats-boot-config
 
-pkg/jetstream/generated pkg/jetstream/apis/jetstream/v1beta2/zz_generated.deepcopy.go: $(jetstreamGenIn) pkg/k8scodegen/file-header.txt
+pkg/jetstream/generated pkg/jetstream/apis/jetstream/v1beta2/zz_generated.deepcopy.go: fetch-modules $(jetstreamGenIn) pkg/k8scodegen/file-header.txt
 	rm -rf pkg/jetstream/generated
-	GOFLAGS='' bash $(codeGeneratorDir)/generate-groups.sh all \
+	D="$(codeGeneratorDir)"; : "$${D:=`go list -m -f '{{.Dir}}' k8s.io/code-generator`}"; GOFLAGS='' bash "$$D/generate-groups.sh" all \
 		github.com/nats-io/nack/pkg/jetstream/generated \
 		github.com/nats-io/nack/pkg/jetstream/apis \
 		"jetstream:v1beta2" \
@@ -155,6 +155,11 @@ else
 	# make nats-boot-config-dockerx ver=1.2.3
 	exit 1
 endif
+
+.PHONY: fetch-modules
+# This will error if we have removed some code to be regenerated, so we instead silence it and force success
+fetch-modules:
+	go list -f '{{with .Module}}{{end}}' all >/dev/null 2>&1 || true
 
 .PHONY: build
 build: jetstream-controller nats-server-config-reloader nats-boot-config
