@@ -114,7 +114,7 @@ func (c *FakeConsumers) UpdateStatus(ctx context.Context, consumer *v1beta2.Cons
 // Delete takes name of the consumer and deletes it. Returns an error if one occurs.
 func (c *FakeConsumers) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(consumersResource, c.ns, name), &v1beta2.Consumer{})
+		Invokes(testing.NewDeleteActionWithOptions(consumersResource, c.ns, name, opts), &v1beta2.Consumer{})
 
 	return err
 }

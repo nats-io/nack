@@ -114,7 +114,7 @@ func (c *FakeAccounts) UpdateStatus(ctx context.Context, account *v1beta2.Accoun
 // Delete takes name of the account and deletes it. Returns an error if one occurs.
 func (c *FakeAccounts) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(accountsResource, c.ns, name), &v1beta2.Account{})
+		Invokes(testing.NewDeleteActionWithOptions(accountsResource, c.ns, name, opts), &v1beta2.Account{})
 
 	return err
 }

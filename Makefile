@@ -1,4 +1,3 @@
-export GOFLAGS := -mod=vendor
 export GO111MODULE := on
 
 now := $(shell date -u +%Y-%m-%dT%H:%M:%S%z)
@@ -17,19 +16,20 @@ configReloaderSrc := $(shell find cmd/nats-server-config-reloader/ pkg/natsreloa
 
 bootConfigSrc := $(shell find cmd/nats-boot-config/ pkg/bootconfig/ -name "*.go")
 
+# You might override this so as to use a more recent version, to update old
+# generated imports, and so migrate away from old import paths and get back to
+# a consistent import tree.
+codeGeneratorDir ?=
+
 default:
 	# Try these (read Makefile for more recipes):
 	#   make jetstream-controller
 	#   make nats-server-config-reloader
 	#   make nats-boot-config
 
-vendor: go.mod go.sum
-	go mod vendor
-	touch $@
-
-pkg/jetstream/generated pkg/jetstream/apis/jetstream/v1beta2/zz_generated.deepcopy.go: vendor $(jetstreamGenIn) pkg/k8scodegen/file-header.txt
+pkg/jetstream/generated pkg/jetstream/apis/jetstream/v1beta2/zz_generated.deepcopy.go: fetch-modules $(jetstreamGenIn) pkg/k8scodegen/file-header.txt
 	rm -rf pkg/jetstream/generated
-	GOFLAGS='' bash vendor/k8s.io/code-generator/generate-groups.sh all \
+	D="$(codeGeneratorDir)"; : "$${D:=`go list -m -f '{{.Dir}}' k8s.io/code-generator`}"; GOFLAGS='' bash "$$D/generate-groups.sh" all \
 		github.com/nats-io/nack/pkg/jetstream/generated \
 		github.com/nats-io/nack/pkg/jetstream/apis \
 		"jetstream:v1beta2" \
@@ -39,12 +39,12 @@ pkg/jetstream/generated pkg/jetstream/apis/jetstream/v1beta2/zz_generated.deepco
 	mv github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2/zz_generated.deepcopy.go pkg/jetstream/apis/jetstream/v1beta2/zz_generated.deepcopy.go
 	rm -rf github.com
 
-jetstream-controller: $(jetstreamSrc) vendor
+jetstream-controller: $(jetstreamSrc)
 	go build -race -o $@ \
 		-ldflags "$(linkerVars)" \
 		github.com/nats-io/nack/cmd/jetstream-controller
 
-jetstream-controller.docker: $(jetstreamSrc) vendor
+jetstream-controller.docker: $(jetstreamSrc)
 	CGO_ENABLED=0 GOOS=linux go build -o $@ \
 		-ldflags "-s -w $(linkerVars)" \
 		-tags timetzdata \
@@ -78,12 +78,12 @@ else
 	exit 1
 endif
 
-nats-server-config-reloader: $(configReloaderSrc) vendor
+nats-server-config-reloader: $(configReloaderSrc)
 	go build -race -o $@ \
 		-ldflags "$(linkerVars)" \
 		github.com/nats-io/nack/cmd/nats-server-config-reloader
 
-nats-server-config-reloader.docker: $(configReloaderSrc) vendor
+nats-server-config-reloader.docker: $(configReloaderSrc)
 	CGO_ENABLED=0 GOOS=linux go build -o $@ \
 		-ldflags "-s -w $(linkerVars)" \
 		-tags timetzdata \
@@ -117,12 +117,12 @@ else
 	exit 1
 endif
 
-nats-boot-config: $(bootConfigSrc) vendor
+nats-boot-config: $(bootConfigSrc)
 	go build -race -o $@ \
 		-ldflags "$(linkerVars)" \
 		github.com/nats-io/nack/cmd/nats-boot-config
 
-nats-boot-config.docker: $(bootConfigSrc) vendor
+nats-boot-config.docker: $(bootConfigSrc)
 	CGO_ENABLED=0 GOOS=linux go build -o $@ \
 		-ldflags "-s -w $(linkerVars)" \
 		-tags timetzdata \
@@ -155,6 +155,11 @@ else
 	# make nats-boot-config-dockerx ver=1.2.3
 	exit 1
 endif
+
+.PHONY: fetch-modules
+# This will error if we have removed some code to be regenerated, so we instead silence it and force success
+fetch-modules:
+	go list -f '{{with .Module}}{{end}}' all >/dev/null 2>&1 || true
 
 .PHONY: build
 build: jetstream-controller nats-server-config-reloader nats-boot-config
