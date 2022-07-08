@@ -241,7 +241,7 @@ func createConsumer(ctx context.Context, c jsmClient, spec apis.ConsumerSpec) (e
 	case "byStartSequence":
 		opts = append(opts, jsm.StartAtSequence(uint64(spec.OptStartSeq)))
 	case "byStartTime":
-		t, err := time.Parse(spec.OptStartTime, time.RFC3339)
+		t, err := time.Parse(time.RFC3339, spec.OptStartTime)
 		if err != nil {
 			return err
 		}

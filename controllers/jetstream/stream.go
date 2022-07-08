@@ -502,7 +502,7 @@ func getStreamSource(ss *apis.StreamSource) (*jsmapi.StreamSource, error) {
 	if ss.OptStartSeq > 0 {
 		jss.OptStartSeq = uint64(ss.OptStartSeq)
 	} else if ss.OptStartTime != "" {
-		t, err := time.Parse(ss.OptStartTime, time.RFC3339)
+		t, err := time.Parse(time.RFC3339, ss.OptStartTime)
 		if err != nil {
 			return nil, err
 		}
