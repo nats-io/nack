@@ -187,8 +187,15 @@ func (c *Controller) processConsumerObject(cns *apis.Consumer, jsmc jsmClient) (
 		c.normalEvent(cns, "Created",
 			fmt.Sprintf("Created consumer %q on stream %q", spec.DurableName, spec.StreamName))
 	case updateOK:
-		c.warningEvent(cns, "Updating",
-			fmt.Sprintf("Consumer updates (%q on %q) are not allowed, recreate to update", spec.DurableName, spec.StreamName))
+		c.normalEvent(cns, "Updating", fmt.Sprintf("Updating consumer %q on stream %q", spec.DurableName, spec.StreamName))
+		if err := natsClientUtil(updateConsumer); err != nil {
+			return err
+		}
+
+		if _, err := setConsumerOK(c.ctx, cns, ifc); err != nil {
+			return err
+		}
+		c.normalEvent(cns, "Updated", fmt.Sprintf("Updated consumer %q on stream %q", spec.DurableName, spec.StreamName))
 	case deleteOK:
 		c.normalEvent(cns, "Deleting", fmt.Sprintf("Deleting consumer %q on stream %q", spec.DurableName, spec.StreamName))
 		if err := natsClientUtil(deleteConsumer); err != nil {
@@ -219,6 +226,36 @@ func createConsumer(ctx context.Context, c jsmClient, spec apis.ConsumerSpec) (e
 		}
 	}()
 
+	opts, err := consumerSpecToOpts(spec)
+	if err != nil {
+		return
+	}
+	_, err = c.NewConsumer(ctx, spec.StreamName, opts)
+	return
+}
+
+func updateConsumer(ctx context.Context, c jsmClient, spec apis.ConsumerSpec) (err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("failed to update consumer %q on stream %q: %w", spec.DurableName, spec.StreamName, err)
+		}
+	}()
+
+	js, err := c.LoadConsumer(ctx, spec.StreamName, spec.DurableName)
+	if err != nil {
+		return
+	}
+
+	opts, err := consumerSpecToOpts(spec)
+	if err != nil {
+		return
+	}
+
+	err = js.UpdateConfiguration(opts...)
+	return
+}
+
+func consumerSpecToOpts(spec apis.ConsumerSpec) ([]jsm.ConsumerOption, error) {
 	opts := []jsm.ConsumerOption{
 		jsm.DurableName(spec.DurableName),
 		jsm.DeliverySubject(spec.DeliverSubject),
@@ -243,7 +280,7 @@ func createConsumer(ctx context.Context, c jsmClient, spec apis.ConsumerSpec) (e
 	case "byStartTime":
 		t, err := time.Parse(time.RFC3339, spec.OptStartTime)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		opts = append(opts, jsm.StartAtTime(t))
 	}
@@ -260,7 +297,7 @@ func createConsumer(ctx context.Context, c jsmClient, spec apis.ConsumerSpec) (e
 	if spec.AckWait != "" {
 		d, err := time.ParseDuration(spec.AckWait)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		opts = append(opts, jsm.AckWait(d))
 	}
@@ -275,45 +312,31 @@ func createConsumer(ctx context.Context, c jsmClient, spec apis.ConsumerSpec) (e
 	if spec.SampleFreq != "" {
 		n, err := strconv.Atoi(spec.SampleFreq)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		opts = append(opts, jsm.SamplePercent(n))
 	}
 
 	if spec.DeliverGroup != "" {
-		opts = append(opts, func(o *jsmapi.ConsumerConfig) error {
-			o.DeliverGroup = spec.DeliverGroup
-			return nil
-		})
+		opts = append(opts, jsm.DeliverGroup(spec.DeliverGroup))
 	}
 
 	if spec.Description != "" {
-		opts = append(opts, func(o *jsmapi.ConsumerConfig) error {
-			o.Description = spec.Description
-			return nil
-		})
+		opts = append(opts, jsm.ConsumerDescription(spec.Description))
 	}
 
 	if spec.FlowControl {
-		opts = append(opts, func(o *jsmapi.ConsumerConfig) error {
-			o.FlowControl = spec.FlowControl
-			return nil
-		})
+		opts = append(opts, jsm.PushFlowControl())
 	}
 
 	if spec.HeartbeatInterval != "" {
 		d, err := time.ParseDuration(spec.HeartbeatInterval)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		opts = append(opts, func(o *jsmapi.ConsumerConfig) error {
-			o.Heartbeat = d
-			return nil
-		})
+		opts = append(opts, jsm.IdleHeartbeat(d))
 	}
-
-	_, err = c.NewConsumer(ctx, spec.StreamName, opts)
-	return err
+	return opts, nil
 }
 
 func deleteConsumer(ctx context.Context, c jsmClient, spec apis.ConsumerSpec) (err error) {

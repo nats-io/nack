@@ -65,7 +65,7 @@ func TestProcessConsumer(t *testing.T) {
 		jsmc := &mockJsmClient{
 			loadConsumerErr: notFoundErr,
 			newConsumerErr:  nil,
-			newConsumer:     &mockDeleter{},
+			newConsumer:     &mockConsumer{},
 		}
 		if err := ctrl.processConsumer(ns, name, jsmc); err != nil {
 			t.Fatal(err)
@@ -89,7 +89,7 @@ func TestProcessConsumer(t *testing.T) {
 		t.Parallel()
 
 		jc := clientsetfake.NewSimpleClientset()
-		wantEvents := 1
+		wantEvents := 2
 		rec := record.NewFakeRecorder(wantEvents)
 		ctrl := NewController(Options{
 			Ctx:            context.Background(),
@@ -122,7 +122,7 @@ func TestProcessConsumer(t *testing.T) {
 
 		jsmc := &mockJsmClient{
 			loadConsumerErr: nil,
-			loadConsumer:    &mockDeleter{},
+			loadConsumer:    &mockConsumer{},
 		}
 		if err := ctrl.processConsumer(ns, name, jsmc); err != nil {
 			t.Fatal(err)
@@ -175,7 +175,7 @@ func TestProcessConsumer(t *testing.T) {
 
 		jsmc := &mockJsmClient{
 			loadConsumerErr: nil,
-			loadConsumer:    &mockDeleter{},
+			loadConsumer:    &mockConsumer{},
 		}
 		if err := ctrl.processConsumer(ns, name, jsmc); err != nil {
 			t.Fatal(err)
