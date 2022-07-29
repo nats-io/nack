@@ -448,6 +448,11 @@ spec:
               maxDeliver:
                 type: integer
                 minimum: -1
+              backoff:
+                description: List of durations representing a retry time scale for NaK'd or retried messages
+                type: array
+                items:
+                  type: string
               filterSubject:
                 description: Select only a specific incoming subjects, supports wildcards.
                 type: string
@@ -461,11 +466,14 @@ spec:
               sampleFreq:
                 description: What percentage of acknowledgements should be samples for observability.
                 type: string
+              maxWaiting:
+                description: The number of pulls that can be outstanding on a pull consumer, pulls received after this is reached are ignored.
+                type: integer
               rateLimitBps:
                 description: rate at which messages will be delivered to clients, expressed in bit per second.
                 type: integer
               maxAckPending:
-                description: Maximum pending Acks before consumers are paused
+                description: Maximum pending Acks before consumers are paused.
                 type: integer
               deliverGroup:
                 description: The name of a queue group.
@@ -477,9 +485,29 @@ spec:
                 description: Enables flow control.
                 type: boolean
                 default: false
+              headersOnly:
+                description: When set, only the headers of messages in the stream are delivered, and not the bodies. Additionally, Nats-Msg-Size header is added to indicate the size of the removed payload
+                type: boolean
+                default: false
               heartbeatInterval:
                 description: The interval used to deliver idle heartbeats for push-based consumers, in Go's time.Duration format.
                 type: string
+              maxRequestBatch:
+                description: The largest batch property that may be specified when doing a pull on a Pull Consumer.
+                type: integer
+              maxRequestExpires:
+                description: The maximum expires duration that may be set when doing a pull on a Pull Consumer.
+                type: string
+              maxRequestMaxBytes:
+                description: The maximum max_bytes value that maybe set when dong a pull on a Pull Consumer.
+                type: integer
+              replicas:
+                description: When set do not inherit the replica count from the stream but specifically set it to this amount.
+                type: integer
+              memStorage:
+                description: Force the consumer state to be kept in memory rather than inherit the setting from the stream.
+                type: boolean
+                default: false
               tls:
                 description: A client's TLS certs and keys.
                 type: object
@@ -622,7 +650,7 @@ spec:
                 description: rate at which messages will be delivered to clients, expressed in bit per second.
                 type: integer
               maxAckPending:
-                description: Maximum pending Acks before consumers are paused
+                description: Maximum pending Acks before consumers are paused.
                 type: integer
               deliverGroup:
                 description: The name of a queue group.

@@ -262,10 +262,12 @@ func consumerSpecToOpts(spec apis.ConsumerSpec) ([]jsm.ConsumerOption, error) {
 		jsm.FilterStreamBySubject(spec.FilterSubject),
 		jsm.RateLimitBitsPerSecond(uint64(spec.RateLimitBps)),
 		jsm.MaxAckPending(uint(spec.MaxAckPending)),
-	}
-
-	if spec.MaxDeliver != 0 {
-		opts = append(opts, jsm.MaxDeliveryAttempts(spec.MaxDeliver))
+		jsm.ConsumerDescription(spec.Description),
+		jsm.DeliverGroup(spec.DeliverGroup),
+		jsm.MaxWaiting(uint(spec.MaxWaiting)),
+		jsm.MaxRequestBatch(uint(spec.MaxRequestBatch)),
+		jsm.MaxRequestMaxBytes(spec.MaxRequestMaxBytes),
+		jsm.ConsumerOverrideReplicas(spec.Replicas),
 	}
 
 	switch spec.DeliverPolicy {
@@ -278,11 +280,17 @@ func consumerSpecToOpts(spec apis.ConsumerSpec) ([]jsm.ConsumerOption, error) {
 	case "byStartSequence":
 		opts = append(opts, jsm.StartAtSequence(uint64(spec.OptStartSeq)))
 	case "byStartTime":
+		if spec.OptStartTime == "" {
+			return nil, fmt.Errorf("'optStartTime' is required for deliver policy 'byStartTime'")
+		}
 		t, err := time.Parse(time.RFC3339, spec.OptStartTime)
 		if err != nil {
 			return nil, err
 		}
 		opts = append(opts, jsm.StartAtTime(t))
+	case "":
+	default:
+		return nil, fmt.Errorf("invalid value for 'deliverPolicy': '%s'. Must be one of 'all', 'last', 'new', 'byStartSequence', 'byStartTime'", spec.DeliverPolicy)
 	}
 
 	switch spec.AckPolicy {
@@ -292,6 +300,9 @@ func consumerSpecToOpts(spec apis.ConsumerSpec) ([]jsm.ConsumerOption, error) {
 		opts = append(opts, jsm.AcknowledgeAll())
 	case "explicit":
 		opts = append(opts, jsm.AcknowledgeExplicit())
+	case "":
+	default:
+		return nil, fmt.Errorf("invalid value for 'ackPolicy': '%s'. Must be one of 'none', 'all', 'explicit'.", spec.AckPolicy)
 	}
 
 	if spec.AckWait != "" {
@@ -307,6 +318,9 @@ func consumerSpecToOpts(spec apis.ConsumerSpec) ([]jsm.ConsumerOption, error) {
 		opts = append(opts, jsm.ReplayInstantly())
 	case "original":
 		opts = append(opts, jsm.ReplayAsReceived())
+	case "":
+	default:
+		return nil, fmt.Errorf("invalid value for 'replayPolicy': '%s'. Must be one of 'instant', 'original'.", spec.ReplayPolicy)
 	}
 
 	if spec.SampleFreq != "" {
@@ -315,14 +329,6 @@ func consumerSpecToOpts(spec apis.ConsumerSpec) ([]jsm.ConsumerOption, error) {
 			return nil, err
 		}
 		opts = append(opts, jsm.SamplePercent(n))
-	}
-
-	if spec.DeliverGroup != "" {
-		opts = append(opts, jsm.DeliverGroup(spec.DeliverGroup))
-	}
-
-	if spec.Description != "" {
-		opts = append(opts, jsm.ConsumerDescription(spec.Description))
 	}
 
 	if spec.FlowControl {
@@ -336,6 +342,39 @@ func consumerSpecToOpts(spec apis.ConsumerSpec) ([]jsm.ConsumerOption, error) {
 		}
 		opts = append(opts, jsm.IdleHeartbeat(d))
 	}
+
+	if len(spec.BackOff) > 0 {
+		backoffs := make([]time.Duration, 0)
+		for _, backoff := range spec.BackOff {
+			dur, err := time.ParseDuration(backoff)
+			if err != nil {
+				return nil, err
+			}
+			backoffs = append(backoffs, dur)
+		}
+		opts = append(opts, jsm.BackoffIntervals(backoffs...))
+	}
+
+	if spec.HeadersOnly {
+		opts = append(opts, jsm.DeliverHeadersOnly())
+	}
+
+	if spec.MaxRequestExpires != "" {
+		dur, err := time.ParseDuration(spec.MaxRequestExpires)
+		if err != nil {
+			return nil, err
+		}
+		opts = append(opts, jsm.MaxRequestExpires(dur))
+	}
+
+	if spec.MemStorage {
+		opts = append(opts, jsm.ConsumerOverrideMemoryStorage())
+	}
+
+	if spec.MaxDeliver != 0 {
+		opts = append(opts, jsm.MaxDeliveryAttempts(spec.MaxDeliver))
+	}
+
 	return opts, nil
 }
 
