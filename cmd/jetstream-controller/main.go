@@ -1,4 +1,4 @@
-// Copyright 2020-2021 The NATS Authors
+// Copyright 2020-2022 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -37,7 +37,7 @@ import (
 var (
 	BuildTime = "build-time-not-set"
 	GitInfo   = "gitinfo-not-set"
-	Version   = "0.7.0"
+	Version   = "0.7.2"
 )
 
 func main() {
