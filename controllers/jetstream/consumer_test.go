@@ -5,10 +5,13 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	jsmapi "github.com/nats-io/jsm.go/api"
 	apis "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 	clientsetfake "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/fake"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	k8smeta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -52,7 +55,18 @@ func TestProcessConsumer(t *testing.T) {
 				Generation: 1,
 			},
 			Spec: apis.ConsumerSpec{
-				DurableName: name,
+				DurableName:       name,
+				DeliverPolicy:     "byStartTime",
+				OptStartTime:      time.Now().Format(time.RFC3339),
+				AckPolicy:         "explicit",
+				AckWait:           "1m",
+				ReplayPolicy:      "original",
+				SampleFreq:        "50",
+				HeartbeatInterval: "30s",
+				BackOff:           []string{"500ms", "1s"},
+				HeadersOnly:       true,
+				MaxRequestExpires: "5m",
+				MemStorage:        true,
 			},
 		})
 		if err != nil {
@@ -65,7 +79,7 @@ func TestProcessConsumer(t *testing.T) {
 		jsmc := &mockJsmClient{
 			loadConsumerErr: notFoundErr,
 			newConsumerErr:  nil,
-			newConsumer:     &mockDeleter{},
+			newConsumer:     &mockConsumer{},
 		}
 		if err := ctrl.processConsumer(ns, name, jsmc); err != nil {
 			t.Fatal(err)
@@ -85,11 +99,66 @@ func TestProcessConsumer(t *testing.T) {
 		}
 	})
 
-	t.Run("update consumer", func(t *testing.T) {
+	t.Run("create consumer, invalid configuration", func(t *testing.T) {
 		t.Parallel()
 
 		jc := clientsetfake.NewSimpleClientset()
 		wantEvents := 1
+		rec := record.NewFakeRecorder(wantEvents)
+		ctrl := NewController(Options{
+			Ctx:            context.Background(),
+			KubeIface:      k8sclientsetfake.NewSimpleClientset(),
+			JetstreamIface: jc,
+			Recorder:       rec,
+		})
+
+		ns, name := "default", "my-consumer"
+
+		informer := ctrl.informerFactory.Jetstream().V1beta2().Consumers()
+		err := informer.Informer().GetStore().Add(&apis.Consumer{
+			ObjectMeta: k8smeta.ObjectMeta{
+				Namespace:  ns,
+				Name:       name,
+				Generation: 1,
+			},
+			Spec: apis.ConsumerSpec{
+				DurableName:   name,
+				DeliverPolicy: "invalid",
+			},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		jc.PrependReactor("update", "consumers", updateObject)
+
+		notFoundErr := jsmapi.ApiError{Code: 404}
+		jsmc := &mockJsmClient{
+			loadConsumerErr: notFoundErr,
+			newConsumerErr:  nil,
+			newConsumer:     &mockConsumer{},
+		}
+		if err := ctrl.processConsumer(ns, name, jsmc); err == nil || !strings.Contains(err.Error(), `failed to create consumer "my-consumer" on stream `) {
+			t.Fatal(err)
+		}
+
+		if got := len(rec.Events); got != wantEvents {
+			t.Error("unexpected number of events")
+			t.Fatalf("got=%d; want=%d", got, wantEvents)
+		}
+
+		gotEvent := <-rec.Events
+		if !strings.Contains(gotEvent, "Creating") {
+			t.Error("unexpected event")
+			t.Fatalf("got=%s; want=%s", gotEvent, "Creating...")
+		}
+	})
+
+	t.Run("update consumer", func(t *testing.T) {
+		t.Parallel()
+
+		jc := clientsetfake.NewSimpleClientset()
+		wantEvents := 2
 		rec := record.NewFakeRecorder(wantEvents)
 		ctrl := NewController(Options{
 			Ctx:            context.Background(),
@@ -122,7 +191,7 @@ func TestProcessConsumer(t *testing.T) {
 
 		jsmc := &mockJsmClient{
 			loadConsumerErr: nil,
-			loadConsumer:    &mockDeleter{},
+			loadConsumer:    &mockConsumer{},
 		}
 		if err := ctrl.processConsumer(ns, name, jsmc); err != nil {
 			t.Fatal(err)
@@ -133,10 +202,12 @@ func TestProcessConsumer(t *testing.T) {
 			t.Fatalf("got=%d; want=%d", got, wantEvents)
 		}
 
-		gotEvent := <-rec.Events
-		if !strings.Contains(gotEvent, "Updating") {
-			t.Error("unexpected event")
-			t.Fatalf("got=%s; want=%s", gotEvent, "Updating...")
+		for i := 0; i < len(rec.Events); i++ {
+			gotEvent := <-rec.Events
+			if !strings.Contains(gotEvent, "Updat") {
+				t.Error("unexpected event")
+				t.Fatalf("got=%s; want=%s", gotEvent, "Updating/Updated...")
+			}
 		}
 	})
 
@@ -175,7 +246,7 @@ func TestProcessConsumer(t *testing.T) {
 
 		jsmc := &mockJsmClient{
 			loadConsumerErr: nil,
-			loadConsumer:    &mockDeleter{},
+			loadConsumer:    &mockConsumer{},
 		}
 		if err := ctrl.processConsumer(ns, name, jsmc); err != nil {
 			t.Fatal(err)
@@ -255,4 +326,109 @@ func TestProcessConsumer(t *testing.T) {
 			t.Fatal("unexpected success")
 		}
 	})
+}
+
+func TestConsumerSpecToOpts(t *testing.T) {
+	tests := map[string]struct {
+		name     string
+		given    apis.ConsumerSpec
+		expected jsmapi.ConsumerConfig
+		errCheck func(t *testing.T, err error)
+	}{
+		"valid consumer spec": {
+			given: apis.ConsumerSpec{
+				DurableName:       "my-consumer",
+				DeliverPolicy:     "byStartSequence",
+				OptStartSeq:       10,
+				AckPolicy:         "explicit",
+				AckWait:           "1m",
+				ReplayPolicy:      "original",
+				SampleFreq:        "50",
+				HeartbeatInterval: "30s",
+				BackOff:           []string{"500ms", "1s"},
+				HeadersOnly:       true,
+				MaxRequestExpires: "5m",
+				MemStorage:        true,
+			},
+			expected: jsmapi.ConsumerConfig{
+				AckPolicy:         jsmapi.AckExplicit,
+				AckWait:           1 * time.Minute,
+				DeliverPolicy:     jsmapi.DeliverByStartSequence,
+				Durable:           "my-consumer",
+				Heartbeat:         30 * time.Second,
+				BackOff:           []time.Duration{500 * time.Millisecond, 1 * time.Second},
+				OptStartSeq:       10,
+				ReplayPolicy:      jsmapi.ReplayOriginal,
+				SampleFrequency:   "50%",
+				HeadersOnly:       true,
+				MaxRequestExpires: 5 * time.Minute,
+				MemoryStorage:     true,
+			},
+		},
+		"valid consumer spec, defaults only": {
+			given: apis.ConsumerSpec{
+				DurableName: "my-consumer",
+			},
+			expected: jsmapi.ConsumerConfig{
+				Durable: "my-consumer",
+			},
+		},
+		"invalid deliver policy value": {
+			given: apis.ConsumerSpec{
+				DurableName:   "my-consumer",
+				DeliverPolicy: "invalid",
+			},
+			errCheck: func(t *testing.T, err error) {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), "invalid value for 'deliverPolicy': 'invalid'")
+			},
+		},
+		"missing start time for deliver policy byStartTime": {
+			given: apis.ConsumerSpec{
+				DurableName:   "my-consumer",
+				DeliverPolicy: "byStartTime",
+			},
+			errCheck: func(t *testing.T, err error) {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), "'optStartTime' is required for deliver policy 'byStartTime'")
+			},
+		},
+		"invalid ack policy": {
+			given: apis.ConsumerSpec{
+				DurableName: "my-consumer",
+				AckPolicy:   "invalid",
+			},
+			errCheck: func(t *testing.T, err error) {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), "invalid value for 'ackPolicy': 'invalid'")
+			},
+		},
+		"invalid replay policy": {
+			given: apis.ConsumerSpec{
+				DurableName:  "my-consumer",
+				ReplayPolicy: "invalid",
+			},
+			errCheck: func(t *testing.T, err error) {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), "invalid value for 'replayPolicy': 'invalid'")
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			res, err := consumerSpecToOpts(test.given)
+			if test.errCheck != nil {
+				test.errCheck(t, err)
+				return
+			}
+			require.NoError(t, err)
+			var config jsmapi.ConsumerConfig
+			for _, opt := range res {
+				err := opt(&config)
+				require.NoError(t, err)
+			}
+			assert.Equal(t, test.expected, config)
+		})
+	}
 }
