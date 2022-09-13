@@ -62,6 +62,8 @@ func (c *Controller) processConsumerObject(cns *apis.Consumer, jsmc jsmClient) (
 			return err
 		}
 
+		accServers = acc.Spec.Servers
+
 		// Lookup the TLS secrets
 		if acc.Spec.TLS != nil && acc.Spec.TLS.Secret != nil {
 			secretName := acc.Spec.TLS.Secret.Name
@@ -79,7 +81,6 @@ func (c *Controller) processConsumerObject(cns *apis.Consumer, jsmc jsmClient) (
 			remoteClientCert = filepath.Join(accDir, acc.Spec.TLS.ClientCert)
 			remoteClientKey = filepath.Join(accDir, acc.Spec.TLS.ClientKey)
 			remoteRootCA = filepath.Join(accDir, acc.Spec.TLS.RootCAs)
-			accServers = acc.Spec.Servers
 
 			for k, v := range secret.Data {
 				if err := os.WriteFile(filepath.Join(accDir, k), v, 0644); err != nil {
