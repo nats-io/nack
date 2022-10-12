@@ -335,6 +335,13 @@ func createStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 		return nil
 	})
 
+	if spec.Republish != nil {
+		opts = append(opts, jsm.Republish(&jsmapi.SubjectMapping{
+			Source:      spec.Republish.Source,
+			Destination: spec.Republish.Destination,
+		}))
+	}
+
 	_, err = c.NewStream(ctx, spec.Name, opts)
 	return err
 }
