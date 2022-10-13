@@ -179,6 +179,16 @@ spec:
                 description: Name of the account to which the Stream belongs.
                 type: string
                 pattern: '^[^.*>]*$'
+              republish:
+                description: Republish configuration of the stream.
+                type: object
+                properties:
+                  destination:
+                    type: string
+                    description: Messages will be additionally published to that subject.
+                  source:
+                    type: string
+                    description: Messages will be published from that subject to the destination subject.
           status:
             type: object
             properties:
