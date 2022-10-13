@@ -37,7 +37,7 @@ import (
 var (
 	BuildTime = "build-time-not-set"
 	GitInfo   = "gitinfo-not-set"
-	Version   = "0.7.3"
+	Version   = "0.7.4"
 )
 
 func main() {
