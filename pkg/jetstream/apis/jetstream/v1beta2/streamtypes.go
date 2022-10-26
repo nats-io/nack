@@ -25,6 +25,7 @@ type StreamSpec struct {
 	Account           string                `json:"account"`
 	Creds             string                `json:"creds"`
 	Description       string                `json:"description"`
+	PreventDelete     bool                  `json:"preventDelete"`
 	Discard           string                `json:"discard"`
 	DuplicateWindow   string                `json:"duplicateWindow"`
 	MaxAge            string                `json:"maxAge"`

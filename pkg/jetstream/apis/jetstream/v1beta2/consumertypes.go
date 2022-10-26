@@ -30,6 +30,7 @@ type ConsumerSpec struct {
 	DeliverPolicy      string   `json:"deliverPolicy"`
 	DeliverSubject     string   `json:"deliverSubject"`
 	Description        string   `json:"description"`
+	PreventDelete      bool     `json:"preventDelete"`
 	DurableName        string   `json:"durableName"`
 	FilterSubject      string   `json:"filterSubject"`
 	FlowControl        bool     `json:"flowControl"`

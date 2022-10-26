@@ -397,6 +397,11 @@ func deleteStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 		}
 	}()
 
+	if spec.PreventDelete {
+		fmt.Printf("Stream %q is configured to preventDelete:\n", name)
+		return nil
+	}
+
 	var apierr jsmapi.ApiError
 	str, err := c.LoadStream(ctx, name)
 	if errors.As(err, &apierr) && apierr.NotFoundError() {

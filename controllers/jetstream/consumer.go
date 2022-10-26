@@ -387,6 +387,11 @@ func deleteConsumer(ctx context.Context, c jsmClient, spec apis.ConsumerSpec) (e
 		}
 	}()
 
+	if spec.PreventDelete {
+		fmt.Printf("Consumer %q is configured to preventDelete on stream %q:\n", stream, consumer)
+		return nil
+	}
+
 	var apierr jsmapi.ApiError
 	cn, err := c.LoadConsumer(ctx, stream, consumer)
 	if errors.As(err, &apierr) && apierr.NotFoundError() {
