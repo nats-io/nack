@@ -190,7 +190,7 @@ spec:
                     type: string
                     description: Messages will be published from that subject to the destination subject.
               preventDelete:
-                description: Indicates if a Stream can be deleted (true) or not (false)
+                description: When true, the managed Stream will not be deleted when the resource is deleted
                 type: boolean
                 default: false
           status:
@@ -556,7 +556,7 @@ spec:
                 type: string
                 pattern: '^[^.*>]*$'
               preventDelete:
-                description: Indicates if a Consumer can be deleted (true) or not (false)
+                description: When true, the managed Consumer will not be deleted when the resource is deleted
                 type: boolean
                 default: false
           status:
