@@ -189,6 +189,10 @@ spec:
                   source:
                     type: string
                     description: Messages will be published from that subject to the destination subject.
+              preventDelete:
+                description: When true, the managed Stream will not be deleted when the resource is deleted
+                type: boolean
+                default: false
           status:
             type: object
             properties:
@@ -551,6 +555,10 @@ spec:
                 description: Name of the account to which the Consumer belongs.
                 type: string
                 pattern: '^[^.*>]*$'
+              preventDelete:
+                description: When true, the managed Consumer will not be deleted when the resource is deleted
+                type: boolean
+                default: false
           status:
             type: object
             properties:
