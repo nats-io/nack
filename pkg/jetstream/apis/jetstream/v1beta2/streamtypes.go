@@ -22,31 +22,31 @@ func (s *Stream) GetSpec() interface{} {
 
 // StreamSpec is the spec for a Stream resource
 type StreamSpec struct {
-	Account           string                `json:"account"`
-	Creds             string                `json:"creds"`
-	Description       string                `json:"description"`
-	PreventDelete     bool                  `json:"preventDelete"`
-	Discard           string                `json:"discard"`
-	DuplicateWindow   string                `json:"duplicateWindow"`
-	MaxAge            string                `json:"maxAge"`
-	MaxBytes          int                   `json:"maxBytes"`
-	MaxConsumers      int                   `json:"maxConsumers"`
-	MaxMsgs           int                   `json:"maxMsgs"`
-	MaxMsgSize        int                   `json:"maxMsgSize"`
-	MaxMsgsPerSubject int                   `json:"maxMsgsPerSubject"`
-	Mirror            *StreamSource         `json:"mirror"`
-	Name              string                `json:"name"`
-	Nkey              string                `json:"nkey"`
-	NoAck             bool                  `json:"noAck"`
-	Placement         *StreamPlacement      `json:"placement"`
-	Replicas          int                   `json:"replicas"`
-	Republish         *StreamSubjectMapping `json:"republish"`
-	Retention         string                `json:"retention"`
-	Servers           []string              `json:"servers"`
-	Sources           []*StreamSource       `json:"sources"`
-	Storage           string                `json:"storage"`
-	Subjects          []string              `json:"subjects"`
-	TLS               TLS                   `json:"tls"`
+	Account           string           `json:"account"`
+	Creds             string           `json:"creds"`
+	Description       string           `json:"description"`
+	PreventDelete     bool             `json:"preventDelete"`
+	Discard           string           `json:"discard"`
+	DuplicateWindow   string           `json:"duplicateWindow"`
+	MaxAge            string           `json:"maxAge"`
+	MaxBytes          int              `json:"maxBytes"`
+	MaxConsumers      int              `json:"maxConsumers"`
+	MaxMsgs           int              `json:"maxMsgs"`
+	MaxMsgSize        int              `json:"maxMsgSize"`
+	MaxMsgsPerSubject int              `json:"maxMsgsPerSubject"`
+	Mirror            *StreamSource    `json:"mirror"`
+	Name              string           `json:"name"`
+	Nkey              string           `json:"nkey"`
+	NoAck             bool             `json:"noAck"`
+	Placement         *StreamPlacement `json:"placement"`
+	Replicas          int              `json:"replicas"`
+	Republish         *RePublish       `json:"republish"`
+	Retention         string           `json:"retention"`
+	Servers           []string         `json:"servers"`
+	Sources           []*StreamSource  `json:"sources"`
+	Storage           string           `json:"storage"`
+	Subjects          []string         `json:"subjects"`
+	TLS               TLS              `json:"tls"`
 }
 
 type StreamPlacement struct {
@@ -64,9 +64,10 @@ type StreamSource struct {
 	ExternalDeliverPrefix string `json:"externalDeliverPrefix"`
 }
 
-type StreamSubjectMapping struct {
+type RePublish struct {
 	Source      string `json:"source"`
 	Destination string `json:"destination"`
+	HeadersOnly bool   `json:"headers_only,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

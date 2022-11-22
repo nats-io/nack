@@ -336,7 +336,7 @@ func createStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 	})
 
 	if spec.Republish != nil {
-		opts = append(opts, jsm.Republish(&jsmapi.SubjectMapping{
+		opts = append(opts, jsm.Republish(&jsmapi.RePublish{
 			Source:      spec.Republish.Source,
 			Destination: spec.Republish.Destination,
 		}))
@@ -372,7 +372,7 @@ func updateStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 		return err
 	}
 
-	return js.UpdateConfiguration(jsmapi.StreamConfig{
+	config := jsmapi.StreamConfig{
 		Name:         spec.Name,
 		Retention:    retention,
 		Subjects:     spec.Subjects,
@@ -386,7 +386,16 @@ func updateStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 		Replicas:     spec.Replicas,
 		NoAck:        spec.NoAck,
 		Duplicates:   duplicates,
-	})
+	}
+	if spec.Republish != nil {
+		config.RePublish = &jsmapi.RePublish{
+			Source:      spec.Republish.Source,
+			Destination: spec.Republish.Destination,
+			HeadersOnly: spec.Republish.HeadersOnly,
+		}
+	}
+
+	return js.UpdateConfiguration(config)
 }
 
 func deleteStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err error) {
