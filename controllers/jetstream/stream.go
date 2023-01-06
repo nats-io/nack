@@ -66,10 +66,13 @@ func (c *Controller) processStreamObject(str *apis.Stream, jsmc jsmClient) (err 
 		remoteClientKey  string
 		remoteRootCA     string
 		accServers       []string
+		acc              *apis.Account
+		accUserCreds     string
 	)
 	if spec.Account != "" && c.opts.CRDConnect {
 		// Lookup the account.
-		acc, err := c.accLister.Accounts(ns).Get(spec.Account)
+		var err error
+		acc, err = c.accLister.Accounts(ns).Get(spec.Account)
 		if err != nil {
 			return err
 		}
@@ -84,7 +87,7 @@ func (c *Controller) processStreamObject(str *apis.Stream, jsmc jsmClient) (err 
 				return err
 			}
 
-			// Write this to the cacheDir
+			// Write this to the cacheDir.
 			accDir := filepath.Join(c.cacheDir, ns, spec.Account)
 			if err := os.MkdirAll(accDir, 0755); err != nil {
 				return err
@@ -97,6 +100,28 @@ func (c *Controller) processStreamObject(str *apis.Stream, jsmc jsmClient) (err 
 			for k, v := range secret.Data {
 				if err := os.WriteFile(filepath.Join(accDir, k), v, 0644); err != nil {
 					return err
+				}
+			}
+		}
+		// Lookup the UserCredentials.
+		if acc.Spec.Creds != nil {
+			secretName := acc.Spec.Creds.Secret.Name
+			secret, err := c.ki.Secrets(ns).Get(c.ctx, secretName, k8smeta.GetOptions{})
+			if err != nil {
+				return err
+			}
+
+			// Write the user credentials to the cache dir.
+			accDir := filepath.Join(c.cacheDir, ns, spec.Account)
+			if err := os.MkdirAll(accDir, 0755); err != nil {
+				return err
+			}
+			for k, v := range secret.Data {
+				if k == acc.Spec.Creds.File {
+					accUserCreds = filepath.Join(c.cacheDir, ns, spec.Account, k)
+					if err := os.WriteFile(filepath.Join(accDir, k), v, 0644); err != nil {
+						return err
+					}
 				}
 			}
 		}
@@ -141,7 +166,9 @@ func (c *Controller) processStreamObject(str *apis.Stream, jsmc jsmClient) (err 
 			if remoteRootCA != "" {
 				opts = append(opts, nats.RootCAs(remoteRootCA))
 			}
-
+			if accUserCreds != "" {
+				opts = append(opts, nats.UserCredentials(accUserCreds))
+			}
 			if len(spec.TLS.RootCAs) > 0 {
 				opts = append(opts, nats.RootCAs(spec.TLS.RootCAs...))
 			}
