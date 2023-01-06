@@ -394,6 +394,22 @@ func updateStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 			HeadersOnly: spec.Republish.HeadersOnly,
 		}
 	}
+	if spec.Mirror != nil {
+		ss, err := getStreamSource(spec.Mirror)
+		if err != nil {
+			return err
+		}
+
+		config.Mirror = ss
+	}
+	config.Sources = make([]*jsmapi.StreamSource, len(spec.Sources))
+	for i, ss := range spec.Sources {
+		jss, err := getStreamSource(ss)
+		if err != nil {
+			return err
+		}
+		config.Sources[i] = jss
+	}
 
 	return js.UpdateConfiguration(config)
 }
