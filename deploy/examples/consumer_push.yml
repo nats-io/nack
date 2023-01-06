@@ -12,3 +12,4 @@ spec:
   replayPolicy: instant
   description: my consumer description
   flowControl: true
+  heartbeatInterval: 1s
