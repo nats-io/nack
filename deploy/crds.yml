@@ -193,6 +193,10 @@ spec:
                 description: When true, the managed Stream will not be deleted when the resource is deleted
                 type: boolean
                 default: false
+              allowDirect:
+                description: When true, allow higher performance, direct access to get individual messages
+                type: boolean
+                default: false
           status:
             type: object
             properties:
