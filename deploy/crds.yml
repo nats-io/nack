@@ -197,6 +197,14 @@ spec:
                 description: When true, allow higher performance, direct access to get individual messages
                 type: boolean
                 default: false
+              allowRollup:
+                description: When true, allows the use of the Nats-Rollup header to replace all contents of a stream, or subject in a stream, with a single new message.
+                type: boolean
+                default: false
+              denyDelete:
+                description: When true, restricts the ability to delete messages from a stream via the API. Cannot be changed once set to true.
+                type: boolean
+                default: false
           status:
             type: object
             properties:

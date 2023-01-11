@@ -24,7 +24,9 @@ func (s *Stream) GetSpec() interface{} {
 type StreamSpec struct {
 	Account           string           `json:"account"`
 	AllowDirect       bool             `json:"allowDirect"`
+	AllowRollup       bool             `json:"allowRollup"`
 	Creds             string           `json:"creds"`
+	DenyDelete        bool             `json:"denyDelete"`
 	Description       string           `json:"description"`
 	PreventDelete     bool             `json:"preventDelete"`
 	Discard           string           `json:"discard"`

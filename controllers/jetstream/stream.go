@@ -373,6 +373,14 @@ func createStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 		opts = append(opts, jsm.AllowDirect())
 	}
 
+	if spec.AllowRollup {
+		opts = append(opts, jsm.AllowRollup())
+	}
+
+	if spec.DenyDelete {
+		opts = append(opts, jsm.DenyDelete())
+	}
+
 	_, err = c.NewStream(ctx, spec.Name, opts)
 	return err
 }
@@ -404,20 +412,22 @@ func updateStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 	}
 
 	config := jsmapi.StreamConfig{
-		Name:         spec.Name,
-		Retention:    retention,
-		Subjects:     spec.Subjects,
-		MaxConsumers: spec.MaxConsumers,
-		MaxMsgs:      int64(spec.MaxMsgs),
-		MaxBytes:     int64(spec.MaxBytes),
-		MaxAge:       maxAge,
-		MaxMsgSize:   int32(spec.MaxMsgSize),
-		Storage:      storage,
-		Discard:      discard,
-		Replicas:     spec.Replicas,
-		NoAck:        spec.NoAck,
-		Duplicates:   duplicates,
-		AllowDirect:  spec.AllowDirect,
+		Name:          spec.Name,
+		Retention:     retention,
+		Subjects:      spec.Subjects,
+		MaxConsumers:  spec.MaxConsumers,
+		MaxMsgs:       int64(spec.MaxMsgs),
+		MaxBytes:      int64(spec.MaxBytes),
+		MaxAge:        maxAge,
+		MaxMsgSize:    int32(spec.MaxMsgSize),
+		Storage:       storage,
+		Discard:       discard,
+		Replicas:      spec.Replicas,
+		NoAck:         spec.NoAck,
+		Duplicates:    duplicates,
+		AllowDirect:   spec.AllowDirect,
+		DenyDelete:    spec.DenyDelete,
+		RollupAllowed: spec.AllowRollup,
 	}
 	if spec.Republish != nil {
 		config.RePublish = &jsmapi.RePublish{
