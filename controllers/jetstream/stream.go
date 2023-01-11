@@ -369,6 +369,10 @@ func createStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 		}))
 	}
 
+	if spec.AllowDirect {
+		opts = append(opts, jsm.AllowDirect())
+	}
+
 	_, err = c.NewStream(ctx, spec.Name, opts)
 	return err
 }
@@ -413,6 +417,7 @@ func updateStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 		Replicas:     spec.Replicas,
 		NoAck:        spec.NoAck,
 		Duplicates:   duplicates,
+		AllowDirect:  spec.AllowDirect,
 	}
 	if spec.Republish != nil {
 		config.RePublish = &jsmapi.RePublish{

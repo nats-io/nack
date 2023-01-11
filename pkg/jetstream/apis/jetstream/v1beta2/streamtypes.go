@@ -23,6 +23,7 @@ func (s *Stream) GetSpec() interface{} {
 // StreamSpec is the spec for a Stream resource
 type StreamSpec struct {
 	Account           string           `json:"account"`
+	AllowDirect       bool             `json:"allowDirect"`
 	Creds             string           `json:"creds"`
 	Description       string           `json:"description"`
 	PreventDelete     bool             `json:"preventDelete"`
