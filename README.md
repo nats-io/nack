@@ -1,7 +1,6 @@
 <img width="800" alt="nack-large" src="https://user-images.githubusercontent.com/26195/92535603-71ad9a80-f1ec-11ea-8959-cdc22b31b84a.png">
 
 [![License][License-Image]][License-Url]
-[![Version](https://d25lcipzij17d.cloudfront.net/badge.svg?id=go&type=5&v=0.9.1)](https://github.com/nats-io/nack/releases/tag/v0.9.1)
 
 [License-Url]: https://www.apache.org/licenses/LICENSE-2.0
 [License-Image]: https://img.shields.io/badge/License-Apache2-blue.svg
@@ -17,7 +16,7 @@ The JetStream controllers allows you to manage [NATS JetStream](https://github.c
 First install the JetStream CRDs:
 
 ```sh
-$ kubectl apply -f https://raw.githubusercontent.com/nats-io/nack/v0.9.1/deploy/crds.yml
+$ kubectl apply -f https://github.com/nats-io/nack/releases/latest/download/crds.yml
 ```
 
 Now install with Helm:
