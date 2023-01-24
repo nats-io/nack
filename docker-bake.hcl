@@ -64,6 +64,7 @@ target "goreleaser" {
     src = "."
   }
   args = {
+    CI = CI
     GITHUB_TOKEN = ""
   }
   dockerfile = "cicd/Dockerfile_goreleaser"
