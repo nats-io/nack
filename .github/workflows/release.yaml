@@ -43,3 +43,8 @@ jobs:
         push: true
         set:
           goreleaser.args.GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
+
+    - name: Attach Release Files
+      run: gh release upload ${{ github.ref_name }} deploy/crds.yml deploy/rbac.yml
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
