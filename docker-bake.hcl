@@ -72,42 +72,42 @@ target "goreleaser" {
 
 target "jetstream-controller" {
   contexts = {
-    base = image_base
+    base  = image_base
     build = "target:goreleaser"
   }
   args = {
     GO_APP = "jetstream-controller"
   }
-  dockerfile = "cicd/Dockerfile"
-  platforms = get_platforms_multiarch()
-  tags = get_tags("jetstream-controller")
-  output = get_output()
+  dockerfile  = "cicd/Dockerfile"
+  platforms   = get_platforms_multiarch()
+  tags        = get_tags("jetstream-controller")
+  output      = get_output()
 }
 
 target "nats-boot-config" {
   contexts = {
-    base = image_base
+    base  = image_base
     build = "target:goreleaser"
   }
   args = {
     GO_APP = "nats-boot-config"
   }
-  dockerfile = "cicd/Dockerfile"
-  platforms = get_platforms_multiarch()
-  tags = get_tags("nats-boot-config")
-  output = get_output()
+  dockerfile  = "cicd/Dockerfile"
+  platforms   = get_platforms_multiarch()
+  tags        = get_tags("nats-boot-config")
+  output      = get_output()
 }
 
 target "nats-server-config-reloader" {
   contexts = {
-    base = image_base
+    base  = image_base
     build = "target:goreleaser"
   }
   args = {
     GO_APP = "nats-server-config-reloader"
   }
-  dockerfile = "cicd/Dockerfile"
-  platforms = get_platforms_multiarch()
-  tags = get_tags("nats-server-config-reloader")
-  output = get_output()
+  dockerfile  = "cicd/Dockerfile"
+  platforms   = get_platforms_multiarch()
+  tags        = get_tags("nats-server-config-reloader")
+  output      = get_output()
 }
