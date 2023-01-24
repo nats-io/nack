@@ -1,0 +1,15 @@
+#syntax=docker/dockerfile-upstream:1.4
+FROM --platform=$BUILDPLATFORM goreleaser
+
+ARG GITHUB_TOKEN
+
+COPY --from=src . /go/src
+
+RUN <<EOT
+  cd /go/src
+  if [[ -z ${GITHUB_TOKEN} ]]; then
+    goreleaser build --rm-dist --skip-validate
+  else
+    goreleaser release --rm-dist
+  fi
+EOT
