@@ -11,7 +11,7 @@ RUN <<EOT
   cd /go/src
   FLAGS="--rm-dist"
   if [[ -z ${GITHUB_TOKEN} ]]; then
-    if [[ ${CI} == "false" ]]; then FLAGS="${FLAGS} --skip-validate --single-target"; fi
+    if [[ ${CI} != "true" ]]; then FLAGS="${FLAGS} --skip-validate --single-target"; fi
     goreleaser build ${FLAGS}
   else
     goreleaser release --rm-dist
