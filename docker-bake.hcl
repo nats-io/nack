@@ -72,8 +72,9 @@ target "goreleaser" {
 
 target "jetstream-controller" {
   contexts = {
-    base  = image_base
-    build = "target:goreleaser"
+    base    = image_base
+    build   = "target:goreleaser"
+    assets  = "cicd/assets"
   }
   args = {
     GO_APP = "jetstream-controller"
@@ -86,8 +87,9 @@ target "jetstream-controller" {
 
 target "nats-boot-config" {
   contexts = {
-    base  = image_base
-    build = "target:goreleaser"
+    base    = image_base
+    build   = "target:goreleaser"
+    assets  = "cicd/assets"
   }
   args = {
     GO_APP = "nats-boot-config"
@@ -100,8 +102,9 @@ target "nats-boot-config" {
 
 target "nats-server-config-reloader" {
   contexts = {
-    base  = image_base
-    build = "target:goreleaser"
+    base    = image_base
+    build   = "target:goreleaser"
+    assets  = "cicd/assets"
   }
   args = {
     GO_APP = "nats-server-config-reloader"
