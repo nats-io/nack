@@ -85,7 +85,7 @@ target "jetstream-controller" {
   output      = get_output()
 }
 
-target "nats-boot-config" {
+target "nats-boot-config-base" {
   contexts = {
     base    = image_base
     build   = "target:goreleaser"
@@ -95,6 +95,21 @@ target "nats-boot-config" {
     GO_APP = "nats-boot-config"
   }
   dockerfile  = "cicd/Dockerfile"
+  platforms   = get_platforms_multiarch()
+}
+
+target "nats-boot-config" {
+  inherits = ["nats-boot-config-base"]
+  contexts = {
+    base     = "target:nats-boot-config-base"
+  }
+
+  dockerfile-inline = <<EOT
+ARG GO_APP
+FROM base
+RUN ln -s /usr/local/bin/$GO_APP /usr/local/bin/nats-pod-bootconfig
+EOT
+
   platforms   = get_platforms_multiarch()
   tags        = get_tags("nats-boot-config")
   output      = get_output()
