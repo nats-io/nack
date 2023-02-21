@@ -225,6 +225,13 @@ func (c *Controller) processStreamObject(str *apis.Stream, jsmc jsmClient) (err 
 		}
 		c.normalEvent(str, "Created", fmt.Sprintf("Created stream %q", spec.Name))
 	case updateOK:
+		if str.Spec.PreventUpdate {
+			c.normalEvent(str, "SkipUpdate", fmt.Sprintf("Skip updating stream %q", spec.Name))
+			if _, err := setStreamOK(c.ctx, str, ifc); err != nil {
+				return err
+			}
+			return nil
+		}
 		c.normalEvent(str, "Updating", fmt.Sprintf("Updating stream %q", spec.Name))
 		if err := natsClientUtil(updateStream); err != nil {
 			return err
@@ -236,6 +243,13 @@ func (c *Controller) processStreamObject(str *apis.Stream, jsmc jsmClient) (err 
 		c.normalEvent(str, "Updated", fmt.Sprintf("Updated stream %q", spec.Name))
 		return nil
 	case deleteOK:
+		if str.Spec.PreventDelete {
+			c.normalEvent(str, "SkipDelete", fmt.Sprintf("Skip deleting stream %q", spec.Name))
+			if _, err := setStreamOK(c.ctx, str, ifc); err != nil {
+				return err
+			}
+			return nil
+		}
 		c.normalEvent(str, "Deleting", fmt.Sprintf("Deleting stream %q", spec.Name))
 		if err := natsClientUtil(deleteStream); err != nil {
 			return err
