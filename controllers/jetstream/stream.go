@@ -31,6 +31,7 @@ import (
 	k8sapi "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	k8smeta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
 )
 
 func (c *Controller) runStreamQueue() {
@@ -517,12 +518,18 @@ func setStreamErrored(ctx context.Context, s *apis.Stream, sif typed.StreamInter
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	res, err := sif.UpdateStatus(ctx, sc, k8smeta.UpdateOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to set stream errored status: %w", err)
-	}
-
-	return res, nil
+	var res *apis.Stream
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		var err error
+		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+		res, err = sif.UpdateStatus(ctx, sc, k8smeta.UpdateOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to set stream errored status: %w", err)
+		}
+		return nil
+	})
+	return res, err
 }
 
 func setStreamOK(ctx context.Context, s *apis.Stream, i typed.StreamInterface) (*apis.Stream, error) {
@@ -540,12 +547,18 @@ func setStreamOK(ctx context.Context, s *apis.Stream, i typed.StreamInterface) (
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	res, err := i.UpdateStatus(ctx, sc, k8smeta.UpdateOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to set stream %q status: %w", s.Spec.Name, err)
-	}
-
-	return res, nil
+	var res *apis.Stream
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		var err error
+		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+		res, err = i.UpdateStatus(ctx, sc, k8smeta.UpdateOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to set stream %q status: %w", s.Spec.Name, err)
+		}
+		return nil
+	})
+	return res, err
 }
 
 func getMaxAge(v string) (time.Duration, error) {
