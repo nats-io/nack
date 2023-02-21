@@ -188,6 +188,13 @@ func (c *Controller) processConsumerObject(cns *apis.Consumer, jsmc jsmClient) (
 		c.normalEvent(cns, "Created",
 			fmt.Sprintf("Created consumer %q on stream %q", spec.DurableName, spec.StreamName))
 	case updateOK:
+		if cns.Spec.PreventUpdate {
+			c.normalEvent(cns, "SkipUpdate", fmt.Sprintf("Skip updating consumer %q on stream %q", spec.DurableName, spec.StreamName))
+			if _, err := setConsumerOK(c.ctx, cns, ifc); err != nil {
+				return err
+			}
+			return nil
+		}
 		c.normalEvent(cns, "Updating", fmt.Sprintf("Updating consumer %q on stream %q", spec.DurableName, spec.StreamName))
 		if err := natsClientUtil(updateConsumer); err != nil {
 			return err
@@ -198,6 +205,13 @@ func (c *Controller) processConsumerObject(cns *apis.Consumer, jsmc jsmClient) (
 		}
 		c.normalEvent(cns, "Updated", fmt.Sprintf("Updated consumer %q on stream %q", spec.DurableName, spec.StreamName))
 	case deleteOK:
+		if cns.Spec.PreventDelete {
+			c.normalEvent(cns, "SkipDelete", fmt.Sprintf("Skip deleting consumer %q on stream %q", spec.DurableName, spec.StreamName))
+			if _, err := setConsumerOK(c.ctx, cns, ifc); err != nil {
+				return err
+			}
+			return nil
+		}
 		c.normalEvent(cns, "Deleting", fmt.Sprintf("Deleting consumer %q on stream %q", spec.DurableName, spec.StreamName))
 		if err := natsClientUtil(deleteConsumer); err != nil {
 			return err
