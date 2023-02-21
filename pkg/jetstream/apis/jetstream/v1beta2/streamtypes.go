@@ -29,6 +29,7 @@ type StreamSpec struct {
 	DenyDelete        bool             `json:"denyDelete"`
 	Description       string           `json:"description"`
 	PreventDelete     bool             `json:"preventDelete"`
+	PreventUpdate     bool             `json:"preventUpdate"`
 	Discard           string           `json:"discard"`
 	DuplicateWindow   string           `json:"duplicateWindow"`
 	MaxAge            string           `json:"maxAge"`
