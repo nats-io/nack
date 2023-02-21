@@ -29,8 +29,10 @@ import (
 	"github.com/nats-io/nats.go"
 
 	k8sapi "k8s.io/api/core/v1"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	k8smeta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
+
+	klog "k8s.io/klog/v2"
 )
 
 func (c *Controller) runStreamQueue() {
@@ -40,10 +42,11 @@ func (c *Controller) runStreamQueue() {
 }
 
 func (c *Controller) processStream(ns, name string, jsmc jsmClient) (err error) {
-	str, err := c.strLister.Streams(ns).Get(name)
-	if err != nil && k8serrors.IsNotFound(err) {
-		return nil
-	} else if err != nil {
+	ctx, done := context.WithTimeout(context.Background(), 5*time.Second)
+	defer done()
+
+	str, err := c.ji.Streams(ns).Get(ctx, name, k8smeta.GetOptions{})
+	if err != nil {
 		return err
 	}
 
@@ -71,8 +74,10 @@ func (c *Controller) processStreamObject(str *apis.Stream, jsmc jsmClient) (err 
 	)
 	if spec.Account != "" && c.opts.CRDConnect {
 		// Lookup the account.
+		ctx, done := context.WithTimeout(context.Background(), 5*time.Second)
+		defer done()
 		var err error
-		acc, err = c.accLister.Accounts(ns).Get(spec.Account)
+		acc, err = c.ji.Accounts(ns).Get(ctx, spec.Account, k8smeta.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -132,7 +137,7 @@ func (c *Controller) processStreamObject(str *apis.Stream, jsmc jsmClient) (err 
 			return
 		}
 
-		if _, serr := setStreamErrored(c.ctx, str, ifc, err); serr != nil {
+		if _, serr := setStreamErrored(c.ctx, c, str, ifc, err); serr != nil {
 			err = fmt.Errorf("%s: %w", err, serr)
 		}
 	}()
@@ -200,48 +205,76 @@ func (c *Controller) processStreamObject(str *apis.Stream, jsmc jsmClient) (err 
 		return nil
 	}
 
-	deleteOK := str.GetDeletionTimestamp() != nil
-	newGeneration := str.Generation != str.Status.ObservedGeneration
-	strOK := true
+	var (
+		streamFoundInServer bool
+		shouldUpdate        bool
+		shouldCreate        bool
+		shouldDelete        = str.GetDeletionTimestamp() != nil
+	)
 	err = natsClientUtil(streamExists)
 	var apierr jsmapi.ApiError
 	if errors.As(err, &apierr) && apierr.NotFoundError() {
-		strOK = false
+		if !shouldDelete {
+			shouldCreate = true
+		}
 	} else if err != nil {
 		return err
+	} else {
+		streamFoundInServer = true
+		if !shouldDelete {
+			shouldUpdate = str.Generation != str.Status.ObservedGeneration
+		}
 	}
-	updateOK := (strOK && !deleteOK && newGeneration)
-	createOK := (!strOK && !deleteOK && newGeneration)
 
 	switch {
-	case createOK:
+	case !streamFoundInServer && shouldCreate:
 		c.normalEvent(str, "Creating", fmt.Sprintf("Creating stream %q", spec.Name))
 		if err := natsClientUtil(createStream); err != nil {
 			return err
 		}
 
-		if _, err := setStreamOK(c.ctx, str, ifc); err != nil {
+		if _, err := setStreamOK(c.ctx, c, str, ifc); err != nil {
 			return err
 		}
 		c.normalEvent(str, "Created", fmt.Sprintf("Created stream %q", spec.Name))
-	case updateOK:
+	case streamFoundInServer && shouldUpdate:
+		if str.Spec.PreventUpdate {
+			c.normalEvent(str, "SkipUpdate", fmt.Sprintf("Skip updating stream %q", spec.Name))
+			if _, err := setStreamOK(c.ctx, c, str, ifc); err != nil {
+				return err
+			}
+			return nil
+		}
 		c.normalEvent(str, "Updating", fmt.Sprintf("Updating stream %q", spec.Name))
 		if err := natsClientUtil(updateStream); err != nil {
 			return err
 		}
 
-		if _, err := setStreamOK(c.ctx, str, ifc); err != nil {
+		if _, err := setStreamOK(c.ctx, c, str, ifc); err != nil {
 			return err
 		}
 		c.normalEvent(str, "Updated", fmt.Sprintf("Updated stream %q", spec.Name))
 		return nil
-	case deleteOK:
+	case streamFoundInServer && shouldDelete:
+		if str.Spec.PreventDelete {
+			c.normalEvent(str, "SkipDelete", fmt.Sprintf("Skip deleting stream %q", spec.Name))
+			if _, err := setStreamOK(c.ctx, c, str, ifc); err != nil {
+				return err
+			}
+			return nil
+		}
 		c.normalEvent(str, "Deleting", fmt.Sprintf("Deleting stream %q", spec.Name))
 		if err := natsClientUtil(deleteStream); err != nil {
 			return err
 		}
 	default:
-		c.warningEvent(str, "Noop", fmt.Sprintf("Nothing done for stream %q", spec.Name))
+		c.normalEvent(str, "Noop", fmt.Sprintf("Nothing done for stream %q (found-in-nats=%v, prevent-delete=%v, prevent-update=%v)",
+			spec.Name, streamFoundInServer, spec.PreventDelete, spec.PreventUpdate,
+		))
+		// Noop events only update the status of the CRD.
+		if _, err := setStreamOK(c.ctx, c, str, ifc); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -465,7 +498,7 @@ func deleteStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 	}()
 
 	if spec.PreventDelete {
-		fmt.Printf("Stream %q is configured to preventDelete:\n", name)
+		klog.Infof("Stream %q is configured to preventDelete", name)
 		return nil
 	}
 
@@ -480,52 +513,65 @@ func deleteStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 	return str.Delete()
 }
 
-func setStreamErrored(ctx context.Context, s *apis.Stream, sif typed.StreamInterface, err error) (*apis.Stream, error) {
+func setStreamErrored(ctx context.Context, c *Controller, s *apis.Stream, sif typed.StreamInterface, err error) (*apis.Stream, error) {
 	if err == nil {
 		return s, nil
 	}
+	var res *apis.Stream
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		// Get latest state before updating the status.
+		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
 
-	sc := s.DeepCopy()
-	sc.Status.Conditions = upsertCondition(sc.Status.Conditions, apis.Condition{
-		Type:               readyCondType,
-		Status:             k8sapi.ConditionFalse,
-		LastTransitionTime: time.Now().UTC().Format(time.RFC3339Nano),
-		Reason:             "Errored",
-		Message:            err.Error(),
+		sc, err2 := sif.Get(ctx, s.Name, k8smeta.GetOptions{})
+		if err2 != nil {
+			return err2
+		}
+		sc.Status.ObservedGeneration = sc.Generation
+		sc.Status.Conditions = []apis.Condition{{
+			Type:               readyCondType,
+			Status:             k8sapi.ConditionFalse,
+			LastTransitionTime: time.Now().UTC().Format(time.RFC3339Nano),
+			Reason:             "Errored",
+			Message:            err.Error(),
+		}}
+		res, err = sif.UpdateStatus(ctx, sc, k8smeta.UpdateOptions{})
+		if err != nil {
+			return err
+		}
+		return nil
 	})
-
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	res, err := sif.UpdateStatus(ctx, sc, k8smeta.UpdateOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to set stream errored status: %w", err)
-	}
-
-	return res, nil
+	return res, err
 }
 
-func setStreamOK(ctx context.Context, s *apis.Stream, i typed.StreamInterface) (*apis.Stream, error) {
-	sc := s.DeepCopy()
+func setStreamOK(ctx context.Context, c *Controller, s *apis.Stream, i typed.StreamInterface) (*apis.Stream, error) {
+	var err error
+	var res *apis.Stream
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		// Get latest state before updating the status.
+		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
 
-	sc.Status.ObservedGeneration = s.Generation
-	sc.Status.Conditions = upsertCondition(sc.Status.Conditions, apis.Condition{
-		Type:               readyCondType,
-		Status:             k8sapi.ConditionTrue,
-		LastTransitionTime: time.Now().UTC().Format(time.RFC3339Nano),
-		Reason:             "Created",
-		Message:            "Stream successfully created",
+		stream, err := i.Get(ctx, s.Name, k8smeta.GetOptions{})
+		if err != nil {
+			return err
+		}
+		sc := stream.DeepCopy()
+		sc.Status.ObservedGeneration = s.Generation
+		sc.Status.Conditions = []apis.Condition{{
+			Type:               readyCondType,
+			Status:             k8sapi.ConditionTrue,
+			Reason:             "Created",
+			Message:            "Stream successfully created",
+			LastTransitionTime: time.Now().UTC().Format(time.RFC3339Nano),
+		}}
+		res, err = i.UpdateStatus(ctx, sc, k8smeta.UpdateOptions{})
+		if err != nil {
+			return err
+		}
+		return nil
 	})
-
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	res, err := i.UpdateStatus(ctx, sc, k8smeta.UpdateOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to set stream %q status: %w", s.Spec.Name, err)
-	}
-
-	return res, nil
+	return res, err
 }
 
 func getMaxAge(v string) (time.Duration, error) {
