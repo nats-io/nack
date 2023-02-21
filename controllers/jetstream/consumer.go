@@ -17,8 +17,9 @@ import (
 	"github.com/nats-io/nats.go"
 
 	k8sapi "k8s.io/api/core/v1"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	k8smeta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
+	klog "k8s.io/klog/v2"
 )
 
 func (c *Controller) runConsumerQueue() {
@@ -28,10 +29,11 @@ func (c *Controller) runConsumerQueue() {
 }
 
 func (c *Controller) processConsumer(ns, name string, jsmc jsmClient) (err error) {
-	cns, err := c.cnsLister.Consumers(ns).Get(name)
-	if err != nil && k8serrors.IsNotFound(err) {
-		return nil
-	} else if err != nil {
+	ctx, done := context.WithTimeout(context.Background(), 5*time.Second)
+	defer done()
+
+	cns, err := c.ji.Consumers(ns).Get(ctx, name, k8smeta.GetOptions{})
+	if err != nil {
 		return err
 	}
 
@@ -57,7 +59,9 @@ func (c *Controller) processConsumerObject(cns *apis.Consumer, jsmc jsmClient) (
 	)
 	if spec.Account != "" && c.opts.CRDConnect {
 		// Lookup the account.
-		acc, err := c.accLister.Accounts(ns).Get(spec.Account)
+		ctx, done := context.WithTimeout(context.Background(), 5*time.Second)
+		defer done()
+		acc, err := c.ji.Accounts(ns).Get(ctx, spec.Account, k8smeta.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -95,7 +99,7 @@ func (c *Controller) processConsumerObject(cns *apis.Consumer, jsmc jsmClient) (
 			return
 		}
 
-		if _, serr := setConsumerErrored(c.ctx, cns, ifc, err); serr != nil {
+		if _, serr := setConsumerErrored(c.ctx, c, cns, ifc, err); serr != nil {
 			err = fmt.Errorf("%s: %w", err, serr)
 		}
 	}()
@@ -139,7 +143,7 @@ func (c *Controller) processConsumerObject(cns *apis.Consumer, jsmc jsmClient) (
 			natsServers := strings.Join(append(servers, accServers...), ",")
 			newNc, err := nats.Connect(natsServers, opts...)
 			if err != nil {
-				return fmt.Errorf("failed to connect to leaf nats(%s): %w", natsServers, err)
+				return fmt.Errorf("failed to CONNECT to nats(%s): %w", natsServers, err)
 			}
 
 			c.normalEvent(cns, "Connecting", "Connecting to new nats-servers")
@@ -161,49 +165,77 @@ func (c *Controller) processConsumerObject(cns *apis.Consumer, jsmc jsmClient) (
 		return nil
 	}
 
-	deleteOK := cns.GetDeletionTimestamp() != nil
-	newGeneration := cns.Generation != cns.Status.ObservedGeneration
-	consumerOK := true
+	var (
+		consumerFoundInServer bool
+		shouldUpdate          bool
+		shouldCreate          bool
+		shouldDelete          = cns.GetDeletionTimestamp() != nil
+	)
 	err = natsClientUtil(consumerExists)
 	var apierr jsmapi.ApiError
 	if errors.As(err, &apierr) && apierr.NotFoundError() {
-		consumerOK = false
+		if !shouldDelete {
+			shouldCreate = true
+		}
 	} else if err != nil {
 		return err
+	} else {
+		consumerFoundInServer = true
+		if !shouldDelete {
+			shouldUpdate = cns.Generation != cns.Status.ObservedGeneration
+		}
 	}
-	updateOK := (consumerOK && !deleteOK && newGeneration)
-	createOK := (!consumerOK && !deleteOK && newGeneration)
 
 	switch {
-	case createOK:
+	case !consumerFoundInServer && shouldCreate:
 		c.normalEvent(cns, "Creating",
 			fmt.Sprintf("Creating consumer %q on stream %q", spec.DurableName, spec.StreamName))
 		if err := natsClientUtil(createConsumer); err != nil {
 			return err
 		}
 
-		if _, err := setConsumerOK(c.ctx, cns, ifc); err != nil {
+		if _, err := setConsumerOK(c.ctx, c, cns, ifc); err != nil {
 			return err
 		}
 		c.normalEvent(cns, "Created",
 			fmt.Sprintf("Created consumer %q on stream %q", spec.DurableName, spec.StreamName))
-	case updateOK:
+	case consumerFoundInServer && shouldUpdate:
+		if cns.Spec.PreventUpdate {
+			c.normalEvent(cns, "SkipUpdate", fmt.Sprintf("Skip updating consumer %q on stream %q", spec.DurableName, spec.StreamName))
+			if _, err := setConsumerOK(c.ctx, c, cns, ifc); err != nil {
+				return err
+			}
+			return nil
+		}
 		c.normalEvent(cns, "Updating", fmt.Sprintf("Updating consumer %q on stream %q", spec.DurableName, spec.StreamName))
 		if err := natsClientUtil(updateConsumer); err != nil {
 			return err
 		}
 
-		if _, err := setConsumerOK(c.ctx, cns, ifc); err != nil {
+		if _, err := setConsumerOK(c.ctx, c, cns, ifc); err != nil {
 			return err
 		}
 		c.normalEvent(cns, "Updated", fmt.Sprintf("Updated consumer %q on stream %q", spec.DurableName, spec.StreamName))
-	case deleteOK:
+	case consumerFoundInServer && shouldDelete:
+		if cns.Spec.PreventDelete {
+			c.normalEvent(cns, "SkipDelete", fmt.Sprintf("Skip deleting consumer %q on stream %q", spec.DurableName, spec.StreamName))
+			if _, err := setConsumerOK(c.ctx, c, cns, ifc); err != nil {
+				return err
+			}
+			return nil
+		}
+
 		c.normalEvent(cns, "Deleting", fmt.Sprintf("Deleting consumer %q on stream %q", spec.DurableName, spec.StreamName))
 		if err := natsClientUtil(deleteConsumer); err != nil {
 			return err
 		}
 	default:
-		c.warningEvent(cns, "Noop", fmt.Sprintf("Nothing done for consumer %q", spec.DurableName))
+		c.normalEvent(cns, "Noop", fmt.Sprintf("Nothing done for consumer %q (found-in-nats=%v, prevent-delete=%v, prevent-update=%v)",
+			spec.DurableName, consumerFoundInServer, spec.PreventDelete, spec.PreventUpdate,
+		))
+		if _, err := setConsumerOK(c.ctx, c, cns, ifc); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -388,7 +420,7 @@ func deleteConsumer(ctx context.Context, c jsmClient, spec apis.ConsumerSpec) (e
 	}()
 
 	if spec.PreventDelete {
-		fmt.Printf("Consumer %q is configured to preventDelete on stream %q:\n", stream, consumer)
+		klog.Infof("Consumer %q is configured to preventDelete on stream %q", stream, consumer)
 		return nil
 	}
 
@@ -403,50 +435,62 @@ func deleteConsumer(ctx context.Context, c jsmClient, spec apis.ConsumerSpec) (e
 	return cn.Delete()
 }
 
-func setConsumerOK(ctx context.Context, s *apis.Consumer, i typed.ConsumerInterface) (*apis.Consumer, error) {
-	sc := s.DeepCopy()
+func setConsumerOK(ctx context.Context, c *Controller, s *apis.Consumer, i typed.ConsumerInterface) (*apis.Consumer, error) {
+	var res *apis.Consumer
+	var err error
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
 
-	sc.Status.ObservedGeneration = s.Generation
-	sc.Status.Conditions = upsertCondition(sc.Status.Conditions, apis.Condition{
-		Type:               readyCondType,
-		Status:             k8sapi.ConditionTrue,
-		LastTransitionTime: time.Now().UTC().Format(time.RFC3339Nano),
-		Reason:             "Created",
-		Message:            "Consumer successfully created",
+		// Get latest state before updating the status.
+		sc, err := i.Get(ctx, s.Name, k8smeta.GetOptions{})
+		if err != nil {
+			return err
+		}
+		sc.Status.Conditions = []apis.Condition{{
+			Type:               readyCondType,
+			Status:             k8sapi.ConditionTrue,
+			LastTransitionTime: time.Now().UTC().Format(time.RFC3339Nano),
+			Reason:             "Created",
+			Message:            "Consumer successfully created",
+		}}
+
+		res, err = i.UpdateStatus(ctx, sc, k8smeta.UpdateOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to set consumer %q status: %w", s.Spec.DurableName, err)
+		}
+		return nil
 	})
 
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	res, err := i.UpdateStatus(ctx, sc, k8smeta.UpdateOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to set consumer %q status: %w", s.Spec.DurableName, err)
-	}
-
-	return res, nil
+	return res, err
 }
 
-func setConsumerErrored(ctx context.Context, s *apis.Consumer, sif typed.ConsumerInterface, err error) (*apis.Consumer, error) {
+func setConsumerErrored(ctx context.Context, c *Controller, s *apis.Consumer, sif typed.ConsumerInterface, err error) (*apis.Consumer, error) {
 	if err == nil {
 		return s, nil
 	}
+	var res *apis.Consumer
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
 
-	sc := s.DeepCopy()
-	sc.Status.Conditions = upsertCondition(sc.Status.Conditions, apis.Condition{
-		Type:               readyCondType,
-		Status:             k8sapi.ConditionFalse,
-		LastTransitionTime: time.Now().UTC().Format(time.RFC3339Nano),
-		Reason:             "Errored",
-		Message:            err.Error(),
+		// Get latest state before updating the status.
+		sc, err2 := sif.Get(ctx, s.Name, k8smeta.GetOptions{})
+		if err2 != nil {
+			return err2
+		}
+		sc.Status.Conditions = []apis.Condition{{
+			Type:               readyCondType,
+			Status:             k8sapi.ConditionFalse,
+			LastTransitionTime: time.Now().UTC().Format(time.RFC3339Nano),
+			Reason:             "Errored",
+			Message:            err.Error(),
+		}}
+		res, err = sif.UpdateStatus(ctx, sc, k8smeta.UpdateOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to set consumer errored status: %w", err)
+		}
+		return nil
 	})
-
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	res, err := sif.UpdateStatus(ctx, sc, k8smeta.UpdateOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to set consumer errored status: %w", err)
-	}
-
-	return res, nil
+	return res, err
 }

@@ -548,10 +548,10 @@ func setStreamOK(ctx context.Context, c *Controller, s *apis.Stream, i typed.Str
 	var err error
 	var res *apis.Stream
 	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		// Get latest state before updating the status.
 		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()
 
+		// Get latest state before updating the status.
 		stream, err := i.Get(ctx, s.Name, k8smeta.GetOptions{})
 		if err != nil {
 			return err
