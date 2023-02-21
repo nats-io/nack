@@ -407,6 +407,7 @@ func processQueueNext(q workqueue.RateLimitingInterface, c jsmClient, process pr
 	}
 
 	err = process(ns, name, c)
+	klog.Infof("ProcessingEntry(ns=%v,name=%v,err=%v)", ns, name, err)
 	if err == nil {
 		// Item processed successfully, don't requeue.
 		q.Forget(item)
