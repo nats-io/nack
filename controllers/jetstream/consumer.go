@@ -217,7 +217,12 @@ func (c *Controller) processConsumerObject(cns *apis.Consumer, jsmc jsmClient) (
 			return err
 		}
 	default:
-		c.warningEvent(cns, "Noop", fmt.Sprintf("Nothing done for consumer %q", spec.DurableName))
+		c.normalEvent(cns, "Noop", fmt.Sprintf("Nothing done for consumer %q (prevent-delete=%v, prevent-update=%v)",
+			spec.DurableName, spec.PreventDelete, spec.PreventUpdate,
+		))
+		if _, err := setConsumerOK(c.ctx, cns, ifc); err != nil {
+			return err
+		}
 	}
 
 	return nil

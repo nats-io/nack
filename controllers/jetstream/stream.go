@@ -255,7 +255,13 @@ func (c *Controller) processStreamObject(str *apis.Stream, jsmc jsmClient) (err 
 			return err
 		}
 	default:
-		c.warningEvent(str, "Noop", fmt.Sprintf("Nothing done for stream %q", spec.Name))
+		c.normalEvent(str, "Noop", fmt.Sprintf("Nothing done for stream %q (prevent-delete=%v, prevent-update=%v)",
+			spec.Name, spec.PreventDelete, spec.PreventUpdate,
+		))
+		// Noop events only update the status of the CRD.
+		if _, err := setStreamOK(c.ctx, str, ifc); err != nil {
+			return err
+		}
 	}
 
 	return nil
