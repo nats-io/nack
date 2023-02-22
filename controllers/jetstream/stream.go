@@ -440,6 +440,7 @@ func updateStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 
 	config := jsmapi.StreamConfig{
 		Name:          spec.Name,
+		Description:   spec.Description,
 		Retention:     retention,
 		Subjects:      spec.Subjects,
 		MaxConsumers:  spec.MaxConsumers,
