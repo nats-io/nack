@@ -73,9 +73,10 @@ func (c *Controller) processStreamObject(str *apis.Stream, jsmc jsmClient) (err 
 		accUserCreds     string
 	)
 	if spec.Account != "" && c.opts.CRDConnect {
-		// Lookup the account.
-		var err error
-		acc, err = c.accLister.Accounts(ns).Get(spec.Account)
+		// Lookup the account using the REST client.
+		ctx, done := context.WithTimeout(context.Background(), 5*time.Second)
+		defer done()
+		acc, err = c.ji.Accounts(ns).Get(ctx, spec.Account, k8smeta.GetOptions{})
 		if err != nil {
 			return err
 		}
