@@ -32,6 +32,7 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	k8smeta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
+	klog "k8s.io/klog/v2"
 )
 
 func (c *Controller) runStreamQueue() {
@@ -61,6 +62,7 @@ func (c *Controller) processStreamObject(str *apis.Stream, jsmc jsmClient) (err 
 	spec := str.Spec
 	ifc := c.ji.Streams(str.Namespace)
 	ns := str.Namespace
+	readOnly := c.opts.ReadOnly
 
 	var (
 		remoteClientCert string
@@ -71,9 +73,10 @@ func (c *Controller) processStreamObject(str *apis.Stream, jsmc jsmClient) (err 
 		accUserCreds     string
 	)
 	if spec.Account != "" && c.opts.CRDConnect {
-		// Lookup the account.
-		var err error
-		acc, err = c.accLister.Accounts(ns).Get(spec.Account)
+		// Lookup the account using the REST client.
+		ctx, done := context.WithTimeout(context.Background(), 5*time.Second)
+		defer done()
+		acc, err = c.ji.Accounts(ns).Get(ctx, spec.Account, k8smeta.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -216,6 +219,10 @@ func (c *Controller) processStreamObject(str *apis.Stream, jsmc jsmClient) (err 
 
 	switch {
 	case createOK:
+		if readOnly {
+			c.normalEvent(str, "SkipCreate", fmt.Sprintf("Skip creating stream %q", spec.Name))
+			return nil
+		}
 		c.normalEvent(str, "Creating", fmt.Sprintf("Creating stream %q", spec.Name))
 		if err := natsClientUtil(createStream); err != nil {
 			return err
@@ -226,7 +233,7 @@ func (c *Controller) processStreamObject(str *apis.Stream, jsmc jsmClient) (err 
 		}
 		c.normalEvent(str, "Created", fmt.Sprintf("Created stream %q", spec.Name))
 	case updateOK:
-		if str.Spec.PreventUpdate {
+		if str.Spec.PreventUpdate || readOnly {
 			c.normalEvent(str, "SkipUpdate", fmt.Sprintf("Skip updating stream %q", spec.Name))
 			if _, err := setStreamOK(c.ctx, str, ifc); err != nil {
 				return err
@@ -244,7 +251,7 @@ func (c *Controller) processStreamObject(str *apis.Stream, jsmc jsmClient) (err 
 		c.normalEvent(str, "Updated", fmt.Sprintf("Updated stream %q", spec.Name))
 		return nil
 	case deleteOK:
-		if str.Spec.PreventDelete {
+		if str.Spec.PreventDelete || readOnly {
 			c.normalEvent(str, "SkipDelete", fmt.Sprintf("Skip deleting stream %q", spec.Name))
 			if _, err := setStreamOK(c.ctx, str, ifc); err != nil {
 				return err
@@ -434,6 +441,7 @@ func updateStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 
 	config := jsmapi.StreamConfig{
 		Name:          spec.Name,
+		Description:   spec.Description,
 		Retention:     retention,
 		Subjects:      spec.Subjects,
 		MaxConsumers:  spec.MaxConsumers,
@@ -486,7 +494,7 @@ func deleteStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 	}()
 
 	if spec.PreventDelete {
-		fmt.Printf("Stream %q is configured to preventDelete:\n", name)
+		klog.Infof("Stream %q is configured to preventDelete:\n", name)
 		return nil
 	}
 

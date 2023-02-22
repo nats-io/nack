@@ -20,6 +20,7 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	k8smeta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
+	klog "k8s.io/klog/v2"
 )
 
 func (c *Controller) runConsumerQueue() {
@@ -57,8 +58,10 @@ func (c *Controller) processConsumerObject(cns *apis.Consumer, jsmc jsmClient) (
 		accServers       []string
 	)
 	if spec.Account != "" && c.opts.CRDConnect {
-		// Lookup the account.
-		acc, err := c.accLister.Accounts(ns).Get(spec.Account)
+		// Lookup the account using the REST client.
+		ctx, done := context.WithTimeout(context.Background(), 5*time.Second)
+		defer done()
+		acc, err := c.ji.Accounts(ns).Get(ctx, spec.Account, k8smeta.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -89,6 +92,7 @@ func (c *Controller) processConsumerObject(cns *apis.Consumer, jsmc jsmClient) (
 				}
 			}
 		}
+		// FIXME: Add support for UserCredentials for consumer.
 	}
 
 	defer func() {
@@ -408,7 +412,7 @@ func deleteConsumer(ctx context.Context, c jsmClient, spec apis.ConsumerSpec) (e
 	}()
 
 	if spec.PreventDelete {
-		fmt.Printf("Consumer %q is configured to preventDelete on stream %q:\n", stream, consumer)
+		klog.Infof("Consumer %q is configured to preventDelete on stream %q:", stream, consumer)
 		return nil
 	}
 

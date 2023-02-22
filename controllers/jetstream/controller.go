@@ -33,6 +33,7 @@ import (
 
 	k8sapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	k8smeta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -76,6 +77,7 @@ type Options struct {
 	Namespace     string
 	CRDConnect    bool
 	CleanupPeriod time.Duration
+	ReadOnly      bool
 
 	Recorder record.EventRecorder
 }
@@ -238,7 +240,7 @@ func (c *Controller) Run() error {
 	return nil
 }
 
-func deletedStreams(prev, cur map[string]*apis.Stream) []*apis.Stream {
+func selectMissingStreamsFromList(prev, cur map[string]*apis.Stream) []*apis.Stream {
 	var deleted []*apis.Stream
 	for name, ps := range prev {
 		if _, ok := cur[name]; !ok {
@@ -248,7 +250,7 @@ func deletedStreams(prev, cur map[string]*apis.Stream) []*apis.Stream {
 	return deleted
 }
 
-func streamMap(ss []*apis.Stream) map[string]*apis.Stream {
+func streamsMap(ss []*apis.Stream) map[string]*apis.Stream {
 	m := make(map[string]*apis.Stream)
 	for _, s := range ss {
 		m[fmt.Sprintf("%s/%s", s.Namespace, s.Name)] = s
@@ -257,9 +259,13 @@ func streamMap(ss []*apis.Stream) map[string]*apis.Stream {
 }
 
 func (c *Controller) cleanupStreams() error {
+	if c.opts.ReadOnly {
+		return nil
+	}
 	tick := time.NewTicker(c.opts.CleanupPeriod)
 	defer tick.Stop()
 
+	// Track the Stream CRDs that may have been created.
 	var prevStreams map[string]*apis.Stream
 	for {
 		select {
@@ -271,23 +277,40 @@ func (c *Controller) cleanupStreams() error {
 				klog.Infof("failed to list streams for cleanup: %s", err)
 				continue
 			}
-			sm := streamMap(streams)
-
-			for _, s := range deletedStreams(prevStreams, sm) {
-				t := k8smeta.NewTime(time.Now())
-				s.DeletionTimestamp = &t
-				if err := c.processStreamObject(s, &realJsmClient{jm: c.jm}); err != nil {
-					klog.Infof("failed to delete stream %s/%s: %s", s.Namespace, s.Name, err)
-					continue
+			sm := streamsMap(streams)
+			missing := selectMissingStreamsFromList(prevStreams, sm)
+			for _, s := range missing {
+				// A stream that we were tracking but that for some reason
+				// was not part of the latest list shared by informer.
+				// Need to double check whether the stream is present before
+				// considering deletion.
+				klog.Infof("stream %s/%s might be missing, looking it up...", s.Namespace, s.Name)
+				ctx, done := context.WithTimeout(context.Background(), 10*time.Second)
+				defer done()
+				_, err := c.ji.Streams(s.Namespace).Get(ctx, s.Name, k8smeta.GetOptions{})
+				if err != nil {
+					if k8serrors.IsNotFound(err) {
+						klog.Infof("stream %s/%s was not found anymore, deleting from JetStream", s.Namespace, s.Name)
+						t := k8smeta.NewTime(time.Now())
+						s.DeletionTimestamp = &t
+						if err := c.processStreamObject(s, &realJsmClient{jm: c.jm}); err != nil && !k8serrors.IsNotFound(err) {
+							klog.Infof("failed to delete stream %s/%s: %s", s.Namespace, s.Name, err)
+							continue
+						}
+						klog.Infof("deleted stream %s/%s from JetStream", s.Namespace, s.Name)
+					} else {
+						klog.Warningf("error looking up stream %s/%s", s.Namespace, s.Name)
+					}
+				} else {
+					klog.Infof("found stream %s/%s, no further action needed", s.Namespace, s.Name)
 				}
-				klog.Infof("deleted stream %s/%s", s.Namespace, s.Name)
 			}
 			prevStreams = sm
 		}
 	}
 }
 
-func deletedConsumers(prev, cur map[string]*apis.Consumer) []*apis.Consumer {
+func selectMissingConsumersFromList(prev, cur map[string]*apis.Consumer) []*apis.Consumer {
 	var deleted []*apis.Consumer
 	for name, ps := range prev {
 		if _, ok := cur[name]; !ok {
@@ -306,9 +329,13 @@ func consumerMap(cs []*apis.Consumer) map[string]*apis.Consumer {
 }
 
 func (c *Controller) cleanupConsumers() error {
+	if c.opts.ReadOnly {
+		return nil
+	}
 	tick := time.NewTicker(c.opts.CleanupPeriod)
 	defer tick.Stop()
 
+	// Track consumers that may have been deleted.
 	var prevConsumers map[string]*apis.Consumer
 	for {
 		select {
@@ -321,15 +348,32 @@ func (c *Controller) cleanupConsumers() error {
 				continue
 			}
 			cm := consumerMap(consumers)
-
-			for _, cns := range deletedConsumers(prevConsumers, cm) {
-				t := k8smeta.NewTime(time.Now())
-				cns.DeletionTimestamp = &t
-				if err := c.processConsumerObject(cns, &realJsmClient{jm: c.jm}); err != nil {
-					klog.Infof("failed to delete consumer %s/%s: %s", cns.Namespace, cns.Name, err)
-					continue
+			missing := selectMissingConsumersFromList(prevConsumers, cm)
+			for _, cns := range missing {
+				// A consumer that we were tracking but that for some reason
+				// was not part of the latest list shared by informer.
+				// Need to double check whether the consumer is present before
+				// considering deletion.
+				klog.Infof("consumer %s/%s might be missing, looking it up...", cns.Namespace, cns.Name)
+				ctx, done := context.WithTimeout(context.Background(), 10*time.Second)
+				defer done()
+				_, err := c.ji.Consumers(cns.Namespace).Get(ctx, cns.Name, k8smeta.GetOptions{})
+				if err != nil {
+					if k8serrors.IsNotFound(err) {
+						klog.Infof("consumer %s/%s was not found anymore, deleting from JetStream", cns.Namespace, cns.Name)
+						t := k8smeta.NewTime(time.Now())
+						cns.DeletionTimestamp = &t
+						if err := c.processConsumerObject(cns, &realJsmClient{jm: c.jm}); err != nil && !k8serrors.IsNotFound(err) {
+							klog.Infof("failed to delete consumer %s/%s: %s", cns.Namespace, cns.Name, err)
+							continue
+						}
+						klog.Infof("deleted consumer %s/%s from JetStream", cns.Namespace, cns.Name)
+					} else {
+						klog.Warningf("error looking up consumer %s/%s", cns.Namespace, cns.Name)
+					}
+				} else {
+					klog.Infof("found consumer %s/%s, no further action needed", cns.Namespace, cns.Name)
 				}
-				klog.Infof("deleted consumer %s/%s", cns.Namespace, cns.Name)
 			}
 			prevConsumers = cm
 		}
