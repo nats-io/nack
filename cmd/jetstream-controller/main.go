@@ -60,6 +60,7 @@ func run() error {
 	server := flag.String("s", "", "NATS Server URL")
 	crdConnect := flag.Bool("crd-connect", false, "If true, then NATS connections will be made from CRD config, not global config")
 	cleanupPeriod := flag.Duration("cleanup-period", 30*time.Second, "Period to run object cleanup")
+	readOnly := flag.Bool("read-only", false, "Starts the controller without causing changes to the NATS resources")
 	flag.Parse()
 
 	if *version {
@@ -115,9 +116,13 @@ func run() error {
 		Namespace:       *namespace,
 		CRDConnect:      *crdConnect,
 		CleanupPeriod:   *cleanupPeriod,
+		ReadOnly:        *readOnly,
 	})
 
 	klog.Infof("Starting %s v%s...", os.Args[0], Version)
+	if *readOnly {
+		klog.Infof("Running in read-only mode: JetStream state in server will not be changed")
+	}
 	go handleSignals(cancel)
 	return ctrl.Run()
 }

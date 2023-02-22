@@ -20,6 +20,7 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	k8smeta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
+	klog "k8s.io/klog/v2"
 )
 
 func (c *Controller) runConsumerQueue() {
@@ -408,7 +409,7 @@ func deleteConsumer(ctx context.Context, c jsmClient, spec apis.ConsumerSpec) (e
 	}()
 
 	if spec.PreventDelete {
-		fmt.Printf("Consumer %q is configured to preventDelete on stream %q:\n", stream, consumer)
+		klog.Infof("Consumer %q is configured to preventDelete on stream %q:", stream, consumer)
 		return nil
 	}
 

@@ -32,6 +32,7 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	k8smeta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
+	klog "k8s.io/klog/v2"
 )
 
 func (c *Controller) runStreamQueue() {
@@ -61,6 +62,7 @@ func (c *Controller) processStreamObject(str *apis.Stream, jsmc jsmClient) (err 
 	spec := str.Spec
 	ifc := c.ji.Streams(str.Namespace)
 	ns := str.Namespace
+	readOnly := c.opts.ReadOnly
 
 	var (
 		remoteClientCert string
@@ -216,6 +218,10 @@ func (c *Controller) processStreamObject(str *apis.Stream, jsmc jsmClient) (err 
 
 	switch {
 	case createOK:
+		if readOnly {
+			c.normalEvent(str, "SkipCreate", fmt.Sprintf("Skip creating stream %q", spec.Name))
+			return nil
+		}
 		c.normalEvent(str, "Creating", fmt.Sprintf("Creating stream %q", spec.Name))
 		if err := natsClientUtil(createStream); err != nil {
 			return err
@@ -226,7 +232,7 @@ func (c *Controller) processStreamObject(str *apis.Stream, jsmc jsmClient) (err 
 		}
 		c.normalEvent(str, "Created", fmt.Sprintf("Created stream %q", spec.Name))
 	case updateOK:
-		if str.Spec.PreventUpdate {
+		if str.Spec.PreventUpdate || readOnly {
 			c.normalEvent(str, "SkipUpdate", fmt.Sprintf("Skip updating stream %q", spec.Name))
 			if _, err := setStreamOK(c.ctx, str, ifc); err != nil {
 				return err
@@ -244,7 +250,7 @@ func (c *Controller) processStreamObject(str *apis.Stream, jsmc jsmClient) (err 
 		c.normalEvent(str, "Updated", fmt.Sprintf("Updated stream %q", spec.Name))
 		return nil
 	case deleteOK:
-		if str.Spec.PreventDelete {
+		if str.Spec.PreventDelete || readOnly {
 			c.normalEvent(str, "SkipDelete", fmt.Sprintf("Skip deleting stream %q", spec.Name))
 			if _, err := setStreamOK(c.ctx, str, ifc); err != nil {
 				return err
@@ -486,7 +492,7 @@ func deleteStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 	}()
 
 	if spec.PreventDelete {
-		fmt.Printf("Stream %q is configured to preventDelete:\n", name)
+		klog.Infof("Stream %q is configured to preventDelete:\n", name)
 		return nil
 	}
 

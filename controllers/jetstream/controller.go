@@ -77,6 +77,7 @@ type Options struct {
 	Namespace     string
 	CRDConnect    bool
 	CleanupPeriod time.Duration
+	ReadOnly      bool
 
 	Recorder record.EventRecorder
 }
@@ -258,6 +259,9 @@ func streamsMap(ss []*apis.Stream) map[string]*apis.Stream {
 }
 
 func (c *Controller) cleanupStreams() error {
+	if c.opts.ReadOnly {
+		return nil
+	}
 	tick := time.NewTicker(c.opts.CleanupPeriod)
 	defer tick.Stop()
 
@@ -325,6 +329,9 @@ func consumerMap(cs []*apis.Consumer) map[string]*apis.Consumer {
 }
 
 func (c *Controller) cleanupConsumers() error {
+	if c.opts.ReadOnly {
+		return nil
+	}
 	tick := time.NewTicker(c.opts.CleanupPeriod)
 	defer tick.Stop()
 
