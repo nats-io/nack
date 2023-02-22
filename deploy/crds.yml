@@ -576,9 +576,9 @@ spec:
                 type: boolean
                 default: false
               preventUpdate:
-                 description: When true, the managed Consumer will not be updated when the resource is updated
-                 type: boolean
-                 default: false
+                description: When true, the managed Consumer will not be updated when the resource is updated
+                type: boolean
+                default: false
           status:
             type: object
             properties:
