@@ -474,7 +474,7 @@ spec:
               ackWait:
                 description: How long to allow messages to remain un-acknowledged before attempting redelivery.
                 type: string
-                default: 1ns
+                default: 30s
               maxDeliver:
                 type: integer
                 minimum: -1
@@ -667,7 +667,7 @@ spec:
               ackWait:
                 description: How long to allow messages to remain un-acknowledged before attempting redelivery.
                 type: string
-                default: 1ns
+                default: 30s
               maxDeliver:
                 type: integer
                 minimum: -1
