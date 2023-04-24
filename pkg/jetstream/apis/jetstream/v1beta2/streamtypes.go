@@ -28,6 +28,7 @@ type StreamSpec struct {
 	Creds             string           `json:"creds"`
 	DenyDelete        bool             `json:"denyDelete"`
 	Description       string           `json:"description"`
+	DiscardPerSubject bool             `json:"discardPerSubject"`
 	PreventDelete     bool             `json:"preventDelete"`
 	PreventUpdate     bool             `json:"preventUpdate"`
 	Discard           string           `json:"discard"`
