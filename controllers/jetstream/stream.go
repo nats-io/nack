@@ -451,6 +451,7 @@ func updateStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 		MaxConsumers:  spec.MaxConsumers,
 		MaxMsgs:       int64(spec.MaxMsgs),
 		MaxBytes:      int64(spec.MaxBytes),
+		MaxMsgsPer:    int64(spec.MaxMsgsPerSubject),
 		MaxAge:        maxAge,
 		MaxMsgSize:    int32(spec.MaxMsgSize),
 		Storage:       storage,
