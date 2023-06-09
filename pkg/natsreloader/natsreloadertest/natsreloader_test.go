@@ -2,6 +2,7 @@ package natsreloadertest
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -56,11 +57,10 @@ func TestReloader(t *testing.T) {
 
 	r, err := natsreloader.NewReloader(nconfig)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %s\n", err)
-		os.Exit(1)
+		t.Fatal(err)
 	}
 
-	var signals = 0
+	signals := 0
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -109,7 +109,7 @@ func TestReloader(t *testing.T) {
 	}()
 
 	err = r.Run(ctx)
-	if err != nil && err != context.Canceled {
+	if err != nil && !errors.Is(err, context.Canceled) {
 		t.Fatal(err)
 	}
 	// We should have gotten only one signal for each configuration file
