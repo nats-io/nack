@@ -7,7 +7,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout code
+    - name: Checkout Source
       uses: actions/checkout@v3
 
     - name: Setup Go

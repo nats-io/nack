@@ -17,11 +17,13 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	v1beta2 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
+	jetstreamv1beta2 "github.com/nats-io/nack/pkg/jetstream/generated/applyconfiguration/jetstream/v1beta2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -33,9 +35,9 @@ type FakeAccounts struct {
 	ns   string
 }
 
-var accountsResource = schema.GroupVersionResource{Group: "jetstream.nats.io", Version: "v1beta2", Resource: "accounts"}
+var accountsResource = v1beta2.SchemeGroupVersion.WithResource("accounts")
 
-var accountsKind = schema.GroupVersionKind{Group: "jetstream.nats.io", Version: "v1beta2", Kind: "Account"}
+var accountsKind = v1beta2.SchemeGroupVersion.WithKind("Account")
 
 // Get takes name of the account, and returns the corresponding account object, and an error if there is any.
 func (c *FakeAccounts) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta2.Account, err error) {
@@ -131,6 +133,51 @@ func (c *FakeAccounts) DeleteCollection(ctx context.Context, opts v1.DeleteOptio
 func (c *FakeAccounts) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta2.Account, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(accountsResource, c.ns, name, pt, data, subresources...), &v1beta2.Account{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1beta2.Account), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied account.
+func (c *FakeAccounts) Apply(ctx context.Context, account *jetstreamv1beta2.AccountApplyConfiguration, opts v1.ApplyOptions) (result *v1beta2.Account, err error) {
+	if account == nil {
+		return nil, fmt.Errorf("account provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(account)
+	if err != nil {
+		return nil, err
+	}
+	name := account.Name
+	if name == nil {
+		return nil, fmt.Errorf("account.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(accountsResource, c.ns, *name, types.ApplyPatchType, data), &v1beta2.Account{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1beta2.Account), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeAccounts) ApplyStatus(ctx context.Context, account *jetstreamv1beta2.AccountApplyConfiguration, opts v1.ApplyOptions) (result *v1beta2.Account, err error) {
+	if account == nil {
+		return nil, fmt.Errorf("account provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(account)
+	if err != nil {
+		return nil, err
+	}
+	name := account.Name
+	if name == nil {
+		return nil, fmt.Errorf("account.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(accountsResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1beta2.Account{})
 
 	if obj == nil {
 		return nil, err
