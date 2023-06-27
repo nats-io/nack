@@ -1,21 +1,24 @@
-#syntax=docker/dockerfile-upstream:1.4
+#syntax=docker/dockerfile-upstream:1.5
 ARG GO_APP
 
-FROM base as deps
+FROM alpine:3.18.2 as deps
 
 ARG GO_APP
+ARG GORELEASER_DIST_DIR=/go/src/dist
 
 ARG TARGETOS
 ARG TARGETARCH
 ARG TARGETVARIANT
 
-RUN mkdir -p /go/bin /go/src
+RUN mkdir -p /go/bin /go/src ${GORELEASER_DIST_DIR}
 
-COPY --from=build /go/src/dist /go/src/dist
+COPY --from=build ${GORELEASER_DIST_DIR}/ ${GORELEASER_DIST_DIR}
 
 RUN <<EOT
   set -e 
   apk add --no-cache ca-certificates jq
+  cd ${GORELEASER_DIST_DIR}/..
+
   if [[ ${TARGETARCH} == "arm" ]]; then VARIANT=$(echo ${TARGETVARIANT} | sed 's/^v//'); fi
   BIN_PATH=$(jq -r ".[] |select(.type   == \"Binary\" and \
                                 .name   == \"${GO_APP}\" and \
@@ -25,7 +28,7 @@ RUN <<EOT
   cp ${BIN_PATH} /go/bin
 EOT
 
-FROM base
+FROM alpine:3.18.2
 
 ARG GO_APP
 ENV GO_APP ${GO_APP}
