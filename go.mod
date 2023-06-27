@@ -5,13 +5,13 @@ go 1.20
 require (
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/nats-io/jsm.go v0.0.35
-	github.com/nats-io/nats.go v1.26.0
+	github.com/nats-io/nats.go v1.27.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.8.4
-	k8s.io/api v0.27.2
-	k8s.io/apimachinery v0.27.2
-	k8s.io/client-go v0.27.2
-	k8s.io/code-generator v0.27.2
+	k8s.io/api v0.27.3
+	k8s.io/apimachinery v0.27.3
+	k8s.io/client-go v0.27.3
+	k8s.io/code-generator v0.27.3
 	k8s.io/klog/v2 v2.100.1
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3
 )

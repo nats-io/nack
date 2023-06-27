@@ -13,7 +13,7 @@ jobs:
     - name: Setup Go
       uses: actions/setup-go@v4
       with:
-        go-version: '1.20'
+        go-version-file: go.mod
 
     - name: Setup QEMU
       uses: docker/setup-qemu-action@v2
@@ -39,8 +39,7 @@ jobs:
       with:
         files: docker-bake.hcl
         push: true
-        set: |
-          goreleaser.args.GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
+        set: goreleaser.args.GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
       env:
         TAGS: "${{ steps.tags.outputs.tags }}"
         REGISTRY: "natsio"
