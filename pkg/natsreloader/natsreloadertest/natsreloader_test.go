@@ -84,7 +84,7 @@ func TestReloader(t *testing.T) {
 		// This is terrible, but we need this thread to wait until r.Run(ctx) has finished starting up
 		// before we start mucking with the file.
 		// There isn't any other good way to synchronize on this happening.
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(200 * time.Millisecond)
 		for _, configfile := range configFiles {
 			for i := 0; i < 5; i++ {
 				// Append some more stuff to the config

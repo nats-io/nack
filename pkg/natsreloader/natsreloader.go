@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"math/rand"
 	"os"
@@ -49,7 +48,7 @@ func (r *Reloader) waitForProcess() error {
 
 	startTime := time.Now()
 	for {
-		pidfile, err := ioutil.ReadFile(r.PidFile)
+		pidfile, err := os.ReadFile(r.PidFile)
 		if err != nil {
 			goto WaitAndRetry
 		}
@@ -76,7 +75,7 @@ func (r *Reloader) waitForProcess() error {
 
 	if attempts > 0 {
 		log.Printf("found pid from pidfile %q after %v failed attempts (%v time after start)",
-			r.PidFile, attempts, time.Now().Sub(startTime))
+			r.PidFile, attempts, time.Since(startTime))
 	}
 
 	r.pid = pid

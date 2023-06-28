@@ -15,14 +15,6 @@ variable CI {
   default = false
 }
 
-variable image_base {
-  default = "docker-image://alpine:3.17.3"
-}
-
-variable image_goreleaser {
-  default = "docker-image://goreleaser/goreleaser:v1.14.1"
-}
-
 ###################
 ### Functions
 ###################
@@ -60,7 +52,6 @@ group "default" {
 
 target "goreleaser" {
   contexts = {
-    goreleaser = image_goreleaser
     src = "."
   }
   args = {
@@ -72,7 +63,6 @@ target "goreleaser" {
 
 target "jetstream-controller" {
   contexts = {
-    base    = image_base
     build   = "target:goreleaser"
     assets  = "cicd/assets"
   }
@@ -87,7 +77,6 @@ target "jetstream-controller" {
 
 target "nats-boot-config-base" {
   contexts = {
-    base    = image_base
     build   = "target:goreleaser"
     assets  = "cicd/assets"
   }
@@ -117,7 +106,6 @@ EOT
 
 target "nats-server-config-reloader" {
   contexts = {
-    base    = image_base
     build   = "target:goreleaser"
     assets  = "cicd/assets"
   }

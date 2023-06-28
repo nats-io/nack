@@ -14,11 +14,10 @@ builds:
     main: ./cmd/jetstream-controller
     binary: jetstream-controller
     ldflags:
-      - -s -w -X main.BuildTime={{.Date}} -X main.GitInfo={{.Commit}} -X main.Version={{.Version}}
+      - -s -w -X main.Version={{.Version}} -X main.GitInfo={{.ShortCommit}} -X main.BuildTime={{.Date}}
     tags:
       - timetzdata
     env:
-      - GO11MODULE=on
       - CGO_ENABLED=0
     goos:
       - linux
@@ -29,15 +28,15 @@ builds:
     goarm:
       - 6
       - 7
+
   - id: nats-boot-config
     main: ./cmd/nats-boot-config
     binary: nats-boot-config
     ldflags:
-      - -s -w -X main.BuildTime={{.Date}} -X main.GitInfo={{.Commit}} -X main.Version={{.Version}}
+      - -s -w -X main.Version={{.Version}} -X main.GitInfo={{.ShortCommit}} -X main.BuildTime={{.Date}}
     tags:
       - timetzdata
     env:
-      - GO11MODULE=on
       - CGO_ENABLED=0
     goos:
       - linux
@@ -48,15 +47,15 @@ builds:
     goarm:
       - 6
       - 7
+
   - id: nats-server-config-reloader
     main: ./cmd/nats-server-config-reloader
     binary: nats-server-config-reloader
     ldflags:
-      - -s -w -X main.BuildTime={{.Date}} -X main.GitInfo={{.Commit}} -X main.Version={{.Version}}
+      - -s -w -X main.Version={{.Version}} -X main.GitInfo={{.ShortCommit}} -X main.BuildTime={{.Date}}
     tags:
       - timetzdata
     env:
-      - GO11MODULE=on
       - CGO_ENABLED=0
     goos:
       - linux
