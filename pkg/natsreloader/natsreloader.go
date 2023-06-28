@@ -110,9 +110,7 @@ func getFileDigest(filePath string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		_ = f.Close()
-	}()
+	defer f.Close()
 	if _, err := io.Copy(h, f); err != nil {
 		return nil, err
 	}
@@ -120,7 +118,7 @@ func getFileDigest(filePath string) ([]byte, error) {
 }
 
 func handleEvent(event fsnotify.Event, lastConfigAppliedCache map[string][]byte, updatedFiles, deletedFiles []string) ([]string, []string) {
-	if event.Op&fsnotify.Remove == fsnotify.Remove {
+	if event.Has(fsnotify.Remove) {
 		// We don't get a Remove event for the directory itself, so
 		// we need to detect that separately.
 		return updatedFiles, append(deletedFiles, event.Name)
@@ -273,9 +271,7 @@ func (r *Reloader) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer func() {
-		_ = configWatcher.Close()
-	}()
+	defer configWatcher.Close()
 
 	// We use a ticker to re-add deleted files to the watcher
 	t := time.NewTicker(time.Second)
