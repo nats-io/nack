@@ -209,6 +209,10 @@ spec:
                 description: When true, restricts the ability to delete messages from a stream via the API. Cannot be changed once set to true.
                 type: boolean
                 default: false
+              discardPerSubject:
+                description: Allows to discard messages on a subject basis.
+                type: boolean
+                default: false
           status:
             type: object
             properties:
