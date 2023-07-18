@@ -58,8 +58,8 @@ func main() {
 	fs.StringVar(&nconfig.PidFile, "pid", "/var/run/nats/gnatsd.pid", "NATS Server Pid File")
 	fs.Var(&fileSet, "c", "NATS Server Config File (may be repeated to specify more than one)")
 	fs.Var(&fileSet, "config", "NATS Server Config File (may be repeated to specify more than one)")
-	fs.IntVar(&nconfig.MaxRetries, "max-retries", 5, "Max attempts to trigger reload")
-	fs.IntVar(&nconfig.RetryWaitSecs, "retry-wait-secs", 2, "Time to back off when reloading fails before retrying")
+	fs.IntVar(&nconfig.MaxRetries, "max-retries", 30, "Max attempts to trigger reload")
+	fs.IntVar(&nconfig.RetryWaitSecs, "retry-wait-secs", 4, "Time to back off when reloading fails before retrying")
 	fs.IntVar(&customSignal, "signal", 1, "Signal to send to the NATS Server process (default SIGHUP 1)")
 
 	fs.Parse(os.Args[1:])
