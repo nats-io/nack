@@ -28,6 +28,7 @@ type StreamSpecApplyConfiguration struct {
 	Creds             *string                            `json:"creds,omitempty"`
 	DenyDelete        *bool                              `json:"denyDelete,omitempty"`
 	Description       *string                            `json:"description,omitempty"`
+	DiscardPerSubject *bool                              `json:"discardPerSubject,omitempty"`
 	PreventDelete     *bool                              `json:"preventDelete,omitempty"`
 	PreventUpdate     *bool                              `json:"preventUpdate,omitempty"`
 	Discard           *string                            `json:"discard,omitempty"`
@@ -45,6 +46,7 @@ type StreamSpecApplyConfiguration struct {
 	Placement         *StreamPlacementApplyConfiguration `json:"placement,omitempty"`
 	Replicas          *int                               `json:"replicas,omitempty"`
 	Republish         *RePublishApplyConfiguration       `json:"republish,omitempty"`
+	FirstSequence     *int                               `json:"firstSequence,omitempty"`
 	Retention         *string                            `json:"retention,omitempty"`
 	Servers           []string                           `json:"servers,omitempty"`
 	Sources           []*jetstreamv1beta2.StreamSource   `json:"sources,omitempty"`
@@ -104,6 +106,14 @@ func (b *StreamSpecApplyConfiguration) WithDenyDelete(value bool) *StreamSpecApp
 // If called multiple times, the Description field is set to the value of the last call.
 func (b *StreamSpecApplyConfiguration) WithDescription(value string) *StreamSpecApplyConfiguration {
 	b.Description = &value
+	return b
+}
+
+// WithDiscardPerSubject sets the DiscardPerSubject field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the DiscardPerSubject field is set to the value of the last call.
+func (b *StreamSpecApplyConfiguration) WithDiscardPerSubject(value bool) *StreamSpecApplyConfiguration {
+	b.DiscardPerSubject = &value
 	return b
 }
 
@@ -240,6 +250,14 @@ func (b *StreamSpecApplyConfiguration) WithReplicas(value int) *StreamSpecApplyC
 // If called multiple times, the Republish field is set to the value of the last call.
 func (b *StreamSpecApplyConfiguration) WithRepublish(value *RePublishApplyConfiguration) *StreamSpecApplyConfiguration {
 	b.Republish = value
+	return b
+}
+
+// WithFirstSequence sets the FirstSequence field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the FirstSequence field is set to the value of the last call.
+func (b *StreamSpecApplyConfiguration) WithFirstSequence(value int) *StreamSpecApplyConfiguration {
+	b.FirstSequence = &value
 	return b
 }
 

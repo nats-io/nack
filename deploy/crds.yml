@@ -189,6 +189,10 @@ spec:
                   source:
                     type: string
                     description: Messages will be published from that subject to the destination subject.
+              firstSequence:
+                description: Sequence number from which the Stream will start.
+                type: number
+                default: 0
               preventDelete:
                 description: When true, the managed Stream will not be deleted when the resource is deleted
                 type: boolean
