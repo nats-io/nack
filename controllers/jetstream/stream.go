@@ -412,6 +412,9 @@ func createStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 	if spec.DiscardPerSubject {
 		opts = append(opts, jsm.DiscardNewPerSubject())
 	}
+	if spec.FirstSequence != 0 {
+		opts = append(opts, jsm.FirstSequence(uint64(spec.FirstSequence)))
+	}
 
 	_, err = c.NewStream(ctx, spec.Name, opts)
 	return err
@@ -463,6 +466,7 @@ func updateStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 		AllowDirect:   spec.AllowDirect,
 		DenyDelete:    spec.DenyDelete,
 		RollupAllowed: spec.AllowRollup,
+		FirstSeq:      spec.FirstSequence,
 	}
 	if spec.Republish != nil {
 		config.RePublish = &jsmapi.RePublish{

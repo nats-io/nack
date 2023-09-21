@@ -46,6 +46,7 @@ type StreamSpec struct {
 	Placement         *StreamPlacement `json:"placement"`
 	Replicas          int              `json:"replicas"`
 	Republish         *RePublish       `json:"republish"`
+	FirstSequence     uint64           `json:"firstSequence"`
 	Retention         string           `json:"retention"`
 	Servers           []string         `json:"servers"`
 	Sources           []*StreamSource  `json:"sources"`
