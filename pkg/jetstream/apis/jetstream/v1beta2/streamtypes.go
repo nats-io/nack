@@ -47,6 +47,7 @@ type StreamSpec struct {
 	Replicas          int              `json:"replicas"`
 	Republish         *RePublish       `json:"republish"`
 	FirstSequence     uint64           `json:"firstSequence"`
+	Compression       string           `json:"compression"`
 	Retention         string           `json:"retention"`
 	Servers           []string         `json:"servers"`
 	Sources           []*StreamSource  `json:"sources"`

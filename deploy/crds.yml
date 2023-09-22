@@ -193,6 +193,13 @@ spec:
                 description: Sequence number from which the Stream will start.
                 type: number
                 default: 0
+              compression:
+                description: Stream specific compression.
+                type: string
+                enum:
+                - s2
+                - none
+                default: ''
               preventDelete:
                 description: When true, the managed Stream will not be deleted when the resource is deleted
                 type: boolean

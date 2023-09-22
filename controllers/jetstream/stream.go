@@ -23,6 +23,7 @@ import (
 	"time"
 
 	jsm "github.com/nats-io/jsm.go"
+	"github.com/nats-io/jsm.go/api"
 	jsmapi "github.com/nats-io/jsm.go/api"
 	apis "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 	typed "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/typed/jetstream/v1beta2"
@@ -337,6 +338,13 @@ func createStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 		opts = append(opts, jsm.DiscardNew())
 	}
 
+	switch spec.Compression {
+	case "s2":
+		opts = append(opts, jsm.Compression(api.S2Compression))
+	case "none":
+		opts = append(opts, jsm.Compression(api.NoCompression))
+	}
+
 	if spec.NoAck {
 		opts = append(opts, jsm.NoAck())
 	}
@@ -490,6 +498,13 @@ func updateStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 			return err
 		}
 		config.Sources[i] = jss
+	}
+
+	switch spec.Compression {
+	case "s2":
+		config.Compression = api.S2Compression
+	case "none":
+		config.Compression = api.NoCompression
 	}
 
 	return js.UpdateConfiguration(config)
