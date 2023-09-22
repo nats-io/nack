@@ -225,6 +225,7 @@ spec:
                 enum:
                 - s2
                 - none
+                - ''
                 default: ''
               subjectTransform:
                 description: SubjectTransform is for applying a subject transform (to matching messages) when a new message is received
