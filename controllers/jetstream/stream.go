@@ -434,6 +434,10 @@ func createStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 		opts = append(opts, jsm.FirstSequence(uint64(spec.FirstSequence)))
 	}
 
+	if spec.Metadata != nil {
+		opts = append(opts, jsm.StreamMetadata(spec.Metadata))
+	}
+
 	_, err = c.NewStream(ctx, spec.Name, opts)
 	return err
 }
@@ -517,6 +521,10 @@ func updateStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 			return err
 		}
 		config.Sources[i] = jss
+	}
+
+	if spec.Metadata != nil {
+		config.Metadata = spec.Metadata
 	}
 
 	switch spec.Compression {

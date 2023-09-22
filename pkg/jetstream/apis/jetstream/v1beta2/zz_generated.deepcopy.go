@@ -441,6 +441,13 @@ func (in *StreamSpec) DeepCopyInto(out *StreamSpec) {
 		*out = new(SubjectTransform)
 		**out = **in
 	}
+	if in.Metadata != nil {
+		in, out := &in.Metadata, &out.Metadata
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	if in.Servers != nil {
 		in, out := &in.Servers, &out.Servers
 		*out = make([]string, len(*in))

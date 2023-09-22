@@ -49,6 +49,7 @@ type StreamSpecApplyConfiguration struct {
 	SubjectTransform  *SubjectTransformApplyConfiguration `json:"subjectTransform,omitempty"`
 	FirstSequence     *uint64                             `json:"firstSequence,omitempty"`
 	Compression       *string                             `json:"compression,omitempty"`
+	Metadata          map[string]string                   `json:"metadata,omitempty"`
 	Retention         *string                             `json:"retention,omitempty"`
 	Servers           []string                            `json:"servers,omitempty"`
 	Sources           []*jetstreamv1beta2.StreamSource    `json:"sources,omitempty"`
@@ -276,6 +277,20 @@ func (b *StreamSpecApplyConfiguration) WithFirstSequence(value uint64) *StreamSp
 // If called multiple times, the Compression field is set to the value of the last call.
 func (b *StreamSpecApplyConfiguration) WithCompression(value string) *StreamSpecApplyConfiguration {
 	b.Compression = &value
+	return b
+}
+
+// WithMetadata puts the entries into the Metadata field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the entries provided by each call will be put on the Metadata field,
+// overwriting an existing map entries in Metadata field with the same key.
+func (b *StreamSpecApplyConfiguration) WithMetadata(entries map[string]string) *StreamSpecApplyConfiguration {
+	if b.Metadata == nil && len(entries) > 0 {
+		b.Metadata = make(map[string]string, len(entries))
+	}
+	for k, v := range entries {
+		b.Metadata[k] = v
+	}
 	return b
 }
 
