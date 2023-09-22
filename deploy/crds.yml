@@ -117,6 +117,19 @@ spec:
                     type: string
                   externalDeliverPrefix:
                     type: string
+                  subjectTransforms:
+                    description: List of subject transforms for this mirror.
+                    type: array
+                    items:
+                      description: A subject transform pair.
+                      type: object
+                      properties:
+                        source:
+                          description: Source subject.
+                          type: string
+                        dest:
+                          description: Destination subject.
+                          type: string
               placement:
                 description: A stream's placement.
                 type: object
@@ -146,6 +159,19 @@ spec:
                       type: string
                     externalDeliverPrefix:
                       type: string
+                    subjectTransforms:
+                      description: List of subject transforms for this mirror.
+                      type: array
+                      items:
+                        description: A subject transform pair.
+                        type: object
+                        properties:
+                          source:
+                            description: Source subject.
+                            type: string
+                          dest:
+                            description: Destination subject.
+                            type: string
               servers:
                 description: A list of servers for creating stream
                 type: array
@@ -193,6 +219,24 @@ spec:
                 description: Sequence number from which the Stream will start.
                 type: number
                 default: 0
+              compression:
+                description: Stream specific compression.
+                type: string
+                enum:
+                - s2
+                - none
+                - ''
+                default: ''
+              subjectTransform:
+                description: SubjectTransform is for applying a subject transform (to matching messages) when a new message is received
+                type: object
+                properties:
+                  source:
+                    type: string
+                    description: Source subject
+                  dest:
+                    type: string
+                    description: Destination subject to transform into
               preventDelete:
                 description: When true, the managed Stream will not be deleted when the resource is deleted
                 type: boolean
@@ -494,6 +538,11 @@ spec:
               filterSubject:
                 description: Select only a specific incoming subjects, supports wildcards.
                 type: string
+              filterSubjects:
+                description: List of incoming subjects, supports wildcards. Available since 2.10.
+                type: array
+                items:
+                  type: string
               replayPolicy:
                 description: How messages are sent.
                 type: string

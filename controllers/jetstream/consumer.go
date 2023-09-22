@@ -308,7 +308,6 @@ func consumerSpecToOpts(spec apis.ConsumerSpec) ([]jsm.ConsumerOption, error) {
 	opts := []jsm.ConsumerOption{
 		jsm.DurableName(spec.DurableName),
 		jsm.DeliverySubject(spec.DeliverSubject),
-		jsm.FilterStreamBySubject(spec.FilterSubject),
 		jsm.RateLimitBitsPerSecond(uint64(spec.RateLimitBps)),
 		jsm.MaxAckPending(uint(spec.MaxAckPending)),
 		jsm.ConsumerDescription(spec.Description),
@@ -317,6 +316,16 @@ func consumerSpecToOpts(spec apis.ConsumerSpec) ([]jsm.ConsumerOption, error) {
 		jsm.MaxRequestBatch(uint(spec.MaxRequestBatch)),
 		jsm.MaxRequestMaxBytes(spec.MaxRequestMaxBytes),
 		jsm.ConsumerOverrideReplicas(spec.Replicas),
+	}
+
+	if spec.FilterSubject != "" && len(spec.FilterSubjects) > 0 {
+		return nil, fmt.Errorf("cannot specify both FilterSubject and FilterSubjects")
+	}
+
+	if spec.FilterSubject != "" {
+		opts = append(opts, jsm.FilterStreamBySubject(spec.FilterSubject))
+	} else if len(spec.FilterSubjects) > 0 {
+		opts = append(opts, jsm.FilterStreamBySubject(spec.FilterSubjects...))
 	}
 
 	switch spec.DeliverPolicy {

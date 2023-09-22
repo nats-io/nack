@@ -23,6 +23,7 @@ import (
 	"time"
 
 	jsm "github.com/nats-io/jsm.go"
+	"github.com/nats-io/jsm.go/api"
 	jsmapi "github.com/nats-io/jsm.go/api"
 	apis "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 	typed "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/typed/jetstream/v1beta2"
@@ -337,6 +338,13 @@ func createStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 		opts = append(opts, jsm.DiscardNew())
 	}
 
+	switch spec.Compression {
+	case "s2":
+		opts = append(opts, jsm.Compression(api.S2Compression))
+	case "none":
+		opts = append(opts, jsm.Compression(api.NoCompression))
+	}
+
 	if spec.NoAck {
 		opts = append(opts, jsm.NoAck())
 	}
@@ -397,6 +405,16 @@ func createStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 		}))
 	}
 
+	if spec.SubjectTransform != nil {
+		opts = append(opts, func(o *api.StreamConfig) error {
+			o.SubjectTransform = &jsmapi.SubjectTransformConfig{
+				Source:      spec.SubjectTransform.Source,
+				Destination: spec.SubjectTransform.Dest,
+			}
+			return nil
+		})
+	}
+
 	if spec.AllowDirect {
 		opts = append(opts, jsm.AllowDirect())
 	}
@@ -446,27 +464,36 @@ func updateStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 		return err
 	}
 
+	var subjectTransform *jsmapi.SubjectTransformConfig
+	if spec.SubjectTransform != nil {
+		subjectTransform = &jsmapi.SubjectTransformConfig{
+			Source:      spec.SubjectTransform.Source,
+			Destination: spec.SubjectTransform.Dest,
+		}
+	}
+
 	config := jsmapi.StreamConfig{
-		Name:          spec.Name,
-		Description:   spec.Description,
-		Retention:     retention,
-		Subjects:      spec.Subjects,
-		MaxConsumers:  spec.MaxConsumers,
-		MaxMsgs:       int64(spec.MaxMsgs),
-		MaxBytes:      int64(spec.MaxBytes),
-		MaxMsgsPer:    int64(spec.MaxMsgsPerSubject),
-		MaxAge:        maxAge,
-		MaxMsgSize:    int32(spec.MaxMsgSize),
-		Storage:       storage,
-		Discard:       discard,
-		DiscardNewPer: spec.DiscardPerSubject,
-		Replicas:      spec.Replicas,
-		NoAck:         spec.NoAck,
-		Duplicates:    duplicates,
-		AllowDirect:   spec.AllowDirect,
-		DenyDelete:    spec.DenyDelete,
-		RollupAllowed: spec.AllowRollup,
-		FirstSeq:      spec.FirstSequence,
+		Name:             spec.Name,
+		Description:      spec.Description,
+		Retention:        retention,
+		Subjects:         spec.Subjects,
+		MaxConsumers:     spec.MaxConsumers,
+		MaxMsgs:          int64(spec.MaxMsgs),
+		MaxBytes:         int64(spec.MaxBytes),
+		MaxMsgsPer:       int64(spec.MaxMsgsPerSubject),
+		MaxAge:           maxAge,
+		MaxMsgSize:       int32(spec.MaxMsgSize),
+		Storage:          storage,
+		Discard:          discard,
+		DiscardNewPer:    spec.DiscardPerSubject,
+		Replicas:         spec.Replicas,
+		NoAck:            spec.NoAck,
+		Duplicates:       duplicates,
+		AllowDirect:      spec.AllowDirect,
+		DenyDelete:       spec.DenyDelete,
+		RollupAllowed:    spec.AllowRollup,
+		FirstSeq:         spec.FirstSequence,
+		SubjectTransform: subjectTransform,
 	}
 	if spec.Republish != nil {
 		config.RePublish = &jsmapi.RePublish{
@@ -490,6 +517,13 @@ func updateStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 			return err
 		}
 		config.Sources[i] = jss
+	}
+
+	switch spec.Compression {
+	case "s2":
+		config.Compression = api.S2Compression
+	case "none":
+		config.Compression = api.NoCompression
 	}
 
 	return js.UpdateConfiguration(config)
@@ -645,6 +679,13 @@ func getStreamSource(ss *apis.StreamSource) (*jsmapi.StreamSource, error) {
 			ApiPrefix:     ss.ExternalAPIPrefix,
 			DeliverPrefix: ss.ExternalDeliverPrefix,
 		}
+	}
+
+	for _, transform := range ss.SubjectTransforms {
+		jss.SubjectTransforms = append(jss.SubjectTransforms, jsmapi.SubjectTransformConfig{
+			Source:      transform.Source,
+			Destination: transform.Dest,
+		})
 	}
 
 	return jss, nil

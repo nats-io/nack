@@ -22,37 +22,44 @@ func (s *Stream) GetSpec() interface{} {
 
 // StreamSpec is the spec for a Stream resource
 type StreamSpec struct {
-	Account           string           `json:"account"`
-	AllowDirect       bool             `json:"allowDirect"`
-	AllowRollup       bool             `json:"allowRollup"`
-	Creds             string           `json:"creds"`
-	DenyDelete        bool             `json:"denyDelete"`
-	Description       string           `json:"description"`
-	DiscardPerSubject bool             `json:"discardPerSubject"`
-	PreventDelete     bool             `json:"preventDelete"`
-	PreventUpdate     bool             `json:"preventUpdate"`
-	Discard           string           `json:"discard"`
-	DuplicateWindow   string           `json:"duplicateWindow"`
-	MaxAge            string           `json:"maxAge"`
-	MaxBytes          int              `json:"maxBytes"`
-	MaxConsumers      int              `json:"maxConsumers"`
-	MaxMsgs           int              `json:"maxMsgs"`
-	MaxMsgSize        int              `json:"maxMsgSize"`
-	MaxMsgsPerSubject int              `json:"maxMsgsPerSubject"`
-	Mirror            *StreamSource    `json:"mirror"`
-	Name              string           `json:"name"`
-	Nkey              string           `json:"nkey"`
-	NoAck             bool             `json:"noAck"`
-	Placement         *StreamPlacement `json:"placement"`
-	Replicas          int              `json:"replicas"`
-	Republish         *RePublish       `json:"republish"`
-	FirstSequence     uint64           `json:"firstSequence"`
-	Retention         string           `json:"retention"`
-	Servers           []string         `json:"servers"`
-	Sources           []*StreamSource  `json:"sources"`
-	Storage           string           `json:"storage"`
-	Subjects          []string         `json:"subjects"`
-	TLS               TLS              `json:"tls"`
+	Account           string            `json:"account"`
+	AllowDirect       bool              `json:"allowDirect"`
+	AllowRollup       bool              `json:"allowRollup"`
+	Creds             string            `json:"creds"`
+	DenyDelete        bool              `json:"denyDelete"`
+	Description       string            `json:"description"`
+	DiscardPerSubject bool              `json:"discardPerSubject"`
+	PreventDelete     bool              `json:"preventDelete"`
+	PreventUpdate     bool              `json:"preventUpdate"`
+	Discard           string            `json:"discard"`
+	DuplicateWindow   string            `json:"duplicateWindow"`
+	MaxAge            string            `json:"maxAge"`
+	MaxBytes          int               `json:"maxBytes"`
+	MaxConsumers      int               `json:"maxConsumers"`
+	MaxMsgs           int               `json:"maxMsgs"`
+	MaxMsgSize        int               `json:"maxMsgSize"`
+	MaxMsgsPerSubject int               `json:"maxMsgsPerSubject"`
+	Mirror            *StreamSource     `json:"mirror"`
+	Name              string            `json:"name"`
+	Nkey              string            `json:"nkey"`
+	NoAck             bool              `json:"noAck"`
+	Placement         *StreamPlacement  `json:"placement"`
+	Replicas          int               `json:"replicas"`
+	Republish         *RePublish        `json:"republish"`
+	SubjectTransform  *SubjectTransform `json:"subjectTransform"`
+	FirstSequence     uint64            `json:"firstSequence"`
+	Compression       string            `json:"compression"`
+	Retention         string            `json:"retention"`
+	Servers           []string          `json:"servers"`
+	Sources           []*StreamSource   `json:"sources"`
+	Storage           string            `json:"storage"`
+	Subjects          []string          `json:"subjects"`
+	TLS               TLS               `json:"tls"`
+}
+
+type SubjectTransform struct {
+	Source string `json:"source"`
+	Dest   string `json:"dest"`
 }
 
 type StreamPlacement struct {
@@ -68,6 +75,8 @@ type StreamSource struct {
 
 	ExternalAPIPrefix     string `json:"externalApiPrefix"`
 	ExternalDeliverPrefix string `json:"externalDeliverPrefix"`
+
+	SubjectTransforms []*SubjectTransform `json:"subjectTransforms"`
 }
 
 type RePublish struct {

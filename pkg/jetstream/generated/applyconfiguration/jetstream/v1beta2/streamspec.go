@@ -22,37 +22,39 @@ import (
 // StreamSpecApplyConfiguration represents an declarative configuration of the StreamSpec type for use
 // with apply.
 type StreamSpecApplyConfiguration struct {
-	Account           *string                            `json:"account,omitempty"`
-	AllowDirect       *bool                              `json:"allowDirect,omitempty"`
-	AllowRollup       *bool                              `json:"allowRollup,omitempty"`
-	Creds             *string                            `json:"creds,omitempty"`
-	DenyDelete        *bool                              `json:"denyDelete,omitempty"`
-	Description       *string                            `json:"description,omitempty"`
-	DiscardPerSubject *bool                              `json:"discardPerSubject,omitempty"`
-	PreventDelete     *bool                              `json:"preventDelete,omitempty"`
-	PreventUpdate     *bool                              `json:"preventUpdate,omitempty"`
-	Discard           *string                            `json:"discard,omitempty"`
-	DuplicateWindow   *string                            `json:"duplicateWindow,omitempty"`
-	MaxAge            *string                            `json:"maxAge,omitempty"`
-	MaxBytes          *int                               `json:"maxBytes,omitempty"`
-	MaxConsumers      *int                               `json:"maxConsumers,omitempty"`
-	MaxMsgs           *int                               `json:"maxMsgs,omitempty"`
-	MaxMsgSize        *int                               `json:"maxMsgSize,omitempty"`
-	MaxMsgsPerSubject *int                               `json:"maxMsgsPerSubject,omitempty"`
-	Mirror            *StreamSourceApplyConfiguration    `json:"mirror,omitempty"`
-	Name              *string                            `json:"name,omitempty"`
-	Nkey              *string                            `json:"nkey,omitempty"`
-	NoAck             *bool                              `json:"noAck,omitempty"`
-	Placement         *StreamPlacementApplyConfiguration `json:"placement,omitempty"`
-	Replicas          *int                               `json:"replicas,omitempty"`
-	Republish         *RePublishApplyConfiguration       `json:"republish,omitempty"`
-	FirstSequence     *int                               `json:"firstSequence,omitempty"`
-	Retention         *string                            `json:"retention,omitempty"`
-	Servers           []string                           `json:"servers,omitempty"`
-	Sources           []*jetstreamv1beta2.StreamSource   `json:"sources,omitempty"`
-	Storage           *string                            `json:"storage,omitempty"`
-	Subjects          []string                           `json:"subjects,omitempty"`
-	TLS               *TLSApplyConfiguration             `json:"tls,omitempty"`
+	Account           *string                             `json:"account,omitempty"`
+	AllowDirect       *bool                               `json:"allowDirect,omitempty"`
+	AllowRollup       *bool                               `json:"allowRollup,omitempty"`
+	Creds             *string                             `json:"creds,omitempty"`
+	DenyDelete        *bool                               `json:"denyDelete,omitempty"`
+	Description       *string                             `json:"description,omitempty"`
+	DiscardPerSubject *bool                               `json:"discardPerSubject,omitempty"`
+	PreventDelete     *bool                               `json:"preventDelete,omitempty"`
+	PreventUpdate     *bool                               `json:"preventUpdate,omitempty"`
+	Discard           *string                             `json:"discard,omitempty"`
+	DuplicateWindow   *string                             `json:"duplicateWindow,omitempty"`
+	MaxAge            *string                             `json:"maxAge,omitempty"`
+	MaxBytes          *int                                `json:"maxBytes,omitempty"`
+	MaxConsumers      *int                                `json:"maxConsumers,omitempty"`
+	MaxMsgs           *int                                `json:"maxMsgs,omitempty"`
+	MaxMsgSize        *int                                `json:"maxMsgSize,omitempty"`
+	MaxMsgsPerSubject *int                                `json:"maxMsgsPerSubject,omitempty"`
+	Mirror            *StreamSourceApplyConfiguration     `json:"mirror,omitempty"`
+	Name              *string                             `json:"name,omitempty"`
+	Nkey              *string                             `json:"nkey,omitempty"`
+	NoAck             *bool                               `json:"noAck,omitempty"`
+	Placement         *StreamPlacementApplyConfiguration  `json:"placement,omitempty"`
+	Replicas          *int                                `json:"replicas,omitempty"`
+	Republish         *RePublishApplyConfiguration        `json:"republish,omitempty"`
+	SubjectTransform  *SubjectTransformApplyConfiguration `json:"subjectTransform,omitempty"`
+	FirstSequence     *uint64                             `json:"firstSequence,omitempty"`
+	Compression       *string                             `json:"compression,omitempty"`
+	Retention         *string                             `json:"retention,omitempty"`
+	Servers           []string                            `json:"servers,omitempty"`
+	Sources           []*jetstreamv1beta2.StreamSource    `json:"sources,omitempty"`
+	Storage           *string                             `json:"storage,omitempty"`
+	Subjects          []string                            `json:"subjects,omitempty"`
+	TLS               *TLSApplyConfiguration              `json:"tls,omitempty"`
 }
 
 // StreamSpecApplyConfiguration constructs an declarative configuration of the StreamSpec type for use with
@@ -253,11 +255,27 @@ func (b *StreamSpecApplyConfiguration) WithRepublish(value *RePublishApplyConfig
 	return b
 }
 
+// WithSubjectTransform sets the SubjectTransform field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the SubjectTransform field is set to the value of the last call.
+func (b *StreamSpecApplyConfiguration) WithSubjectTransform(value *SubjectTransformApplyConfiguration) *StreamSpecApplyConfiguration {
+	b.SubjectTransform = value
+	return b
+}
+
 // WithFirstSequence sets the FirstSequence field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the FirstSequence field is set to the value of the last call.
-func (b *StreamSpecApplyConfiguration) WithFirstSequence(value int) *StreamSpecApplyConfiguration {
+func (b *StreamSpecApplyConfiguration) WithFirstSequence(value uint64) *StreamSpecApplyConfiguration {
 	b.FirstSequence = &value
+	return b
+}
+
+// WithCompression sets the Compression field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Compression field is set to the value of the last call.
+func (b *StreamSpecApplyConfiguration) WithCompression(value string) *StreamSpecApplyConfiguration {
+	b.Compression = &value
 	return b
 }
 

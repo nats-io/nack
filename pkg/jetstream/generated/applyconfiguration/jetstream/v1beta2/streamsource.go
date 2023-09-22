@@ -15,15 +15,20 @@
 
 package v1beta2
 
+import (
+	v1beta2 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
+)
+
 // StreamSourceApplyConfiguration represents an declarative configuration of the StreamSource type for use
 // with apply.
 type StreamSourceApplyConfiguration struct {
-	Name                  *string `json:"name,omitempty"`
-	OptStartSeq           *int    `json:"optStartSeq,omitempty"`
-	OptStartTime          *string `json:"optStartTime,omitempty"`
-	FilterSubject         *string `json:"filterSubject,omitempty"`
-	ExternalAPIPrefix     *string `json:"externalApiPrefix,omitempty"`
-	ExternalDeliverPrefix *string `json:"externalDeliverPrefix,omitempty"`
+	Name                  *string                     `json:"name,omitempty"`
+	OptStartSeq           *int                        `json:"optStartSeq,omitempty"`
+	OptStartTime          *string                     `json:"optStartTime,omitempty"`
+	FilterSubject         *string                     `json:"filterSubject,omitempty"`
+	ExternalAPIPrefix     *string                     `json:"externalApiPrefix,omitempty"`
+	ExternalDeliverPrefix *string                     `json:"externalDeliverPrefix,omitempty"`
+	SubjectTransforms     []*v1beta2.SubjectTransform `json:"subjectTransforms,omitempty"`
 }
 
 // StreamSourceApplyConfiguration constructs an declarative configuration of the StreamSource type for use with
@@ -77,5 +82,18 @@ func (b *StreamSourceApplyConfiguration) WithExternalAPIPrefix(value string) *St
 // If called multiple times, the ExternalDeliverPrefix field is set to the value of the last call.
 func (b *StreamSourceApplyConfiguration) WithExternalDeliverPrefix(value string) *StreamSourceApplyConfiguration {
 	b.ExternalDeliverPrefix = &value
+	return b
+}
+
+// WithSubjectTransforms adds the given value to the SubjectTransforms field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the SubjectTransforms field.
+func (b *StreamSourceApplyConfiguration) WithSubjectTransforms(values ...**v1beta2.SubjectTransform) *StreamSourceApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithSubjectTransforms")
+		}
+		b.SubjectTransforms = append(b.SubjectTransforms, *values[i])
+	}
 	return b
 }
