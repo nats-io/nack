@@ -52,6 +52,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &jetstreamv1beta2.StreamSourceApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("StreamSpec"):
 		return &jetstreamv1beta2.StreamSpecApplyConfiguration{}
+	case v1beta2.SchemeGroupVersion.WithKind("SubjectTransform"):
+		return &jetstreamv1beta2.SubjectTransformApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("TLS"):
 		return &jetstreamv1beta2.TLSApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("TLSSecret"):

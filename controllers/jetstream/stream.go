@@ -405,6 +405,16 @@ func createStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 		}))
 	}
 
+	if spec.SubjectTransform != nil {
+		opts = append(opts, func(o *api.StreamConfig) error {
+			o.SubjectTransform = &jsmapi.SubjectTransformConfig{
+				Source:      spec.SubjectTransform.Source,
+				Destination: spec.SubjectTransform.Dest,
+			}
+			return nil
+		})
+	}
+
 	if spec.AllowDirect {
 		opts = append(opts, jsm.AllowDirect())
 	}
@@ -454,27 +464,36 @@ func updateStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 		return err
 	}
 
+	var subjectTransform *jsmapi.SubjectTransformConfig
+	if spec.SubjectTransform != nil {
+		subjectTransform = &jsmapi.SubjectTransformConfig{
+			Source:      spec.SubjectTransform.Source,
+			Destination: spec.SubjectTransform.Dest,
+		}
+	}
+
 	config := jsmapi.StreamConfig{
-		Name:          spec.Name,
-		Description:   spec.Description,
-		Retention:     retention,
-		Subjects:      spec.Subjects,
-		MaxConsumers:  spec.MaxConsumers,
-		MaxMsgs:       int64(spec.MaxMsgs),
-		MaxBytes:      int64(spec.MaxBytes),
-		MaxMsgsPer:    int64(spec.MaxMsgsPerSubject),
-		MaxAge:        maxAge,
-		MaxMsgSize:    int32(spec.MaxMsgSize),
-		Storage:       storage,
-		Discard:       discard,
-		DiscardNewPer: spec.DiscardPerSubject,
-		Replicas:      spec.Replicas,
-		NoAck:         spec.NoAck,
-		Duplicates:    duplicates,
-		AllowDirect:   spec.AllowDirect,
-		DenyDelete:    spec.DenyDelete,
-		RollupAllowed: spec.AllowRollup,
-		FirstSeq:      spec.FirstSequence,
+		Name:             spec.Name,
+		Description:      spec.Description,
+		Retention:        retention,
+		Subjects:         spec.Subjects,
+		MaxConsumers:     spec.MaxConsumers,
+		MaxMsgs:          int64(spec.MaxMsgs),
+		MaxBytes:         int64(spec.MaxBytes),
+		MaxMsgsPer:       int64(spec.MaxMsgsPerSubject),
+		MaxAge:           maxAge,
+		MaxMsgSize:       int32(spec.MaxMsgSize),
+		Storage:          storage,
+		Discard:          discard,
+		DiscardNewPer:    spec.DiscardPerSubject,
+		Replicas:         spec.Replicas,
+		NoAck:            spec.NoAck,
+		Duplicates:       duplicates,
+		AllowDirect:      spec.AllowDirect,
+		DenyDelete:       spec.DenyDelete,
+		RollupAllowed:    spec.AllowRollup,
+		FirstSeq:         spec.FirstSequence,
+		SubjectTransform: subjectTransform,
 	}
 	if spec.Republish != nil {
 		config.RePublish = &jsmapi.RePublish{

@@ -200,6 +200,16 @@ spec:
                 - s2
                 - none
                 default: ''
+              subjectTransform:
+                description: SubjectTransform is for applying a subject transform (to matching messages) when a new message is received
+                type: object
+                properties:
+                  source:
+                    type: string
+                    description: Source subject
+                  dest:
+                    type: string
+                    description: Destination subject to transform to
               preventDelete:
                 description: When true, the managed Stream will not be deleted when the resource is deleted
                 type: boolean
