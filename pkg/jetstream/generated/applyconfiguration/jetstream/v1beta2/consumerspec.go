@@ -30,6 +30,7 @@ type ConsumerSpecApplyConfiguration struct {
 	PreventUpdate      *bool                  `json:"preventUpdate,omitempty"`
 	DurableName        *string                `json:"durableName,omitempty"`
 	FilterSubject      *string                `json:"filterSubject,omitempty"`
+	FilterSubjects     []string               `json:"filterSubjects,omitempty"`
 	FlowControl        *bool                  `json:"flowControl,omitempty"`
 	HeadersOnly        *bool                  `json:"headersOnly,omitempty"`
 	HeartbeatInterval  *string                `json:"heartbeatInterval,omitempty"`
@@ -154,6 +155,16 @@ func (b *ConsumerSpecApplyConfiguration) WithDurableName(value string) *Consumer
 // If called multiple times, the FilterSubject field is set to the value of the last call.
 func (b *ConsumerSpecApplyConfiguration) WithFilterSubject(value string) *ConsumerSpecApplyConfiguration {
 	b.FilterSubject = &value
+	return b
+}
+
+// WithFilterSubjects adds the given value to the FilterSubjects field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the FilterSubjects field.
+func (b *ConsumerSpecApplyConfiguration) WithFilterSubjects(values ...string) *ConsumerSpecApplyConfiguration {
+	for i := range values {
+		b.FilterSubjects = append(b.FilterSubjects, values[i])
+	}
 	return b
 }
 

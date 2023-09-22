@@ -199,6 +199,11 @@ func (in *ConsumerSpec) DeepCopyInto(out *ConsumerSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.FilterSubjects != nil {
+		in, out := &in.FilterSubjects, &out.FilterSubjects
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.Servers != nil {
 		in, out := &in.Servers, &out.Servers
 		*out = make([]string, len(*in))

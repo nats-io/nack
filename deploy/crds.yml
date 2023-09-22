@@ -501,6 +501,11 @@ spec:
               filterSubject:
                 description: Select only a specific incoming subjects, supports wildcards.
                 type: string
+              filterSubjects:
+                description: List of incoming subjects, supports wildcards. Available since 2.10.
+                type: array
+                items:
+                  type: string
               replayPolicy:
                 description: How messages are sent.
                 type: string
