@@ -681,5 +681,12 @@ func getStreamSource(ss *apis.StreamSource) (*jsmapi.StreamSource, error) {
 		}
 	}
 
+	for _, transform := range ss.SubjectTransforms {
+		jss.SubjectTransforms = append(jss.SubjectTransforms, jsmapi.SubjectTransformConfig{
+			Source:      transform.Source,
+			Destination: transform.Dest,
+		})
+	}
+
 	return jss, nil
 }

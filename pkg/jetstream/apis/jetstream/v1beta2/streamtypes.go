@@ -75,6 +75,8 @@ type StreamSource struct {
 
 	ExternalAPIPrefix     string `json:"externalApiPrefix"`
 	ExternalDeliverPrefix string `json:"externalDeliverPrefix"`
+
+	SubjectTransforms []*SubjectTransform `json:"subjectTransforms"`
 }
 
 type RePublish struct {

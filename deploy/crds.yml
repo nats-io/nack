@@ -117,6 +117,19 @@ spec:
                     type: string
                   externalDeliverPrefix:
                     type: string
+                  subjectTransforms:
+                    description: List of subject transforms for this mirror.
+                    type: array
+                    items:
+                      description: A subject transform pair.
+                      type: object
+                      properties:
+                        source:
+                          description: Source subject.
+                          type: string
+                        dest:
+                          description: Destination subject.
+                          type: string
               placement:
                 description: A stream's placement.
                 type: object
@@ -146,6 +159,19 @@ spec:
                       type: string
                     externalDeliverPrefix:
                       type: string
+                    subjectTransforms:
+                      description: List of subject transforms for this mirror.
+                      type: array
+                      items:
+                        description: A subject transform pair.
+                        type: object
+                        properties:
+                          source:
+                            description: Source subject.
+                            type: string
+                          dest:
+                            description: Destination subject.
+                            type: string
               servers:
                 description: A list of servers for creating stream
                 type: array
@@ -209,7 +235,7 @@ spec:
                     description: Source subject
                   dest:
                     type: string
-                    description: Destination subject to transform to
+                    description: Destination subject to transform into
               preventDelete:
                 description: When true, the managed Stream will not be deleted when the resource is deleted
                 type: boolean
