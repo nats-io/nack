@@ -49,6 +49,7 @@ type StreamSpec struct {
 	SubjectTransform  *SubjectTransform `json:"subjectTransform"`
 	FirstSequence     uint64            `json:"firstSequence"`
 	Compression       string            `json:"compression"`
+	Metadata          map[string]string `json:"metadata"`
 	Retention         string            `json:"retention"`
 	Servers           []string          `json:"servers"`
 	Sources           []*StreamSource   `json:"sources"`

@@ -210,6 +210,13 @@ func (in *ConsumerSpec) DeepCopyInto(out *ConsumerSpec) {
 		copy(*out, *in)
 	}
 	in.TLS.DeepCopyInto(&out.TLS)
+	if in.Metadata != nil {
+		in, out := &in.Metadata, &out.Metadata
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	return
 }
 
@@ -440,6 +447,13 @@ func (in *StreamSpec) DeepCopyInto(out *StreamSpec) {
 		in, out := &in.SubjectTransform, &out.SubjectTransform
 		*out = new(SubjectTransform)
 		**out = **in
+	}
+	if in.Metadata != nil {
+		in, out := &in.Metadata, &out.Metadata
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
 	}
 	if in.Servers != nil {
 		in, out := &in.Servers, &out.Servers

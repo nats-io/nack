@@ -172,6 +172,11 @@ spec:
                           dest:
                             description: Destination subject.
                             type: string
+              metadata:
+                description: Additional Stream metadata.
+                type: object
+                additionalProperties:
+                  type: string
               servers:
                 description: A list of servers for creating stream
                 type: array
@@ -595,6 +600,11 @@ spec:
                 description: Force the consumer state to be kept in memory rather than inherit the setting from the stream.
                 type: boolean
                 default: false
+              metadata:
+                description: Additional Consumer metadata.
+                type: object
+                additionalProperties:
+                  type: string
               tls:
                 description: A client's TLS certs and keys.
                 type: object
