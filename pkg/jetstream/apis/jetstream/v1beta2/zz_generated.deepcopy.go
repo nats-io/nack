@@ -210,6 +210,13 @@ func (in *ConsumerSpec) DeepCopyInto(out *ConsumerSpec) {
 		copy(*out, *in)
 	}
 	in.TLS.DeepCopyInto(&out.TLS)
+	if in.Metadata != nil {
+		in, out := &in.Metadata, &out.Metadata
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	return
 }
 

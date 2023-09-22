@@ -433,6 +433,10 @@ func consumerSpecToOpts(spec apis.ConsumerSpec) ([]jsm.ConsumerOption, error) {
 		opts = append(opts, jsm.MaxDeliveryAttempts(spec.MaxDeliver))
 	}
 
+	if spec.Metadata != nil {
+		opts = append(opts, jsm.ConsumerMetadata(spec.Metadata))
+	}
+
 	return opts, nil
 }
 

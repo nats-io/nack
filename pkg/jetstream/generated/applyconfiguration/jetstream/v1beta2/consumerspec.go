@@ -52,6 +52,7 @@ type ConsumerSpecApplyConfiguration struct {
 	StreamName         *string                `json:"streamName,omitempty"`
 	TLS                *TLSApplyConfiguration `json:"tls,omitempty"`
 	Account            *string                `json:"account,omitempty"`
+	Metadata           map[string]string      `json:"metadata,omitempty"`
 }
 
 // ConsumerSpecApplyConfiguration constructs an declarative configuration of the ConsumerSpec type for use with
@@ -335,5 +336,19 @@ func (b *ConsumerSpecApplyConfiguration) WithTLS(value *TLSApplyConfiguration) *
 // If called multiple times, the Account field is set to the value of the last call.
 func (b *ConsumerSpecApplyConfiguration) WithAccount(value string) *ConsumerSpecApplyConfiguration {
 	b.Account = &value
+	return b
+}
+
+// WithMetadata puts the entries into the Metadata field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the entries provided by each call will be put on the Metadata field,
+// overwriting an existing map entries in Metadata field with the same key.
+func (b *ConsumerSpecApplyConfiguration) WithMetadata(entries map[string]string) *ConsumerSpecApplyConfiguration {
+	if b.Metadata == nil && len(entries) > 0 {
+		b.Metadata = make(map[string]string, len(entries))
+	}
+	for k, v := range entries {
+		b.Metadata[k] = v
+	}
 	return b
 }

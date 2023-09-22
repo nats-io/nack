@@ -600,6 +600,11 @@ spec:
                 description: Force the consumer state to be kept in memory rather than inherit the setting from the stream.
                 type: boolean
                 default: false
+              metadata:
+                description: Additional Consumer metadata.
+                type: object
+                additionalProperties:
+                  type: string
               tls:
                 description: A client's TLS certs and keys.
                 type: object
