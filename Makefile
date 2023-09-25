@@ -29,7 +29,10 @@ default:
 
 pkg/jetstream/generated pkg/jetstream/apis/jetstream/v1beta2/zz_generated.deepcopy.go: fetch-modules $(jetstreamGenIn) pkg/k8scodegen/file-header.txt
 	rm -rf pkg/jetstream/generated
-	D="$(codeGeneratorDir)"; : "$${D:=`go list -m -f '{{.Dir}}' k8s.io/code-generator`}"; GOFLAGS='' bash "$$D/generate-groups.sh" all \
+	# Temporary chmod fix until we migrate to kube_codegen.sh
+	D="$(codeGeneratorDir)"; : "$${D:=`go list -m -f '{{.Dir}}' k8s.io/code-generator`}"; \
+	chmod u+x "$$D/generate-internal-groups.sh"; \
+	GOFLAGS='' bash "$$D/generate-groups.sh" all \
 		github.com/nats-io/nack/pkg/jetstream/generated \
 		github.com/nats-io/nack/pkg/jetstream/apis \
 		"jetstream:v1beta2" \
