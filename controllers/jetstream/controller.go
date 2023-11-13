@@ -178,9 +178,9 @@ func (c *Controller) Run() error {
 
 	// Connect to NATS.
 	opts := make([]nats.Option, 0)
-	opts = append(opts, nats.Name(c.opts.NATSClientName))
 	// Always attempt to have a connection to NATS.
 	opts = append(opts, nats.MaxReconnects(-1))
+	natsCtxDefaults := &natsContextDefaults{Name: c.opts.NATSClientName}
 	if !c.opts.CRDConnect {
 		// Use JWT/NKEYS based credentials if present.
 		if c.opts.NATSCredentials != "" {
@@ -194,13 +194,15 @@ func (c *Controller) Run() error {
 		}
 
 		if c.opts.NATSCertificate != "" && c.opts.NATSKey != "" {
-			opts = append(opts, nats.ClientCert(c.opts.NATSCertificate, c.opts.NATSKey))
+			natsCtxDefaults.TLSCert = c.opts.NATSCertificate
+			natsCtxDefaults.TLSKey = c.opts.NATSKey
 		}
 
 		if c.opts.NATSCA != "" {
-			opts = append(opts, nats.RootCAs(c.opts.NATSCA))
+			natsCtxDefaults.TLSCAs = []string{c.opts.NATSCA}
 		}
-		ncp := newNatsConnPool(logrus.New(), &natsContextDefaults{URL: c.opts.NATSServerURL}, opts)
+		natsCtxDefaults.URL = c.opts.NATSServerURL
+		ncp := newNatsConnPool(logrus.New(), natsCtxDefaults, opts)
 		pooledNc, err := ncp.Get(&natsContext{})
 		if err != nil {
 			return fmt.Errorf("failed to connect to nats: %w", err)
@@ -208,7 +210,7 @@ func (c *Controller) Run() error {
 		pooledNc.ReturnToPool()
 		c.connPool = ncp
 	} else {
-		c.connPool = newNatsConnPool(logrus.New(), &natsContextDefaults{Name: c.opts.NATSClientName}, opts)
+		c.connPool = newNatsConnPool(logrus.New(), natsCtxDefaults, opts)
 	}
 
 	defer utilruntime.HandleCrash()

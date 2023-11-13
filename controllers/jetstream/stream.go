@@ -147,7 +147,6 @@ func (c *Controller) processStreamObject(str *apis.Stream, jsm jsmClientFunc) (e
 		if c.opts.CRDConnect {
 			// Create a new client
 			natsCtx := &natsContext{}
-			natsCtx.Name = fmt.Sprintf("%s-str-%s-%d", c.opts.NATSClientName, spec.Name, str.Generation)
 			// Use JWT/NKEYS based credentials if present.
 			if spec.Creds != "" {
 				natsCtx.Credentials = spec.Creds
