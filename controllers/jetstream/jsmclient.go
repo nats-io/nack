@@ -6,6 +6,7 @@ import (
 	"github.com/nats-io/jsm.go"
 	jsmapi "github.com/nats-io/jsm.go/api"
 	"github.com/nats-io/nats.go"
+	"github.com/sirupsen/logrus"
 )
 
 type jsmClient interface {
@@ -29,23 +30,20 @@ type jsmConsumer interface {
 	Delete() error
 }
 
-type jsmDeleter interface {
-	Delete() error
-}
-
 type realJsmClient struct {
-	nc *nats.Conn
-	jm *jsm.Manager
+	pooledNc *pooledNatsConn
+	jm       *jsm.Manager
 }
 
 func (c *realJsmClient) Connect(servers string, opts ...nats.Option) error {
-	nc, err := nats.Connect(servers, opts...)
+	connPool := newNatsConnPool(logrus.New(), &natsContextDefaults{URL: servers}, opts)
+	pooledNc, err := connPool.Get(&natsContext{})
 	if err != nil {
 		return err
 	}
-	c.nc = nc
+	c.pooledNc = pooledNc
 
-	m, err := jsm.New(nc)
+	m, err := jsm.New(pooledNc.nc)
 	if err != nil {
 		return err
 	}
@@ -55,7 +53,7 @@ func (c *realJsmClient) Connect(servers string, opts ...nats.Option) error {
 }
 
 func (c *realJsmClient) Close() {
-	_ = c.nc.Drain()
+	c.pooledNc.ReturnToPool()
 }
 
 func (c *realJsmClient) LoadStream(_ context.Context, name string) (jsmStream, error) {

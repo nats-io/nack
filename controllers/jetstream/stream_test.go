@@ -68,7 +68,7 @@ func TestProcessStream(t *testing.T) {
 		jsmc := &mockJsmClient{
 			loadStreamErr: notFoundErr,
 		}
-		if err := ctrl.processStream(ns, name, jsmc); err != nil {
+		if err := ctrl.processStream(ns, name, testWrapJSMC(jsmc)); err != nil {
 			t.Fatal(err)
 		}
 
@@ -129,7 +129,7 @@ func TestProcessStream(t *testing.T) {
 			loadStreamErr: nil,
 			loadStream:    &mockStream{},
 		}
-		if err := ctrl.processStream(ns, name, jsmc); err != nil {
+		if err := ctrl.processStream(ns, name, testWrapJSMC(jsmc)); err != nil {
 			t.Fatal(err)
 		}
 
@@ -190,7 +190,7 @@ func TestProcessStream(t *testing.T) {
 			loadStreamErr: nil,
 			loadStream:    &mockStream{},
 		}
-		if err := ctrl.processStream(ns, name, jsmc); err != nil {
+		if err := ctrl.processStream(ns, name, testWrapJSMC(jsmc)); err != nil {
 			t.Fatal(err)
 		}
 
@@ -268,7 +268,7 @@ func TestProcessStream(t *testing.T) {
 		jsmc := &mockJsmClient{
 			loadStreamErr: errors.New("failed to load stream"),
 		}
-		if err := ctrl.processStream(ns, name, jsmc); err == nil {
+		if err := ctrl.processStream(ns, name, testWrapJSMC(jsmc)); err == nil {
 			t.Fatal("unexpected success")
 		}
 	})

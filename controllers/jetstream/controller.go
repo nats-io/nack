@@ -23,6 +23,7 @@ import (
 	"github.com/nats-io/jsm.go"
 	jsmapi "github.com/nats-io/jsm.go/api"
 	"github.com/nats-io/nats.go"
+	"github.com/sirupsen/logrus"
 
 	apis "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 	clientset "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned"
@@ -83,10 +84,9 @@ type Options struct {
 }
 
 type Controller struct {
-	ctx  context.Context
-	opts Options
-	nc   *nats.Conn
-	jm   *jsm.Manager
+	ctx      context.Context
+	opts     Options
+	connPool *natsConnPool
 
 	ki              k8styped.CoreV1Interface
 	ji              typed.JetstreamV1beta2Interface
@@ -175,12 +175,13 @@ func NewController(opt Options) *Controller {
 }
 
 func (c *Controller) Run() error {
+
+	// Connect to NATS.
+	opts := make([]nats.Option, 0)
+	// Always attempt to have a connection to NATS.
+	opts = append(opts, nats.MaxReconnects(-1))
+	natsCtxDefaults := &natsContextDefaults{Name: c.opts.NATSClientName}
 	if !c.opts.CRDConnect {
-		// Connect to NATS.
-		opts := make([]nats.Option, 0)
-
-		opts = append(opts, nats.Name(c.opts.NATSClientName))
-
 		// Use JWT/NKEYS based credentials if present.
 		if c.opts.NATSCredentials != "" {
 			opts = append(opts, nats.UserCredentials(c.opts.NATSCredentials))
@@ -193,26 +194,23 @@ func (c *Controller) Run() error {
 		}
 
 		if c.opts.NATSCertificate != "" && c.opts.NATSKey != "" {
-			opts = append(opts, nats.ClientCert(c.opts.NATSCertificate, c.opts.NATSKey))
+			natsCtxDefaults.TLSCert = c.opts.NATSCertificate
+			natsCtxDefaults.TLSKey = c.opts.NATSKey
 		}
 
 		if c.opts.NATSCA != "" {
-			opts = append(opts, nats.RootCAs(c.opts.NATSCA))
+			natsCtxDefaults.TLSCAs = []string{c.opts.NATSCA}
 		}
-
-		// Always attempt to have a connection to NATS.
-		opts = append(opts, nats.MaxReconnects(-1))
-
-		nc, err := nats.Connect(c.opts.NATSServerURL, opts...)
+		natsCtxDefaults.URL = c.opts.NATSServerURL
+		ncp := newNatsConnPool(logrus.New(), natsCtxDefaults, opts)
+		pooledNc, err := ncp.Get(&natsContext{})
 		if err != nil {
 			return fmt.Errorf("failed to connect to nats: %w", err)
 		}
-		c.nc = nc
-		jm, err := jsm.New(c.nc)
-		if err != nil {
-			return err
-		}
-		c.jm = jm
+		pooledNc.ReturnToPool()
+		c.connPool = ncp
+	} else {
+		c.connPool = newNatsConnPool(logrus.New(), natsCtxDefaults, opts)
 	}
 
 	defer utilruntime.HandleCrash()
@@ -238,6 +236,25 @@ func (c *Controller) Run() error {
 
 	// Gracefully shutdown.
 	return nil
+}
+
+// RealJSMC creates a new JSM client from pooled nats connections
+// Providing a blank string for servers, defaults to c.opts.NATSServerUrls
+// call deferred jsmC.Close() on returned instance to return the nats connection to pool
+func (c *Controller) RealJSMC(cfg *natsContext) (jsmClient, error) {
+	if cfg == nil {
+		cfg = &natsContext{}
+	}
+	pooledNc, err := c.connPool.Get(cfg)
+	if err != nil {
+		return nil, err
+	}
+	jm, err := jsm.New(pooledNc.nc)
+	if err != nil {
+		return nil, err
+	}
+	jsmc := &realJsmClient{pooledNc: pooledNc, jm: jm}
+	return jsmc, nil
 }
 
 func selectMissingStreamsFromList(prev, cur map[string]*apis.Stream) []*apis.Stream {
@@ -293,7 +310,7 @@ func (c *Controller) cleanupStreams() error {
 						klog.Infof("stream %s/%s was not found anymore, deleting from JetStream", s.Namespace, s.Name)
 						t := k8smeta.NewTime(time.Now())
 						s.DeletionTimestamp = &t
-						if err := c.processStreamObject(s, &realJsmClient{jm: c.jm}); err != nil && !k8serrors.IsNotFound(err) {
+						if err := c.processStreamObject(s, c.RealJSMC); err != nil && !k8serrors.IsNotFound(err) {
 							klog.Infof("failed to delete stream %s/%s: %s", s.Namespace, s.Name, err)
 							continue
 						}
@@ -363,7 +380,7 @@ func (c *Controller) cleanupConsumers() error {
 						klog.Infof("consumer %s/%s was not found anymore, deleting from JetStream", cns.Namespace, cns.Name)
 						t := k8smeta.NewTime(time.Now())
 						cns.DeletionTimestamp = &t
-						if err := c.processConsumerObject(cns, &realJsmClient{jm: c.jm}); err != nil && !k8serrors.IsNotFound(err) {
+						if err := c.processConsumerObject(cns, c.RealJSMC); err != nil && !k8serrors.IsNotFound(err) {
 							klog.Infof("failed to delete consumer %s/%s: %s", cns.Namespace, cns.Name, err)
 							continue
 						}
@@ -433,9 +450,10 @@ func enqueueWork(q workqueue.RateLimitingInterface, item interface{}) (err error
 	return nil
 }
 
-type processorFunc func(ns, name string, c jsmClient) error
+type jsmClientFunc func(*natsContext) (jsmClient, error)
+type processorFunc func(ns, name string, jmsClient jsmClientFunc) error
 
-func processQueueNext(q workqueue.RateLimitingInterface, c jsmClient, process processorFunc) {
+func processQueueNext(q workqueue.RateLimitingInterface, jmsClient jsmClientFunc, process processorFunc) {
 	item, shutdown := q.Get()
 	if shutdown {
 		return
@@ -450,7 +468,7 @@ func processQueueNext(q workqueue.RateLimitingInterface, c jsmClient, process pr
 		return
 	}
 
-	err = process(ns, name, c)
+	err = process(ns, name, jmsClient)
 	if err == nil {
 		// Item processed successfully, don't requeue.
 		q.Forget(item)

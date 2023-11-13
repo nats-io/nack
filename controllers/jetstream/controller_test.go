@@ -103,7 +103,7 @@ func TestProcessQueueNext(t *testing.T) {
 		key := "this/is/a/bad/key"
 		q.Add(key)
 
-		processQueueNext(q, &mockJsmClient{}, func(ns, name string, c jsmClient) error {
+		processQueueNext(q, testWrapJSMC(&mockJsmClient{}), func(ns, name string, c jsmClientFunc) error {
 			return nil
 		})
 
@@ -136,7 +136,7 @@ func TestProcessQueueNext(t *testing.T) {
 				numRequeues = q.NumRequeues(key)
 			}
 
-			processQueueNext(q, &mockJsmClient{}, func(ns, name string, c jsmClient) error {
+			processQueueNext(q, testWrapJSMC(&mockJsmClient{}), func(ns, name string, c jsmClientFunc) error {
 				return fmt.Errorf("processing error")
 			})
 		}
@@ -164,7 +164,7 @@ func TestProcessQueueNext(t *testing.T) {
 		q.Add(key)
 
 		numRequeues := q.NumRequeues(key)
-		processQueueNext(q, &mockJsmClient{}, func(ns, name string, c jsmClient) error {
+		processQueueNext(q, testWrapJSMC(&mockJsmClient{}), func(ns, name string, c jsmClientFunc) error {
 			return nil
 		})
 

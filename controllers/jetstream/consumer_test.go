@@ -81,7 +81,9 @@ func TestProcessConsumer(t *testing.T) {
 			newConsumerErr:  nil,
 			newConsumer:     &mockConsumer{},
 		}
-		if err := ctrl.processConsumer(ns, name, jsmc); err != nil {
+		if err := ctrl.processConsumer(ns, name, func(n *natsContext) (jsmClient, error) {
+			return jsmc, nil
+		}); err != nil {
 			t.Fatal(err)
 		}
 
@@ -138,7 +140,7 @@ func TestProcessConsumer(t *testing.T) {
 			newConsumerErr:  nil,
 			newConsumer:     &mockConsumer{},
 		}
-		if err := ctrl.processConsumer(ns, name, jsmc); err == nil || !strings.Contains(err.Error(), `failed to create consumer "my-consumer" on stream `) {
+		if err := ctrl.processConsumer(ns, name, testWrapJSMC(jsmc)); err == nil || !strings.Contains(err.Error(), `failed to create consumer "my-consumer" on stream `) {
 			t.Fatal(err)
 		}
 
@@ -193,7 +195,7 @@ func TestProcessConsumer(t *testing.T) {
 			loadConsumerErr: nil,
 			loadConsumer:    &mockConsumer{},
 		}
-		if err := ctrl.processConsumer(ns, name, jsmc); err != nil {
+		if err := ctrl.processConsumer(ns, name, testWrapJSMC(jsmc)); err != nil {
 			t.Fatal(err)
 		}
 
@@ -248,7 +250,7 @@ func TestProcessConsumer(t *testing.T) {
 			loadConsumerErr: nil,
 			loadConsumer:    &mockConsumer{},
 		}
-		if err := ctrl.processConsumer(ns, name, jsmc); err != nil {
+		if err := ctrl.processConsumer(ns, name, testWrapJSMC(jsmc)); err != nil {
 			t.Fatal(err)
 		}
 
@@ -322,7 +324,7 @@ func TestProcessConsumer(t *testing.T) {
 		jsmc := &mockJsmClient{
 			loadConsumerErr: errors.New("failed to load consumer"),
 		}
-		if err := ctrl.processConsumer(ns, name, jsmc); err == nil {
+		if err := ctrl.processConsumer(ns, name, testWrapJSMC(jsmc)); err == nil {
 			t.Fatal("unexpected success")
 		}
 	})
@@ -430,5 +432,11 @@ func TestConsumerSpecToOpts(t *testing.T) {
 			}
 			assert.Equal(t, test.expected, config)
 		})
+	}
+}
+
+func testWrapJSMC(jsm jsmClient) jsmClientFunc {
+	return func(n *natsContext) (jsmClient, error) {
+		return jsm, nil
 	}
 }
