@@ -14,8 +14,6 @@ import (
 	jsmapi "github.com/nats-io/jsm.go/api"
 	apis "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 	typed "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/typed/jetstream/v1beta2"
-	"github.com/nats-io/nats.go"
-
 	k8sapi "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	k8smeta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,11 +23,11 @@ import (
 
 func (c *Controller) runConsumerQueue() {
 	for {
-		processQueueNext(c.cnsQueue, &realJsmClient{jm: c.jm}, c.processConsumer)
+		processQueueNext(c.cnsQueue, c.RealJSMC, c.processConsumer)
 	}
 }
 
-func (c *Controller) processConsumer(ns, name string, jsmc jsmClient) (err error) {
+func (c *Controller) processConsumer(ns, name string, jsmClient jsmClientFunc) (err error) {
 	cns, err := c.cnsLister.Consumers(ns).Get(name)
 	if err != nil && k8serrors.IsNotFound(err) {
 		return nil
@@ -37,10 +35,10 @@ func (c *Controller) processConsumer(ns, name string, jsmc jsmClient) (err error
 		return err
 	}
 
-	return c.processConsumerObject(cns, jsmc)
+	return c.processConsumerObject(cns, jsmClient)
 }
 
-func (c *Controller) processConsumerObject(cns *apis.Consumer, jsmc jsmClient) (err error) {
+func (c *Controller) processConsumerObject(cns *apis.Consumer, jsm jsmClientFunc) (err error) {
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("failed to process consumer: %w", err)
@@ -133,56 +131,51 @@ func (c *Controller) processConsumerObject(cns *apis.Consumer, jsmc jsmClient) (
 		servers := spec.Servers
 		if c.opts.CRDConnect {
 			// Create a new client
-			opts := make([]nats.Option, 0)
-			opts = append(opts, nats.Name(fmt.Sprintf("%s-con-%s-%d", c.opts.NATSClientName, spec.DurableName, cns.Generation)))
+			natsCtx := &natsContext{}
+			natsCtx.Name = fmt.Sprintf("%s-con-%s-%d", c.opts.NATSClientName, spec.DurableName, cns.Generation)
 			// Use JWT/NKEYS based credentials if present.
 			if spec.Creds != "" {
-				opts = append(opts, nats.UserCredentials(spec.Creds))
+				natsCtx.Credentials = spec.Creds
 			} else if spec.Nkey != "" {
-				opt, err := nats.NkeyOptionFromSeed(spec.Nkey)
-				if err != nil {
-					return err
-				}
-				opts = append(opts, opt)
+				natsCtx.Nkey = spec.Nkey
 			}
 			if spec.TLS.ClientCert != "" && spec.TLS.ClientKey != "" {
-				opts = append(opts, nats.ClientCert(spec.TLS.ClientCert, spec.TLS.ClientKey))
+				natsCtx.TLSCert = spec.TLS.ClientCert
+				natsCtx.TLSKey = spec.TLS.ClientKey
 			}
 
 			// Use fetched secrets for the account and server if defined.
 			if remoteClientCert != "" && remoteClientKey != "" {
-				opts = append(opts, nats.ClientCert(remoteClientCert, remoteClientKey))
+				natsCtx.TLSCert = remoteClientCert
+				natsCtx.TLSKey = remoteClientKey
 			}
 			if remoteRootCA != "" {
-				opts = append(opts, nats.RootCAs(remoteRootCA))
+				natsCtx.TLSCAs = []string{remoteRootCA}
 			}
 			if accUserCreds != "" {
-				opts = append(opts, nats.UserCredentials(accUserCreds))
+				natsCtx.Credentials = accUserCreds
 			}
 			if len(spec.TLS.RootCAs) > 0 {
-				opts = append(opts, nats.RootCAs(spec.TLS.RootCAs...))
+				natsCtx.TLSCAs = spec.TLS.RootCAs
 			}
-
-			opts = append(opts, nats.MaxReconnects(-1))
 
 			natsServers := strings.Join(append(servers, accServers...), ",")
-			newNc, err := nats.Connect(natsServers, opts...)
-			if err != nil {
-				return fmt.Errorf("failed to connect to leaf nats(%s): %w", natsServers, err)
-			}
-
+			natsCtx.URL = natsServers
 			c.normalEvent(cns, "Connecting", "Connecting to new nats-servers")
-			newJm, err := jsm.New(newNc)
+			jsmc, err := jsm(natsCtx)
 			if err != nil {
 				return err
 			}
-			newJsmc := &realJsmClient{nc: newNc, jm: newJm}
+			defer jsmc.Close()
 
-			if err := op(c.ctx, newJsmc, spec); err != nil {
+			if err := op(c.ctx, jsmc, spec); err != nil {
 				return err
 			}
-			newJsmc.Close()
 		} else {
+			jsmc, err := jsm(&natsContext{})
+			if err != nil {
+				return err
+			}
 			if err := op(c.ctx, jsmc, spec); err != nil {
 				return err
 			}
