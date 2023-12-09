@@ -1,0 +1,6 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestSuite
+crdDir: ./deploy/crds.yml
+testDirs:
+  - tests/
+timeout: 120
