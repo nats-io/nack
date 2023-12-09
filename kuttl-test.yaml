@@ -1,6 +1,11 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestSuite
 crdDir: ./deploy/crds.yml
+commands:
+  - command: helm delete nats
+    ignoreFailure: true
+  - command: helm repo add nats https://nats-io.github.io/k8s/helm/charts
+  - command: helm install --replace nats nats/nats
 testDirs:
   - tests/
 timeout: 120
