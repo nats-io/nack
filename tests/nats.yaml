@@ -1,20 +1,18 @@
 ---
-nats:
-  global:
-    labels:
-      app: main-jetstream
+global:
+  labels:
+    app: main-jetstream
 
-  natsBox:
+natsBox:
+  enabled: false
+
+config:
+  cluster:
+    enabled: false
+    replicas: 1
+
+  gateway:
     enabled: false
 
-  config:
-    cluster:
-      noAdvertise: true
-      enabled: true
-      replicas: 3
-
-    gateway:
-      enabled: false
-
-    jetstream:
-      enabled: true
+  jetstream:
+    enabled: true
