@@ -5,4 +5,4 @@ metadata:
     run: natscli
   name: natscli
 status:
-  phase: successful
+  phase: Succeeded
