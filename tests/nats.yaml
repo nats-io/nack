@@ -16,11 +16,12 @@ config:
   jetstream:
     enabled: true
 
-    memStorage:
+    memoryStore:
       enabled: true
-      size: 256Mi
+      maxSize: 256Mi
 
-    fileStorage:
+    memoryStore:
       enabled: true
-      storageDirectory: /data/jetstream
-      size: 256Mi
+      pvc:
+        enabled: true
+        size: 256Mi
