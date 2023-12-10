@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    run: natscli
+  name: natscli
+spec:
+  containers:
+  - image: natsio/nats-box
+    name: natscli
+    command:
+      - nats
+    args:
+      - -s
+      - nats://nats:4222
+      - stream
+      - ls
