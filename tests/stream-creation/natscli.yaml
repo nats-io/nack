@@ -5,6 +5,7 @@ metadata:
     run: natscli
   name: natscli
 spec:
+  restartPolicy: Never
   containers:
   - image: natsio/nats-box
     name: natscli
@@ -14,4 +15,5 @@ spec:
       - -s
       - nats://nats:4222
       - stream
-      - ls
+      - info
+      - rides
