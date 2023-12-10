@@ -1,0 +1,20 @@
+---
+nats:
+  global:
+    labels:
+      app: main-jetstream
+
+  natsBox:
+    enabled: false
+
+  config:
+    cluster:
+      noAdvertise: true
+      enabled: true
+      replicas: 3
+
+    gateway:
+      enabled: false
+
+    jetstream:
+      enabled: true
