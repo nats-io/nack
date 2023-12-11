@@ -1,0 +1,27 @@
+---
+global:
+  labels:
+    app: main-jetstream
+
+natsBox:
+  enabled: false
+
+config:
+  cluster:
+    enabled: false
+
+  gateway:
+    enabled: false
+
+  jetstream:
+    enabled: true
+
+    memoryStore:
+      enabled: true
+      maxSize: 256Mi
+
+    memoryStore:
+      enabled: true
+      pvc:
+        enabled: true
+        size: 256Mi

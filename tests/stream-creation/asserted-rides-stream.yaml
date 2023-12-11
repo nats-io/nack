@@ -1,0 +1,30 @@
+apiVersion: jetstream.nats.io/v1beta2
+kind: Stream
+metadata:
+  name: rides
+spec:
+  allowDirect: false
+  allowRollup: false
+  compression: ""
+  creds: ""
+  denyDelete: false
+  discard: old
+  discardPerSubject: false
+  firstSequence: 0
+  maxAge: ""
+  maxBytes: -1
+  maxConsumers: -1
+  maxMsgSize: -1
+  maxMsgs: -1
+  maxMsgsPerSubject: 0
+  name: rides
+  nkey: ""
+  noAck: false
+  preventDelete: false
+  preventUpdate: false
+  replicas: 1
+  retention: limits
+  servers: []
+  storage: memory
+  subjects:
+    - rides.>

@@ -1,0 +1,7 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestSuite
+testDirs:
+  - tests/
+commands:
+  - command: kubectl apply -f ./deploy/crds.yml
+timeout: 120

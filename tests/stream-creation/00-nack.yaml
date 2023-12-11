@@ -1,0 +1,11 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+unitTest: false
+commands:
+  - command: helm uninstall --namespace $NAMESPACE nats
+    ignoreFailure: true
+  - command: helm uninstall --namespace $NAMESPACE nack
+    ignoreFailure: true
+  - command: helm repo add nats https://nats-io.github.io/k8s/helm/charts
+  - command: helm upgrade --install --wait --namespace $NAMESPACE nats nats/nats -f ../nats.yaml
+  - command: helm upgrade --install --wait --namespace $NAMESPACE nack nats/nack -f ../nack.yaml
