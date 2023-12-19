@@ -119,9 +119,9 @@ func run() error {
 		ReadOnly:        *readOnly,
 	})
 
-	klog.Infof("Starting %s v%s...", os.Args[0], Version)
+	klog.InfoS(fmt.Sprintf("Starting %s v%s...", os.Args[0], Version))
 	if *readOnly {
-		klog.Infof("Running in read-only mode: JetStream state in server will not be changed")
+		klog.InfoS("Running in read-only mode: JetStream state in server will not be changed")
 	}
 	go handleSignals(cancel)
 	return ctrl.Run()

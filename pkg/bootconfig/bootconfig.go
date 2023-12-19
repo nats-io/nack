@@ -91,7 +91,7 @@ func (c *Controller) Run(ctx context.Context) error {
 
 	nodeName := os.Getenv("KUBERNETES_NODE_NAME")
 	if nodeName == "" {
-		return errors.New("Target node name is missing")
+		return errors.New("target node name is missing")
 	}
 	log.Infof("Pod running on node %q", nodeName)
 
@@ -114,7 +114,7 @@ func (c *Controller) Run(ctx context.Context) error {
 	if !ok {
 		externalAddress, ok = node.Labels[c.opts.TargetTag]
 		if !ok || len(externalAddress) == 0 {
-			return errors.New("Could not find external IP address.")
+			return errors.New("could not find external IP address")
 		}
 	}
 	log.Infof("Pod is running on node with external IP: %s", externalAddress)
@@ -123,7 +123,7 @@ func (c *Controller) Run(ctx context.Context) error {
 
 	err = os.WriteFile(c.opts.ClientAdvertiseFileName, []byte(clientAdvertiseConfig), 0644)
 	if err != nil {
-		return fmt.Errorf("Could not write client advertise config: %s", err)
+		return fmt.Errorf("could not write client advertise config: %s", err)
 	}
 	log.Infof("Successfully wrote client advertise config to %q", c.opts.ClientAdvertiseFileName)
 
@@ -131,7 +131,7 @@ func (c *Controller) Run(ctx context.Context) error {
 
 	err = os.WriteFile(c.opts.GatewayAdvertiseFileName, []byte(gatewayAdvertiseConfig), 0644)
 	if err != nil {
-		return fmt.Errorf("Could not write gateway advertise config: %s", err)
+		return fmt.Errorf("could not write gateway advertise config: %s", err)
 	}
 	log.Infof("Successfully wrote gateway advertise config to %q", c.opts.GatewayAdvertiseFileName)
 

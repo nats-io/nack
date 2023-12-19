@@ -441,7 +441,7 @@ func deleteConsumer(ctx context.Context, c jsmClient, spec apis.ConsumerSpec) (e
 	}()
 
 	if spec.PreventDelete {
-		klog.Infof("Consumer %q is configured to preventDelete on stream %q:", stream, consumer)
+		klog.InfoS(fmt.Sprintf("Consumer %q is configured to preventDelete on stream %q", stream, consumer), "stream", stream, "consumer", consumer)
 		return nil
 	}
 
