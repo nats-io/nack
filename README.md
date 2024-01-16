@@ -1,9 +1,9 @@
 <img width="800" alt="nack-large" src="https://user-images.githubusercontent.com/26195/92535603-71ad9a80-f1ec-11ea-8959-cdc22b31b84a.png">
 
 [![License Apache 2](https://img.shields.io/badge/License-Apache2-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
-[![Release Badge](https://github.com/nats-io/nack/actions/workflows/release.yml/badge.svg?event=release)](https://github.com/nats-io/nack/actions/workflows/release.yml)
-[![E2E Badge](https://github.com/nats-io/nack/actions/workflows/e2e.yml/badge.svg?event=release)](https://github.com/nats-io/nack/actions/workflows/e2e.yml)
-[![TEST Badge](https://github.com/nats-io/nack/actions/workflows/test.yml/badge.svg?event=release)](https://github.com/nats-io/nack/actions/workflows/test.yml)
+[![Release Badge](https://github.com/nats-io/nack/actions/workflows/release.yaml/badge.svg?event=release)](https://github.com/nats-io/nack/actions/workflows/release.yaml)
+[![E2E Badge](https://github.com/nats-io/nack/actions/workflows/e2e.yaml/badge.svg?event=release)](https://github.com/nats-io/nack/actions/workflows/e2e.yaml)
+[![TEST Badge](https://github.com/nats-io/nack/actions/workflows/test.yaml/badge.svg?event=release)](https://github.com/nats-io/nack/actions/workflows/test.yaml)
 
 [NATS](https://nats.io) Controllers for Kubernetes (NACK)
 
