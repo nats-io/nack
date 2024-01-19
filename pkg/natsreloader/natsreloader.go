@@ -23,6 +23,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"syscall"
@@ -36,7 +37,7 @@ const errorFmt = "Error: %s\n"
 // Config represents the configuration of the reloader.
 type Config struct {
 	PidFile       string
-	ConfigFiles   []string
+	WatchedFiles  []string
 	MaxRetries    int
 	RetryWaitSecs int
 	Signal        os.Signal
@@ -186,7 +187,7 @@ func handleEvents(configWatcher *fsnotify.Watcher, event fsnotify.Event, lastCon
 	}
 }
 
-func handleDeletedFiles(deletedFiles []string, configWatcher *fsnotify.Watcher, lastConfigAppliedCache map[string][]byte) ([]string, []string) {	
+func handleDeletedFiles(deletedFiles []string, configWatcher *fsnotify.Watcher, lastConfigAppliedCache map[string][]byte) ([]string, []string) {
 	if len(deletedFiles) > 0 {
 		log.Printf("Tracking files %v", deletedFiles)
 	}
@@ -213,23 +214,36 @@ func (r *Reloader) init() (*fsnotify.Watcher, map[string][]byte, error) {
 		return nil, nil, err
 	}
 
+	watchedFiles := make([]string, 0)
+
+	for _, c := range r.WatchedFiles {
+		childFiles, err := getServerFiles(c)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		watchedFiles = append(watchedFiles, childFiles...)
+	}
+
+	r.WatchedFiles = append(r.WatchedFiles, watchedFiles...)
+
 	// Follow configuration updates in the directory where
 	// the config file is located and trigger reload when
 	// it is either recreated or written into.
-	for i := range r.ConfigFiles {
+	for i := range r.WatchedFiles {
 		// Ensure our paths are canonical
-		r.ConfigFiles[i], _ = filepath.Abs(r.ConfigFiles[i])
+		r.WatchedFiles[i], _ = filepath.Abs(r.WatchedFiles[i])
 	}
-	r.ConfigFiles = removeDuplicateStrings(r.ConfigFiles)
+	r.WatchedFiles = removeDuplicateStrings(r.WatchedFiles)
 	// Follow configuration file updates and trigger reload when
 	// it is either recreated or written into.
-	for i := range r.ConfigFiles {
+	for i := range r.WatchedFiles {
 		// Watch files individually for https://github.com/kubernetes/kubernetes/issues/112677
-		if err := configWatcher.Add(r.ConfigFiles[i]); err != nil {
+		if err := configWatcher.Add(r.WatchedFiles[i]); err != nil {
 			_ = configWatcher.Close()
 			return nil, nil, err
 		}
-		log.Printf("Watching file: %v", r.ConfigFiles[i])
+		log.Printf("Watching file: %v", r.WatchedFiles[i])
 	}
 
 	// lastConfigAppliedCache is the last config update
@@ -238,7 +252,7 @@ func (r *Reloader) init() (*fsnotify.Watcher, map[string][]byte, error) {
 
 	// Preload config hashes, so we know their digests
 	// up front and avoid potentially reloading when unnecessary.
-	for _, configFile := range r.ConfigFiles {
+	for _, configFile := range r.WatchedFiles {
 		digest, err := getFileDigest(configFile)
 		if err != nil {
 			_ = configWatcher.Close()
@@ -251,7 +265,7 @@ func (r *Reloader) init() (*fsnotify.Watcher, map[string][]byte, error) {
 
 	if len(lastConfigAppliedCache) == 0 {
 		log.Printf("Error: no watched config files cached; input spec was: %#v",
-			r.ConfigFiles)
+			r.WatchedFiles)
 	}
 	return configWatcher, lastConfigAppliedCache, nil
 }
@@ -373,4 +387,94 @@ func retryJitter(base time.Duration) time.Duration {
 	// 10% +/-
 	offset := rand.Float64()*0.2 - 0.1
 	return time.Duration(b + offset)
+}
+
+func getServerFiles(configFile string) ([]string, error) {
+	filePaths, err := getIncludePaths(configFile, make(map[string]interface{}))
+	if err != nil {
+		return nil, err
+	}
+
+	certPaths, err := getCertPaths(filePaths)
+	if err != nil {
+		return nil, err
+	}
+
+	filePaths = append(filePaths, certPaths...)
+	sort.Strings(filePaths)
+
+	return filePaths, nil
+}
+
+func getIncludePaths(configFile string, checked map[string]interface{}) ([]string, error) {
+	if _, ok := checked[configFile]; ok {
+		return []string{}, nil
+	}
+
+	configFile, err := filepath.Abs(configFile)
+	if err != nil {
+		return nil, err
+	}
+
+	// Add the current config file to the list and mark it as checked
+	filePaths := []string{configFile}
+	checked[configFile] = nil
+
+	parentDirectory := filepath.Dir(configFile)
+	includeRegex := regexp.MustCompile(`(?m)^\s*include\s+([^\n]*)`)
+
+	content, err := os.ReadFile(configFile)
+	if err != nil {
+		return nil, err
+	}
+
+	includeMatches := includeRegex.FindAllStringSubmatch(string(content), -1)
+	for _, match := range includeMatches {
+		// Include filepaths in NATS config are always relative
+		fullyQualifiedPath := filepath.Join(parentDirectory, match[1])
+		fullyQualifiedPath = filepath.Clean(fullyQualifiedPath)
+
+		if _, err := os.Stat(fullyQualifiedPath); os.IsNotExist(err) {
+			return nil, fmt.Errorf("%s does not exist", fullyQualifiedPath)
+		}
+
+		// Recursive call to make sure we catch any nested includes
+		// Using map[string]interface{} as a set to avoid loops
+		includePaths, err := getIncludePaths(fullyQualifiedPath, checked)
+		if err != nil {
+			return nil, err
+		}
+
+		filePaths = append(filePaths, includePaths...)
+	}
+
+	return filePaths, nil
+}
+
+func getCertPaths(configPaths []string) ([]string, error) {
+	certPaths := []string{}
+	certRegex := regexp.MustCompile(`(?m)^\s*(cert_file|key_file|ca_file)\s*:\s*"?([^"\n]*)"?`)
+
+	for _, configPath := range configPaths {
+		content, err := os.ReadFile(configPath)
+		if err != nil {
+			return nil, err
+		}
+
+		certMatches := certRegex.FindAllStringSubmatch(string(content), -1)
+		for _, match := range certMatches {
+			fullyQualifiedPath, err := filepath.Abs(match[2])
+			if err != nil {
+				return nil, err
+			}
+
+			if _, err := os.Stat(fullyQualifiedPath); os.IsNotExist(err) {
+				return nil, fmt.Errorf("%s does not exist", fullyQualifiedPath)
+			}
+
+			certPaths = append(certPaths, fullyQualifiedPath)
+		}
+	}
+
+	return certPaths, nil
 }

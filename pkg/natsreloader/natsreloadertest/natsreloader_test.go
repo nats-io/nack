@@ -48,9 +48,9 @@ func TestReloader(t *testing.T) {
 
 	// Create tempfile with contents, then update it
 	nconfig := &natsreloader.Config{
-		PidFile:     pidfile.Name(),
-		ConfigFiles: []string{},
-		Signal:      syscall.SIGHUP,
+		PidFile:      pidfile.Name(),
+		WatchedFiles: []string{},
+		Signal:       syscall.SIGHUP,
 	}
 
 	var configFiles []*os.File
@@ -65,7 +65,7 @@ func TestReloader(t *testing.T) {
 			t.Fatal(err)
 		}
 		configFiles = append(configFiles, configFile)
-		nconfig.ConfigFiles = append(nconfig.ConfigFiles, configFile.Name())
+		nconfig.WatchedFiles = append(nconfig.WatchedFiles, configFile.Name())
 	}
 
 	r, err := natsreloader.NewReloader(nconfig)

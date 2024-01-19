@@ -42,9 +42,9 @@ func main() {
 
 	// Help and version
 	var (
-		showHelp    bool
-		showVersion bool
-		fileSet     StringSet
+		showHelp     bool
+		showVersion  bool
+		fileSet      StringSet
 		customSignal int
 	)
 
@@ -64,9 +64,9 @@ func main() {
 
 	fs.Parse(os.Args[1:])
 
-	nconfig.ConfigFiles = fileSet
+	nconfig.WatchedFiles = fileSet
 	if len(fileSet) == 0 {
-		nconfig.ConfigFiles = []string{"/etc/nats-config/gnatsd.conf"}
+		nconfig.WatchedFiles = []string{"/etc/nats-config/gnatsd.conf"}
 	}
 	nconfig.Signal = syscall.Signal(customSignal)
 
