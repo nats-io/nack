@@ -17,14 +17,52 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"sort"
+	"strings"
 	"sync"
 	"syscall"
 	"testing"
 	"time"
 
 	"github.com/nats-io/nack/pkg/natsreloader"
+)
+
+const (
+	testConfig_0 = `
+jetstream {
+	store_dir: data/jetstream
+	max_mem: 10G
+	max_file: 10G
+}
+operator: eyJ0eXAiOiJKV1QiLCJhbGciOiJlZDI1NTE5LW5rZXkifQ.eyJqdGkiOiI3Sk1aNEQ0RE1WU1hGWDRYWExCTVVITjY1MjdaQlhaV0dZUUtBQVk0TVRQQTZOSEdHS1NBIiwiaWF0IjoxNjgyNTAzMzg4LCJpc3MiOiJPQ1hXU0tWNU5UTUxCUjI0NlZaQ0laSzVZRlBVTVNPVjZVWk5JNDRPTFVVUUlCNkE0VU1RWE1USiIsIm5hbWUiOiJuYXRzLXRlc3QtMDEiLCJzdWIiOiJPQ1hXU0tWNU5UTUxCUjI0NlZaQ0laSzVZRlBVTVNPVjZVWk5JNDRPTFVVUUlCNkE0VU1RWE1USiIsIm5hdHMiOnsic2lnbmluZ19rZXlzIjpbIk9DS1oyNkpJUDdCN1BHQk43QTdEVEVHVk9NUlNHNE5XVFZURjdPQ0pOSVdRS0xZT0YzWDJBTlFKIl0sImFjY291bnRfc2VydmVyX3VybCI6Im5hdHM6Ly9sb2NhbGhvc3Q6NDIyMiIsIm9wZXJhdG9yX3NlcnZpY2VfdXJscyI6WyJuYXRzOi8vbG9jYWxob3N0OjQyMjIiXSwic3lzdGVtX2FjY291bnQiOiJBQk5ITEY2NVlEWkxGWUlIUVVVU0pXWlZSUVc0UE8zVFFRT0VTNlA3WTRUQ1BQWVVTNkhIVzJFUyIsInR5cGUiOiJvcGVyYXRvciIsInZlcnNpb24iOjJ9fQ.LjVkEnA3Fg3F20cPZm5FShZQKWPiU4pLdhh2s0cj_zhxA88wXgNfUo_SPs59JE97qvpR7AOWksP5dzxMZJ2iBQ
+# System Account named SYS
+system_account: ABNHLF65YDZLFYIHQUUSJWZVRQW4PO3TQQOES6P7Y4TCPPYUS6HHW2ES
+
+resolver {
+	type: full
+	dir: './'
+}
+
+jetstream {
+	store_dir: data/jetstream
+	max_mem: 10G
+	max_file: 10G
+}
+
+include ./testConfig_1.conf`
+
+	testConfig_1 = `include ./testConfig_2.conf`
+
+	testConfig_2 = `
+tls: {
+	cert_file: "./test.pem"
+	key_file: "./testkey.pem"
+}
+`
 )
 
 var configContents = `port = 2222`
@@ -133,4 +171,122 @@ func TestReloader(t *testing.T) {
 	if got != expected {
 		t.Fatalf("Wrong number of signals received. Expected: %v, got: %v", expected, got)
 	}
+}
+
+func TestFileFinder(t *testing.T) {
+	directory, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	confFile := filepath.Join(directory, "testConfig_0.conf")
+	err = writeFile(testConfig_0, confFile)
+	defer os.Remove(confFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	confFile = filepath.Join(directory, "testConfig_1.conf")
+	err = writeFile(testConfig_1, confFile)
+	defer os.Remove(confFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	confFile = filepath.Join(directory, "testConfig_2.conf")
+	err = writeFile(testConfig_2, confFile)
+	defer os.Remove(confFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	confFile = filepath.Join(directory, "test.pem")
+	err = writeFile("test", confFile)
+	defer os.Remove(confFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	confFile = filepath.Join(directory, "testkey.pem")
+	err = writeFile("test", confFile)
+	defer os.Remove(confFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pid := os.Getpid()
+	pidFile := filepath.Join(directory, "nats.pid")
+	err = writeFile(fmt.Sprintf("%d", pid), pidFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(pidFile)
+
+	nconfig := &natsreloader.Config{
+		PidFile:      pidFile,
+		WatchedFiles: []string{filepath.Join(directory, "testConfig_0.conf")},
+		Signal:       syscall.SIGHUP,
+	}
+
+	r, err := natsreloader.NewReloader(nconfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	go func() {
+		err = r.Run(ctx)
+		if err != nil {
+			t.Error(err)
+		}
+	}()
+
+	time.Sleep(time.Second)
+
+	expectedWatchedFiles := []string{
+		"/testConfig_0.conf",
+		"/testConfig_1.conf",
+		"/testConfig_2.conf",
+		"/test.pem",
+		"/testkey.pem",
+	}
+
+	watchedFiles := r.WatchedFiles
+
+	sort.Strings(expectedWatchedFiles)
+	sort.Strings(watchedFiles)
+
+	if len(watchedFiles) > len(expectedWatchedFiles) {
+		t.Fatal("Unexpected number of watched files")
+	}
+
+	for i, e := range expectedWatchedFiles {
+		f := strings.TrimPrefix(watchedFiles[i], directory)
+		if f != e {
+			t.Fatal("Expected watched file list does not match")
+		}
+
+	}
+
+	cancel()
+}
+
+func writeFile(content, path string) error {
+	parentDirectory := filepath.Dir(path)
+	if _, err := os.Stat(parentDirectory); errors.Is(err, fs.ErrNotExist) {
+		err = os.MkdirAll(parentDirectory, 0o755)
+		if err != nil {
+			return err
+		}
+	}
+
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0o644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	_, err = file.WriteString(content)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
