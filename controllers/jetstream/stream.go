@@ -207,7 +207,7 @@ func (c *Controller) processStreamObject(str *apis.Stream, jsm jsmClientFunc) (e
 		return err
 	}
 	updateOK := (strOK && !deleteOK && newGeneration)
-	createOK := (!strOK && !deleteOK && newGeneration)
+	createOK := (!strOK && !deleteOK)
 
 	switch {
 	case createOK:
