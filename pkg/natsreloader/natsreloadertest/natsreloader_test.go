@@ -240,6 +240,8 @@ func TestFileFinder(t *testing.T) {
 
 	time.Sleep(time.Second)
 
+	cancel()
+
 	expectedWatchedFiles := []string{
 		"/testConfig_0.conf",
 		"/testConfig_1.conf",
@@ -264,8 +266,6 @@ func TestFileFinder(t *testing.T) {
 		}
 
 	}
-
-	cancel()
 }
 
 func writeFile(content, path string) error {
