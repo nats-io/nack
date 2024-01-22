@@ -5,7 +5,7 @@ metadata:
   name: mystream-sources
 spec:
   name: mystream-sources
-  storage: memory
+  storage: file
   sources:
   - name: m1
   - name: m2
