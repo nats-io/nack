@@ -5,7 +5,7 @@ metadata:
   name: mystream-placement
 spec:
   name: mystream-placement
-  storage: memory
+  storage: file
   placement:
     tags:
     - NODE_0

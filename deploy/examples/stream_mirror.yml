@@ -5,7 +5,7 @@ metadata:
   name: mystream-mirror
 spec:
   name: mystream-mirror
-  storage: memory
+  storage: file
   mirror:
     name: my-publish-subj
     externalApiPrefix: FOO.JS.API

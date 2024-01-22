@@ -23,7 +23,7 @@ Now install with Helm:
 
 ```
 helm repo add nats https://nats-io.github.io/k8s/helm/charts/
-helm install nats nats/nats --set=nats.jetstream.enabled=true
+helm install nats nats/nats --set=config.jetstream.enabled=true
 helm install nack nats/nack --set jetstream.nats.url=nats://nats:4222
 ```
 

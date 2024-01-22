@@ -12,5 +12,5 @@ spec:
   name: mystreamtemplate
   maxStreams: 2
   subjects: ["orders.*"]
-  storage: memory
+  storage: file
   maxAge: 1h
