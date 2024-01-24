@@ -26,6 +26,7 @@ import (
 	"regexp"
 	"sort"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -217,6 +218,10 @@ func (r *Reloader) init() (*fsnotify.Watcher, map[string][]byte, error) {
 	watchedFiles := make([]string, 0)
 
 	for _, c := range r.WatchedFiles {
+		// Only try to parse config files
+		if !strings.HasSuffix(c, ".conf") {
+			continue
+		}
 		childFiles, err := getServerFiles(c)
 		if err != nil {
 			return nil, nil, err
