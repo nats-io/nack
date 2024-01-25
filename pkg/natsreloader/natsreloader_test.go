@@ -11,7 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package natsreloadertest
+package natsreloader
 
 import (
 	"context"
@@ -27,8 +27,6 @@ import (
 	"syscall"
 	"testing"
 	"time"
-
-	"github.com/nats-io/nack/pkg/natsreloader"
 )
 
 const (
@@ -63,6 +61,31 @@ tls: {
 	key_file: "./testkey.pem"
 }
 `
+	includeTest_0 = `
+include nats_0.conf
+include  nats_1.conf;	// semicolon terminated
+include "nats_2.conf"	// quoted
+include  "nats_3.conf"; // quoted and semicolon terminated
+include 'nats_4.conf'	// are single quotes valid in nats conf?  if so also need this
+include  'nats_5.conf'; // are single quotes valid in nats conf?  if so also need this
+include $NATS;        	// ignore, this is a variable.  let's not worry about variable interpolation
+include "$NATS_6.conf"  // don't ignore, this is a string not a variable
+include includeTest_1.conf
+`
+	includeTest_1 = `
+tls: {
+	cert_file: ./nats_0.pem
+	key_file: 'nats_0.key'
+}
+tls: {
+	cert_file: "./nats_1.pem"
+	key_file: $test
+}
+tls: {
+	cert_file: "$nats_2.pem";
+	key_file: 'nats_1.key';
+}
+`
 )
 
 var configContents = `port = 2222`
@@ -85,7 +108,7 @@ func TestReloader(t *testing.T) {
 	defer os.Remove(pidfile.Name())
 
 	// Create tempfile with contents, then update it
-	nconfig := &natsreloader.Config{
+	nconfig := &Config{
 		PidFile:      pidfile.Name(),
 		WatchedFiles: []string{},
 		Signal:       syscall.SIGHUP,
@@ -106,7 +129,7 @@ func TestReloader(t *testing.T) {
 		nconfig.WatchedFiles = append(nconfig.WatchedFiles, configFile.Name())
 	}
 
-	r, err := natsreloader.NewReloader(nconfig)
+	r, err := NewReloader(nconfig)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -173,6 +196,74 @@ func TestReloader(t *testing.T) {
 	}
 }
 
+func TestInclude(t *testing.T) {
+	directory, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dummyFiles := []string{
+		"nats_0.conf",
+		"nats_1.conf",
+		"nats_2.conf",
+		"nats_3.conf",
+		"nats_4.conf",
+		"nats_5.conf",
+		"$NATS_6.conf",
+		"nats_0.pem",
+		"nats_1.pem",
+		"$nats_2.pem",
+		"nats_0.key",
+		"nats_1.key",
+	}
+
+	for _, f := range dummyFiles {
+		p := filepath.Join(directory, f)
+		err = writeFile("", p)
+		defer os.Remove(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	includeTestConf_0 := filepath.Join(directory, "includeTest_0.conf")
+	err = writeFile(includeTest_0, includeTestConf_0)
+	defer os.Remove(includeTestConf_0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	includeTestConf_1 := filepath.Join(directory, "includeTest_1.conf")
+	err = writeFile(includeTest_1, includeTestConf_1)
+	defer os.Remove(includeTestConf_1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	includes, err := getServerFiles("includeTest_0.conf")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	includePaths := make([]string, 0)
+	for _, p := range includes {
+		includePaths = append(includePaths, filepath.Base(p))
+	}
+
+	dummyFiles = append(dummyFiles, "includeTest_0.conf")
+	dummyFiles = append(dummyFiles, "includeTest_1.conf")
+
+	sort.Strings(dummyFiles)
+	sort.Strings(includePaths)
+
+	for i, p := range dummyFiles {
+		if p != includePaths[i] {
+			t.Fatal("Expected include paths do not match")
+		}
+	}
+
+}
+
 func TestFileFinder(t *testing.T) {
 	directory, err := os.Getwd()
 	if err != nil {
@@ -218,13 +309,13 @@ func TestFileFinder(t *testing.T) {
 	}
 	defer os.Remove(pidFile)
 
-	nconfig := &natsreloader.Config{
+	nconfig := &Config{
 		PidFile:      pidFile,
 		WatchedFiles: []string{filepath.Join(directory, "testConfig_0.conf")},
 		Signal:       syscall.SIGHUP,
 	}
 
-	r, err := natsreloader.NewReloader(nconfig)
+	r, err := NewReloader(nconfig)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -426,7 +426,7 @@ func getIncludePaths(configFile string, checked map[string]interface{}) ([]strin
 	checked[configFile] = nil
 
 	parentDirectory := filepath.Dir(configFile)
-	includeRegex := regexp.MustCompile(`(?m)^\s*include\s+['"]?([^'"\n]*)`)
+	includeRegex := regexp.MustCompile(`(?m)^\s*include\s+(['"]?[^'";\n]*)`)
 
 	content, err := os.ReadFile(configFile)
 	if err != nil {
@@ -435,8 +435,16 @@ func getIncludePaths(configFile string, checked map[string]interface{}) ([]strin
 
 	includeMatches := includeRegex.FindAllStringSubmatch(string(content), -1)
 	for _, match := range includeMatches {
+		matchStr := match[1]
+		if strings.HasPrefix(matchStr, "$") {
+			continue
+		}
+
+		matchStr = strings.TrimPrefix(matchStr, "'")
+		matchStr = strings.TrimPrefix(matchStr, "\"")
+
 		// Include filepaths in NATS config are always relative
-		fullyQualifiedPath := filepath.Join(parentDirectory, match[1])
+		fullyQualifiedPath := filepath.Join(parentDirectory, matchStr)
 		fullyQualifiedPath = filepath.Clean(fullyQualifiedPath)
 
 		if _, err := os.Stat(fullyQualifiedPath); os.IsNotExist(err) {
@@ -458,7 +466,7 @@ func getIncludePaths(configFile string, checked map[string]interface{}) ([]strin
 
 func getCertPaths(configPaths []string) ([]string, error) {
 	certPaths := []string{}
-	certRegex := regexp.MustCompile(`(?m)^\s*(cert_file|key_file|ca_file)\s*:\s*"?([^"\n]*)"?`)
+	certRegex := regexp.MustCompile(`(?m)^\s*(cert_file|key_file|ca_file)\s*:\s*(['"]?[^'";\n]*)"?`)
 
 	for _, configPath := range configPaths {
 		content, err := os.ReadFile(configPath)
@@ -468,7 +476,15 @@ func getCertPaths(configPaths []string) ([]string, error) {
 
 		certMatches := certRegex.FindAllStringSubmatch(string(content), -1)
 		for _, match := range certMatches {
-			fullyQualifiedPath, err := filepath.Abs(match[2])
+			matchStr := match[2]
+			if strings.HasPrefix(matchStr, "$") {
+				continue
+			}
+
+			matchStr = strings.TrimPrefix(matchStr, "'")
+			matchStr = strings.TrimPrefix(matchStr, "\"")
+
+			fullyQualifiedPath, err := filepath.Abs(matchStr)
 			if err != nil {
 				return nil, err
 			}
