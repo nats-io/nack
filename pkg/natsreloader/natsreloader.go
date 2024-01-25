@@ -426,7 +426,7 @@ func getIncludePaths(configFile string, checked map[string]interface{}) ([]strin
 	checked[configFile] = nil
 
 	parentDirectory := filepath.Dir(configFile)
-	includeRegex := regexp.MustCompile(`(?m)^\s*include\s+([^\n]*)`)
+	includeRegex := regexp.MustCompile(`(?m)^\s*include\s+['"]?([^'"\n]*)`)
 
 	content, err := os.ReadFile(configFile)
 	if err != nil {

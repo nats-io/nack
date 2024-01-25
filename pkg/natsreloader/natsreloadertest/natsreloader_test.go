@@ -53,7 +53,7 @@ jetstream {
 	max_file: 10G
 }
 
-include ./testConfig_1.conf`
+include './testConfig_1.conf'`
 
 	testConfig_1 = `include ./testConfig_2.conf`
 
