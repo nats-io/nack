@@ -92,7 +92,7 @@ func (c *Controller) processStreamObject(str *apis.Stream, jsm jsmClientFunc) (e
 
 			// Write this to the cacheDir.
 			accDir := filepath.Join(c.cacheDir, ns, spec.Account)
-			if err := os.MkdirAll(accDir, 0755); err != nil {
+			if err := os.MkdirAll(accDir, 0o755); err != nil {
 				return err
 			}
 
@@ -101,7 +101,7 @@ func (c *Controller) processStreamObject(str *apis.Stream, jsm jsmClientFunc) (e
 			remoteRootCA = filepath.Join(accDir, acc.Spec.TLS.RootCAs)
 
 			for k, v := range secret.Data {
-				if err := os.WriteFile(filepath.Join(accDir, k), v, 0644); err != nil {
+				if err := os.WriteFile(filepath.Join(accDir, k), v, 0o644); err != nil {
 					return err
 				}
 			}
@@ -116,13 +116,13 @@ func (c *Controller) processStreamObject(str *apis.Stream, jsm jsmClientFunc) (e
 
 			// Write the user credentials to the cache dir.
 			accDir := filepath.Join(c.cacheDir, ns, spec.Account)
-			if err := os.MkdirAll(accDir, 0755); err != nil {
+			if err := os.MkdirAll(accDir, 0o755); err != nil {
 				return err
 			}
 			for k, v := range secret.Data {
 				if k == acc.Spec.Creds.File {
 					accUserCreds = filepath.Join(c.cacheDir, ns, spec.Account, k)
-					if err := os.WriteFile(filepath.Join(accDir, k), v, 0644); err != nil {
+					if err := os.WriteFile(filepath.Join(accDir, k), v, 0o644); err != nil {
 						return err
 					}
 				}
@@ -207,7 +207,7 @@ func (c *Controller) processStreamObject(str *apis.Stream, jsm jsmClientFunc) (e
 		return err
 	}
 	updateOK := (strOK && !deleteOK && newGeneration)
-	createOK := (!strOK && !deleteOK && newGeneration)
+	createOK := (!strOK && !deleteOK) || (!updateOK && !deleteOK && newGeneration)
 
 	switch {
 	case createOK:
