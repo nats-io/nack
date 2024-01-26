@@ -64,12 +64,12 @@ tls: {
 	includeTest_0 = `
 include nats_0.conf
 include  nats_1.conf;	// semicolon terminated
-include "nats_2.conf"	// quoted
-include  "nats_3.conf"; // quoted and semicolon terminated
-include 'nats_4.conf'	// are single quotes valid in nats conf?  if so also need this
-include  'nats_5.conf'; // are single quotes valid in nats conf?  if so also need this
-include $NATS;        	// ignore, this is a variable.  let's not worry about variable interpolation
-include "$NATS_6.conf"  // don't ignore, this is a string not a variable
+include "nats_2.conf"	// double-quoted
+include  "nats_3.conf"; // double-quoted and semicolon terminated
+include 'nats_4.conf'	// single-quoted
+include  'nats_5.conf'; // single-quoted and semicolon terminated
+include $NATS;        	// ignore variable
+include "$NATS_6.conf"  // filename starting with $
 include includeTest_1.conf
 `
 	includeTest_1 = `
