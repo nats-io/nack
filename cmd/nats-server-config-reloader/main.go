@@ -42,9 +42,9 @@ func main() {
 
 	// Help and version
 	var (
-		showHelp    bool
-		showVersion bool
-		fileSet     StringSet
+		showHelp     bool
+		showVersion  bool
+		fileSet      StringSet
 		customSignal int
 	)
 
@@ -54,8 +54,8 @@ func main() {
 	fs.BoolVar(&showVersion, "v", false, "Show version")
 	fs.BoolVar(&showVersion, "version", false, "Show version")
 
-	fs.StringVar(&nconfig.PidFile, "P", "/var/run/nats/gnatsd.pid", "NATS Server Pid File")
-	fs.StringVar(&nconfig.PidFile, "pid", "/var/run/nats/gnatsd.pid", "NATS Server Pid File")
+	fs.StringVar(&nconfig.PidFile, "P", "/var/run/nats/nats.pid", "NATS Server Pid File")
+	fs.StringVar(&nconfig.PidFile, "pid", "/var/run/nats/nats.pid", "NATS Server Pid File")
 	fs.Var(&fileSet, "c", "NATS Server Config File (may be repeated to specify more than one)")
 	fs.Var(&fileSet, "config", "NATS Server Config File (may be repeated to specify more than one)")
 	fs.IntVar(&nconfig.MaxRetries, "max-retries", 30, "Max attempts to trigger reload")
@@ -64,9 +64,9 @@ func main() {
 
 	fs.Parse(os.Args[1:])
 
-	nconfig.ConfigFiles = fileSet
+	nconfig.WatchedFiles = fileSet
 	if len(fileSet) == 0 {
-		nconfig.ConfigFiles = []string{"/etc/nats-config/gnatsd.conf"}
+		nconfig.WatchedFiles = []string{"/etc/nats-config/nats.conf"}
 	}
 	nconfig.Signal = syscall.Signal(customSignal)
 
