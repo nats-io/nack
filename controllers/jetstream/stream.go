@@ -537,7 +537,7 @@ func deleteStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 	}()
 
 	if spec.PreventDelete {
-		klog.Infof("Stream %q is configured to preventDelete:\n", name)
+		klog.InfoS(fmt.Sprintf("Stream %q is configured to preventDelete", name), "stream", name)
 		return nil
 	}
 
