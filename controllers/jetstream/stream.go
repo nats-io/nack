@@ -514,6 +514,13 @@ func updateStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 		config.Sources[i] = jss
 	}
 
+	if spec.Placement != nil {
+		config.Placement = &jsmapi.Placement{
+			Cluster: spec.Placement.Cluster,
+			Tags:    spec.Placement.Tags,
+		}
+	}
+
 	if spec.Metadata != nil {
 		config.Metadata = spec.Metadata
 	}
