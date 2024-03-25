@@ -23,7 +23,7 @@ jobs:
         uses: helm/kind-action@v1.8.0
 
       - name: set up helm
-        uses: azure/setup-helm@v3
+        uses: azure/setup-helm@v4
 
       - name: run e2e test
         run: kubectl kuttl test
