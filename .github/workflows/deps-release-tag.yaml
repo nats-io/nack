@@ -1,0 +1,37 @@
+name: Deps Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    name: Tag
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - id: tag
+        name: Determine tag
+        run: |
+          version="$(head -n 1 ./cicd/tag_deps_version.txt)"
+          ref_name="v$version"
+          create=true
+          if [ "$(git ls-remote origin "refs/tags/$ref_name" | wc -l)" = "1" ]; then
+            create=false
+          fi
+
+          echo "version=$version" | tee -a "$GITHUB_OUTPUT"
+          echo "ref-name=$ref_name" | tee -a "$GITHUB_OUTPUT"
+          echo "create=$create" | tee -a "$GITHUB_OUTPUT"
+
+      - if: ${{ fromJSON(steps.tag.outputs.create) }}
+        name: Tag
+        run: |
+          git tag "${{ steps.tag.outputs.ref-name }}"
+          git push origin "${{ steps.tag.outputs.ref-name }}"
