@@ -26,9 +26,10 @@ jobs:
       - id: tag
         name: Determine tag
         run: |
-          old_version="$(head -n 1 ./cicd/tag-deps-version.txt)"
+          deps_file="./cicd/tag-deps-version.txt"
+          old_version="$(head -n 1 "$deps_file")"
           old_ref_name="v$old_version"
-          new_version="$(tail -n 1 ./cicd/tag-deps-version.txt)"
+          new_version="$(tail -n 1 "$deps_file")"
           new_ref_name="v$new_version"
 
           create=true
