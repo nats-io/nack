@@ -14,24 +14,43 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
 
       - id: tag
         name: Determine tag
         run: |
-          version="$(head -n 1 ./cicd/tag_deps_version.txt)"
-          ref_name="v$version"
+          old_version="$(head -n 1 ./cicd/tag-deps-version.txt)"
+          old_ref_name="v$old_version"
+          new_version="$(tail -n 1 ./cicd/tag-deps-version.txt)"
+          new_ref_name="v$new_version"
+
           create=true
-          if [ "$(git ls-remote origin "refs/tags/$ref_name" | wc -l)" = "1" ]; then
+          if [ "$(git ls-remote origin "refs/tags/$new_ref_name" | wc -l)" = "1" ]; then
             create=false
           fi
 
-          echo "version=$version" | tee -a "$GITHUB_OUTPUT"
-          echo "ref-name=$ref_name" | tee -a "$GITHUB_OUTPUT"
+          echo "old-version=$old_version" | tee -a "$GITHUB_OUTPUT"
+          echo "old-ref-name=$old_ref_name" | tee -a "$GITHUB_OUTPUT"
+          echo "new-version=$new_version" | tee -a "$GITHUB_OUTPUT"
+          echo "new-ref-name=$new_ref_name" | tee -a "$GITHUB_OUTPUT"
           echo "create=$create" | tee -a "$GITHUB_OUTPUT"
 
       - if: ${{ fromJSON(steps.tag.outputs.create) }}
         name: Tag
         run: |
-          git tag "${{ steps.tag.outputs.ref-name }}"
-          git push origin "${{ steps.tag.outputs.ref-name }}"
+          commit="$(git rev-parse HEAD)"
+          git fetch origin refs/tags/"${{ steps.tag.outputs.old-ref-name }}"
+          git checkout -b deps "${{ steps.tag.outputs.old-ref-name }}"
+          git restore --source="$commit" ./cicd
+          git add ./cicd
+          if git commit -m "bump dependency release to ${{ steps.tag.outputs.new-version }}"; then
+            git tag "${{ steps.tag.outputs.new-ref-name }}"
+            git push origin "${{ steps.tag.outputs.new-ref-name }}"
+          fi

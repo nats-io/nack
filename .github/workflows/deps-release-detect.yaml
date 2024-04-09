@@ -66,16 +66,19 @@ jobs:
             echo "prevVersion      : $prevVersion"
             echo "newVersion       : $newVersion"
 
-            tag_deps_version="$(git ls-remote 2>/dev/null \
+            tagPrevVersion="$(git ls-remote 2>/dev/null \
               | grep -oE 'refs/tags/v[0-9]+\.[0-9]+\.[0-9]+' \
               | cut -d'/' -f3 \
               | xargs semver \
-              | tail -n 1 \
-              | xargs semver -i patch)"
+              | tail -n 1)"
+            
+            tagNewVersion="$(semver -i patch "$tagPrevVersion")"
               
-            echo "$tag_deps_version" > ./cicd/tag-base-version.txt
+            echo "$tagPrevVersion" > ./cicd/tag-deps-version.txt
+            echo "$tagNewVersion" >> ./cicd/tag-deps-version.txt
+
             git add ./cicd/tag-base-version.txt
-            if git commit -m "bump dependency release to $tag_deps_version"; then
+            if git commit -m "bump dependency release to $tagNewVersion"; then
               push=1
             fi
           done
