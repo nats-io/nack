@@ -6,6 +6,7 @@ on:
       - main
 
 permissions:
+  actions: write
   contents: write
 
 jobs:
@@ -55,3 +56,9 @@ jobs:
             git tag "${{ steps.tag.outputs.new-ref-name }}"
             git push origin "${{ steps.tag.outputs.new-ref-name }}"
           fi
+
+      - if: ${{ fromJSON(steps.tag.outputs.create) }}
+        name: Trigger Release
+        run: gh workflow run release.yaml --ref "${{ steps.tag.outputs.new-ref-name }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
