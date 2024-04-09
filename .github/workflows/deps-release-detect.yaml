@@ -1,0 +1,88 @@
+name: Deps Release
+
+on: 'pull_request'
+
+permissions:
+  contents: write
+
+jobs:
+  detect:
+    name: Detect
+    runs-on: ubuntu-latest
+    if: ${{ github.actor == 'dependabot[bot]' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+          git checkout -b "$GITHUB_HEAD_REF"
+
+      - name: Dependabot metadata
+        id: dependabot-metadata
+        uses: dependabot/fetch-metadata@v2
+
+      - name: Install node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      
+      - name: Install semver
+        run: |-
+          npm install -g semver
+
+      - name: Bump
+        run: |-
+          set -e
+          push=0
+          config='[
+            {
+              "directory": "cicd",
+              "dependencyName": "alpine"
+            }
+          ]'
+
+          deps='${{ steps.dependabot-metadata.outputs.updated-dependencies-json }}'
+
+          for i in $(seq 0 "$(("$(echo "$config" | jq length) - 1"))"); do
+            directory="$(echo "$config" | jq -r ".[$i].directory")"
+            dependencyName="$(echo "$config" | jq -r ".[$i].dependencyName")"
+            match="$(echo "$deps" | jq ".[] | select(.directory == \"/$directory\" and .dependencyName == \"$dependencyName\")")"
+            if [ -z "$match" ]; then
+              continue
+            fi
+
+            updateType="$(echo "$match" | jq -r ".updateType")"
+            prevVersion="$(echo "$match" | jq -r ".prevVersion")"
+            newVersion="$(echo "$match" | jq -r ".newVersion")"
+
+            echo "directory        : $directory"
+            echo "dependencyName   : $dependencyName"
+            echo "updateType       : $updateType"
+            echo "prevVersion      : $prevVersion"
+            echo "newVersion       : $newVersion"
+
+            tagPrevVersion="$(git ls-remote 2>/dev/null \
+              | grep -oE 'refs/tags/v[0-9]+\.[0-9]+\.[0-9]+' \
+              | cut -d'/' -f3 \
+              | xargs semver \
+              | tail -n 1)"
+            
+            tagNewVersion="$(semver -i patch "$tagPrevVersion")"
+              
+            echo "$tagPrevVersion" > ./cicd/tag-deps-version.txt
+            echo "$tagNewVersion" >> ./cicd/tag-deps-version.txt
+
+            git add ./cicd/tag-base-version.txt
+            if git commit -m "bump dependency release to $tagNewVersion"; then
+              push=1
+            fi
+          done
+
+          if [ "$push" = "1" ]; then
+            git push -u origin "$GITHUB_HEAD_REF"
+          fi

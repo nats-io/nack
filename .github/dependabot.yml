@@ -6,6 +6,10 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+  - package-ecosystem: docker
+    directory: /cicd
+    schedule:
+      interval: daily
 
   # version updates: disabled
   # security updates: enabled
