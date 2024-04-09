@@ -45,6 +45,7 @@ jobs:
               "dependencyName": "alpine"
             }
           ]'
+          deps_file="./cicd/tag-deps-version.txt"
 
           deps='${{ steps.dependabot-metadata.outputs.updated-dependencies-json }}'
 
@@ -74,10 +75,10 @@ jobs:
             
             tagNewVersion="$(semver -i patch "$tagPrevVersion")"
               
-            echo "$tagPrevVersion" > ./cicd/tag-deps-version.txt
-            echo "$tagNewVersion" >> ./cicd/tag-deps-version.txt
+            echo "$tagPrevVersion" > "$deps_file"
+            echo "$tagNewVersion" >> "$deps_file"
 
-            git add ./cicd/tag-base-version.txt
+            git add "$deps_file"
             if git commit -m "bump dependency release to $tagNewVersion"; then
               push=1
             fi
