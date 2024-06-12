@@ -119,7 +119,7 @@ func NewController(opt Options) *Controller {
 	if opt.Recorder == nil {
 		utilruntime.Must(scheme.AddToScheme(k8sscheme.Scheme))
 		eventBroadcaster := record.NewBroadcaster()
-		eventBroadcaster.StartLogging(klog.Infof)
+		eventBroadcaster.StartLogging(klog.InfoS)
 		eventBroadcaster.StartRecordingToSink(&k8styped.EventSinkImpl{
 			Interface: opt.KubeIface.CoreV1().Events(""),
 		})
@@ -291,7 +291,7 @@ func (c *Controller) cleanupStreams() error {
 		case <-tick.C:
 			streams, err := c.strLister.List(labels.Everything())
 			if err != nil {
-				klog.Infof("failed to list streams for cleanup: %s", err)
+				klog.InfoS("failed to list streams for cleanup: %s", err)
 				continue
 			}
 			sm := streamsMap(streams)
@@ -299,27 +299,27 @@ func (c *Controller) cleanupStreams() error {
 			for _, s := range missing {
 				// A stream that we were tracking but that for some reason
 				// was not part of the latest list shared by informer.
-				// Need to double check whether the stream is present before
+				// Need to double-check whether the stream is present before
 				// considering deletion.
-				klog.Infof("stream %s/%s might be missing, looking it up...", s.Namespace, s.Name)
+				klog.InfoS(fmt.Sprintf("stream %s/%s might be missing, looking it up...", s.Namespace, s.Name), "namespace", s.Namespace, "stream", s.Name)
 				ctx, done := context.WithTimeout(context.Background(), 10*time.Second)
 				defer done()
 				_, err := c.ji.Streams(s.Namespace).Get(ctx, s.Name, k8smeta.GetOptions{})
 				if err != nil {
 					if k8serrors.IsNotFound(err) {
-						klog.Infof("stream %s/%s was not found anymore, deleting from JetStream", s.Namespace, s.Name)
+						klog.InfoS(fmt.Sprintf("stream %s/%s was not found anymore, deleting from JetStream", s.Namespace, s.Name), "namespace", s.Namespace, "stream", s.Name)
 						t := k8smeta.NewTime(time.Now())
 						s.DeletionTimestamp = &t
 						if err := c.processStreamObject(s, c.RealJSMC); err != nil && !k8serrors.IsNotFound(err) {
-							klog.Infof("failed to delete stream %s/%s: %s", s.Namespace, s.Name, err)
+							klog.InfoS(fmt.Sprintf("failed to delete stream %s/%s: %s", s.Namespace, s.Name, err), "namespace", s.Namespace, "stream", s.Name, "error", err)
 							continue
 						}
-						klog.Infof("deleted stream %s/%s from JetStream", s.Namespace, s.Name)
+						klog.InfoS(fmt.Sprintf("deleted stream %s/%s from JetStream", s.Namespace, s.Name), "namespace", s.Namespace, "stream", s.Name)
 					} else {
-						klog.Warningf("error looking up stream %s/%s", s.Namespace, s.Name)
+						klog.InfoS(fmt.Sprintf("error looking up stream %s/%s", s.Namespace, s.Name), "namespace", s.Namespace, "stream", s.Name)
 					}
 				} else {
-					klog.Infof("found stream %s/%s, no further action needed", s.Namespace, s.Name)
+					klog.InfoS(fmt.Sprintf("found stream %s/%s, no further action needed", s.Namespace, s.Name), "namespace", s.Namespace, "stream", s.Name)
 				}
 			}
 			prevStreams = sm
@@ -361,7 +361,7 @@ func (c *Controller) cleanupConsumers() error {
 		case <-tick.C:
 			consumers, err := c.cnsLister.List(labels.Everything())
 			if err != nil {
-				klog.Infof("failed to list consumers for cleanup: %s", err)
+				klog.InfoS(fmt.Sprintf("failed to list consumers for cleanup: %s", err), "error", err)
 				continue
 			}
 			cm := consumerMap(consumers)
@@ -369,27 +369,27 @@ func (c *Controller) cleanupConsumers() error {
 			for _, cns := range missing {
 				// A consumer that we were tracking but that for some reason
 				// was not part of the latest list shared by informer.
-				// Need to double check whether the consumer is present before
+				// Need to double-check whether the consumer is present before
 				// considering deletion.
-				klog.Infof("consumer %s/%s might be missing, looking it up...", cns.Namespace, cns.Name)
+				klog.InfoS(fmt.Sprintf("consumer %s/%s might be missing, looking it up...", cns.Namespace, cns.Name), "namespace", cns.Namespace, "consumer", cns.Name)
 				ctx, done := context.WithTimeout(context.Background(), 10*time.Second)
 				defer done()
 				_, err := c.ji.Consumers(cns.Namespace).Get(ctx, cns.Name, k8smeta.GetOptions{})
 				if err != nil {
 					if k8serrors.IsNotFound(err) {
-						klog.Infof("consumer %s/%s was not found anymore, deleting from JetStream", cns.Namespace, cns.Name)
+						klog.InfoS(fmt.Sprintf("consumer %s/%s was not found anymore, deleting from JetStream", cns.Namespace, cns.Name), "namespace", cns.Namespace, "consumer", cns.Name)
 						t := k8smeta.NewTime(time.Now())
 						cns.DeletionTimestamp = &t
 						if err := c.processConsumerObject(cns, c.RealJSMC); err != nil && !k8serrors.IsNotFound(err) {
-							klog.Infof("failed to delete consumer %s/%s: %s", cns.Namespace, cns.Name, err)
+							klog.InfoS(fmt.Sprintf("failed to delete consumer %s/%s: %s", cns.Namespace, cns.Name, err), "namespace", cns.Namespace, "consumer", cns.Name, "error", err)
 							continue
 						}
-						klog.Infof("deleted consumer %s/%s from JetStream", cns.Namespace, cns.Name)
+						klog.InfoS(fmt.Sprintf("deleted consumer %s/%s from JetStream", cns.Namespace, cns.Name), "namespace", cns.Namespace, "consumer", cns.Name)
 					} else {
-						klog.Warningf("error looking up consumer %s/%s", cns.Namespace, cns.Name)
+						klog.InfoS(fmt.Sprintf("error looking up consumer %s/%s", cns.Namespace, cns.Name), "namespace", cns.Namespace, "consumer", cns.Name)
 					}
 				} else {
-					klog.Infof("found consumer %s/%s, no further action needed", cns.Namespace, cns.Name)
+					klog.InfoS(fmt.Sprintf("found consumer %s/%s, no further action needed", cns.Namespace, cns.Name), "namespace", cns.Namespace, "consumer", cns.Name)
 				}
 			}
 			prevConsumers = cm
