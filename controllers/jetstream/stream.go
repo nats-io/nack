@@ -418,11 +418,16 @@ func createStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 		opts = append(opts, jsm.DenyDelete())
 	}
 
+	if spec.DenyPurge {
+		opts = append(opts, jsm.DenyPurge())
+	}
+
 	if spec.DiscardPerSubject {
 		opts = append(opts, jsm.DiscardNewPerSubject())
 	}
+
 	if spec.FirstSequence != 0 {
-		opts = append(opts, jsm.FirstSequence(uint64(spec.FirstSequence)))
+		opts = append(opts, jsm.FirstSequence(spec.FirstSequence))
 	}
 
 	if spec.Metadata != nil {
