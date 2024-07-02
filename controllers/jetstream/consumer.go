@@ -193,7 +193,7 @@ func (c *Controller) processConsumerObject(cns *apis.Consumer, jsm jsmClientFunc
 		return err
 	}
 	updateOK := (consumerOK && !deleteOK && newGeneration)
-	createOK := (!consumerOK && !deleteOK && newGeneration)
+	createOK := (!consumerOK && !deleteOK) || (!updateOK && !deleteOK && newGeneration)
 
 	switch {
 	case createOK:
