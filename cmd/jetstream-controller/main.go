@@ -57,7 +57,7 @@ func run() error {
 	cert := flag.String("tlscert", "", "NATS TLS public certificate")
 	key := flag.String("tlskey", "", "NATS TLS private key")
 	ca := flag.String("tlsca", "", "NATS TLS certificate authority chain")
-	tlsfirst := flag.Bool("tlsfirst", false, "If true, then NATS connections will be initiated with a TLS negotiation, rather than using a plain text / STARTTLS approach")
+	tlsfirst := flag.Bool("tlsfirst", false, "If enabled, forces explicit TLS without waiting for Server INFO")
 	server := flag.String("s", "", "NATS Server URL")
 	crdConnect := flag.Bool("crd-connect", false, "If true, then NATS connections will be made from CRD config, not global config")
 	cleanupPeriod := flag.Duration("cleanup-period", 30*time.Second, "Period to run object cleanup")
