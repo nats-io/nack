@@ -86,7 +86,7 @@ func (c *Controller) processConsumerObject(cns *apis.Consumer, jsm jsmClientFunc
 			remoteRootCA = filepath.Join(accDir, acc.Spec.TLS.RootCAs)
 
 			for k, v := range secret.Data {
-				if err := os.WriteFile(filepath.Join(accDir, k), v, 0644); err != nil {
+				if err := os.WriteFile(filepath.Join(accDir, k), v, 0o644); err != nil {
 					return err
 				}
 			}
@@ -107,7 +107,7 @@ func (c *Controller) processConsumerObject(cns *apis.Consumer, jsm jsmClientFunc
 			for k, v := range secret.Data {
 				if k == acc.Spec.Creds.File {
 					accUserCreds = filepath.Join(c.cacheDir, ns, spec.Account, k)
-					if err := os.WriteFile(filepath.Join(accDir, k), v, 0644); err != nil {
+					if err := os.WriteFile(filepath.Join(accDir, k), v, 0o644); err != nil {
 						return err
 					}
 				}
@@ -193,7 +193,7 @@ func (c *Controller) processConsumerObject(cns *apis.Consumer, jsm jsmClientFunc
 		return err
 	}
 	updateOK := (consumerOK && !deleteOK && newGeneration)
-	createOK := (!consumerOK && !deleteOK && newGeneration)
+	createOK := (!consumerOK && !deleteOK) || (!updateOK && !deleteOK && newGeneration)
 
 	switch {
 	case createOK:
