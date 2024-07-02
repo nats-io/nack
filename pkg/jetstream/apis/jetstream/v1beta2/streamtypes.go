@@ -27,6 +27,7 @@ type StreamSpec struct {
 	AllowRollup       bool              `json:"allowRollup"`
 	Creds             string            `json:"creds"`
 	DenyDelete        bool              `json:"denyDelete"`
+	DenyPurge         bool              `json:"denyPurge"`
 	Description       string            `json:"description"`
 	DiscardPerSubject bool              `json:"discardPerSubject"`
 	PreventDelete     bool              `json:"preventDelete"`
