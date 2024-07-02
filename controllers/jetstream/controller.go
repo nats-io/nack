@@ -75,6 +75,8 @@ type Options struct {
 	NATSCertificate string
 	NATSKey         string
 
+	NATSTLSFirst bool
+
 	Namespace     string
 	CRDConnect    bool
 	CleanupPeriod time.Duration
@@ -180,6 +182,9 @@ func (c *Controller) Run() error {
 	opts := make([]nats.Option, 0)
 	// Always attempt to have a connection to NATS.
 	opts = append(opts, nats.MaxReconnects(-1))
+	if c.opts.NATSTLSFirst {
+		opts = append(opts, nats.TLSHandshakeFirst())
+	}
 	natsCtxDefaults := &natsContextDefaults{Name: c.opts.NATSClientName}
 	if !c.opts.CRDConnect {
 		// Use JWT/NKEYS based credentials if present.
