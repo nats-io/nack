@@ -407,6 +407,8 @@ func consumerSpecToOpts(spec apis.ConsumerSpec) ([]jsm.ConsumerOption, error) {
 
 	if spec.HeadersOnly {
 		opts = append(opts, jsm.DeliverHeadersOnly())
+	} else {
+		opts = append(opts, jsm.DeliverBodies())
 	}
 
 	if spec.MaxRequestExpires != "" {
