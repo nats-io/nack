@@ -27,6 +27,7 @@ type StreamSpecApplyConfiguration struct {
 	AllowRollup       *bool                               `json:"allowRollup,omitempty"`
 	Creds             *string                             `json:"creds,omitempty"`
 	DenyDelete        *bool                               `json:"denyDelete,omitempty"`
+	DenyPurge         *bool                               `json:"denyPurge,omitempty"`
 	Description       *string                             `json:"description,omitempty"`
 	DiscardPerSubject *bool                               `json:"discardPerSubject,omitempty"`
 	PreventDelete     *bool                               `json:"preventDelete,omitempty"`
@@ -101,6 +102,14 @@ func (b *StreamSpecApplyConfiguration) WithCreds(value string) *StreamSpecApplyC
 // If called multiple times, the DenyDelete field is set to the value of the last call.
 func (b *StreamSpecApplyConfiguration) WithDenyDelete(value bool) *StreamSpecApplyConfiguration {
 	b.DenyDelete = &value
+	return b
+}
+
+// WithDenyPurge sets the DenyPurge field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the DenyPurge field is set to the value of the last call.
+func (b *StreamSpecApplyConfiguration) WithDenyPurge(value bool) *StreamSpecApplyConfiguration {
+	b.DenyPurge = &value
 	return b
 }
 
