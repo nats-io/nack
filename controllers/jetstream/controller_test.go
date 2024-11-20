@@ -1,6 +1,7 @@
 package jetstream
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"testing"
@@ -17,8 +18,8 @@ import (
 
 func TestMain(m *testing.M) {
 	// Disable error logs.
-	utilruntime.ErrorHandlers = []func(error){
-		func(err error) {},
+	utilruntime.ErrorHandlers = []utilruntime.ErrorHandler{
+		func(ctx context.Context, err error, msg string, args ...any) {},
 	}
 
 	os.Exit(m.Run())

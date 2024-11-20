@@ -1,4 +1,4 @@
-// Copyright 2020 The NATS Authors
+// Copyright 2024 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -19,7 +19,7 @@ import (
 	jetstreamv1beta2 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 )
 
-// StreamSpecApplyConfiguration represents an declarative configuration of the StreamSpec type for use
+// StreamSpecApplyConfiguration represents a declarative configuration of the StreamSpec type for use
 // with apply.
 type StreamSpecApplyConfiguration struct {
 	Account           *string                             `json:"account,omitempty"`
@@ -59,7 +59,7 @@ type StreamSpecApplyConfiguration struct {
 	TLS               *TLSApplyConfiguration              `json:"tls,omitempty"`
 }
 
-// StreamSpecApplyConfiguration constructs an declarative configuration of the StreamSpec type for use with
+// StreamSpecApplyConfiguration constructs a declarative configuration of the StreamSpec type for use with
 // apply.
 func StreamSpec() *StreamSpecApplyConfiguration {
 	return &StreamSpecApplyConfiguration{}
