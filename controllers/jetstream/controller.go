@@ -140,15 +140,17 @@ func NewController(opt Options) *Controller {
 	streamQueue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Streams")
 	consumerQueue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Consumers")
 
-	streamInformer.Informer().AddEventHandler(eventHandlers(
-		opt.Ctx,
-		streamQueue,
-	))
+	streamInformer.Informer().AddEventHandler(
+		eventHandlers(
+			streamQueue,
+		),
+	)
 
-	consumerInformer.Informer().AddEventHandler(eventHandlers(
-		opt.Ctx,
-		consumerQueue,
-	))
+	consumerInformer.Informer().AddEventHandler(
+		eventHandlers(
+			consumerQueue,
+		),
+	)
 
 	cacheDir, err := os.MkdirTemp(".", "nack")
 	if err != nil {
@@ -728,7 +730,7 @@ func shouldEnqueue(prevObj, nextObj interface{}) bool {
 	return markedDelete || specChanged
 }
 
-func eventHandlers(ctx context.Context, q workqueue.RateLimitingInterface) cache.ResourceEventHandlerFuncs {
+func eventHandlers(q workqueue.RateLimitingInterface) cache.ResourceEventHandlerFuncs {
 	return cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			if err := enqueueWork(q, obj); err != nil {

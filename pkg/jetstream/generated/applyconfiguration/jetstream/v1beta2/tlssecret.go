@@ -1,4 +1,4 @@
-// Copyright 2020 The NATS Authors
+// Copyright 2024 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -15,7 +15,7 @@
 
 package v1beta2
 
-// TLSSecretApplyConfiguration represents an declarative configuration of the TLSSecret type for use
+// TLSSecretApplyConfiguration represents a declarative configuration of the TLSSecret type for use
 // with apply.
 type TLSSecretApplyConfiguration struct {
 	ClientCert *string                      `json:"cert,omitempty"`
@@ -24,7 +24,7 @@ type TLSSecretApplyConfiguration struct {
 	Secret     *SecretRefApplyConfiguration `json:"secret,omitempty"`
 }
 
-// TLSSecretApplyConfiguration constructs an declarative configuration of the TLSSecret type for use with
+// TLSSecretApplyConfiguration constructs a declarative configuration of the TLSSecret type for use with
 // apply.
 func TLSSecret() *TLSSecretApplyConfiguration {
 	return &TLSSecretApplyConfiguration{}
