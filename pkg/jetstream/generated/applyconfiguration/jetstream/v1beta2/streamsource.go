@@ -1,4 +1,4 @@
-// Copyright 2020 The NATS Authors
+// Copyright 2024 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -19,7 +19,7 @@ import (
 	v1beta2 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 )
 
-// StreamSourceApplyConfiguration represents an declarative configuration of the StreamSource type for use
+// StreamSourceApplyConfiguration represents a declarative configuration of the StreamSource type for use
 // with apply.
 type StreamSourceApplyConfiguration struct {
 	Name                  *string                     `json:"name,omitempty"`
@@ -31,7 +31,7 @@ type StreamSourceApplyConfiguration struct {
 	SubjectTransforms     []*v1beta2.SubjectTransform `json:"subjectTransforms,omitempty"`
 }
 
-// StreamSourceApplyConfiguration constructs an declarative configuration of the StreamSource type for use with
+// StreamSourceApplyConfiguration constructs a declarative configuration of the StreamSource type for use with
 // apply.
 func StreamSource() *StreamSourceApplyConfiguration {
 	return &StreamSourceApplyConfiguration{}

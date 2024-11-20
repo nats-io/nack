@@ -1,5 +1,7 @@
 export GO111MODULE := on
 
+SHELL=/usr/bin/env bash
+
 now := $(shell date -u +%Y-%m-%dT%H:%M:%S%z)
 gitBranch := $(shell git rev-parse --abbrev-ref HEAD)
 gitCommit := $(shell git rev-parse --short HEAD)
@@ -9,7 +11,6 @@ VERSION ?= version-not-set
 linkerVars := -X main.BuildTime=$(now) -X main.GitInfo=$(gitBranch)-$(gitCommit)$(repoDirty) -X main.Version=$(VERSION)
 drepo ?= natsio
 
-jetstreamGenIn:= $(shell grep -l -R -F "// +k8s:" pkg/jetstream/apis)
 jetstreamSrc := $(shell find cmd/jetstream-controller pkg/jetstream controllers/jetstream -name "*.go") pkg/jetstream/apis/jetstream/v1beta2/zz_generated.deepcopy.go
 
 configReloaderSrc := $(shell find cmd/nats-server-config-reloader/ pkg/natsreloader/ -name "*.go")
@@ -27,20 +28,21 @@ default:
 	#   make nats-server-config-reloader
 	#   make nats-boot-config
 
-pkg/jetstream/generated pkg/jetstream/apis/jetstream/v1beta2/zz_generated.deepcopy.go: fetch-modules $(jetstreamGenIn) pkg/k8scodegen/file-header.txt
+generate: fetch-modules pkg/k8scodegen/file-header.txt
 	rm -rf pkg/jetstream/generated
-	# Temporary chmod fix until we migrate to kube_codegen.sh
 	D="$(codeGeneratorDir)"; : "$${D:=`go list -m -f '{{.Dir}}' k8s.io/code-generator`}"; \
-	chmod u+x "$$D/generate-internal-groups.sh"; \
-	GOFLAGS='' bash "$$D/generate-groups.sh" all \
-		github.com/nats-io/nack/pkg/jetstream/generated \
-		github.com/nats-io/nack/pkg/jetstream/apis \
-		"jetstream:v1beta2" \
-		--output-base . \
-		--go-header-file pkg/k8scodegen/file-header.txt
-	mv github.com/nats-io/nack/pkg/jetstream/generated pkg/jetstream/generated
-	mv github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2/zz_generated.deepcopy.go pkg/jetstream/apis/jetstream/v1beta2/zz_generated.deepcopy.go
-	rm -rf github.com
+	source "$$D/kube_codegen.sh" ; \
+	kube::codegen::gen_helpers \
+	  --boilerplate pkg/k8scodegen/file-header.txt \
+	  pkg/jetstream/apis; \
+	kube::codegen::gen_client \
+		--with-watch \
+		--with-applyconfig \
+		--boilerplate pkg/k8scodegen/file-header.txt \
+		--output-dir pkg/jetstream/generated \
+		--output-pkg github.com/nats-io/nack/pkg/jetstream/generated \
+		--one-input-api jetstream/v1beta2 \
+		pkg/jetstream/apis
 
 jetstream-controller: $(jetstreamSrc)
 	go build -race -o $@ \
