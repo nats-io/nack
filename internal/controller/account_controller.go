@@ -19,13 +19,12 @@ package controller
 import (
 	"context"
 	"github.com/nats-io/nats.go/jetstream"
+	"k8s.io/klog/v2"
 
+	jetstreamnatsiov1beta2 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
-
-	jetstreamnatsiov1beta2 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 )
 
 // AccountReconciler reconciles a Account object
@@ -42,7 +41,8 @@ type AccountReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.17.3/pkg/reconcile
 func (r *AccountReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	log := klog.FromContext(ctx)
+	log.Info("reconcile %s", "namespace", req.Namespace, "name", req.Name)
 
 	// TODO(user): your logic here
 
