@@ -21,13 +21,38 @@ type Config struct {
 func RegisterAll(mgr ctrl.Manager, clientConfig *NatsConfig, config *Config) error {
 
 	// Controllers need access to a nats client in pedantic mode
-	_, err := CreateJetStreamClient(clientConfig, true)
+	js, err := CreateJetStreamClient(clientConfig, true)
 	if err != nil {
 		return fmt.Errorf("create jetstream client: %w", err)
 	}
 
 	// Register controllers
-	// TODO add stream, consumer and account reconcilers here
+	if err := (&AccountReconciler{
+		Client:    mgr.GetClient(),
+		Config:    config,
+		Scheme:    mgr.GetScheme(),
+		JetStream: js,
+	}).SetupWithManager(mgr); err != nil {
+		return fmt.Errorf("unable to create account controller: %w", err)
+	}
+
+	if err := (&ConsumerReconciler{
+		Client:    mgr.GetClient(),
+		Config:    config,
+		Scheme:    mgr.GetScheme(),
+		JetStream: js,
+	}).SetupWithManager(mgr); err != nil {
+		return fmt.Errorf("unable to create consumer controller: %w", err)
+	}
+
+	if err := (&StreamReconciler{
+		Client:    mgr.GetClient(),
+		Config:    config,
+		Scheme:    mgr.GetScheme(),
+		JetStream: js,
+	}).SetupWithManager(mgr); err != nil {
+		return fmt.Errorf("unable to create stream controller: %w", err)
+	}
 
 	return nil
 }
