@@ -43,6 +43,7 @@ type StreamReconciler struct {
 func (r *StreamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := klog.FromContext(ctx)
 	log.Info("reconcile %s", "namespace", req.Namespace, "name", req.Name)
+	// TODO(user): your logic here
 
 	return ctrl.Result{}, nil
 }
