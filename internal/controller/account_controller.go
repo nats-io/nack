@@ -42,7 +42,7 @@ type AccountReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.17.3/pkg/reconcile
 func (r *AccountReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := klog.FromContext(ctx)
-	log.Info("reconcile %s", "namespace", req.Namespace, "name", req.Name)
+	log.Info("reconcile", "namespace", req.Namespace, "name", req.Name)
 
 	// TODO(user): your logic here
 
