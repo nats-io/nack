@@ -19,12 +19,13 @@ package controller
 import (
 	"context"
 	"github.com/nats-io/nats.go/jetstream"
-	"k8s.io/klog/v2"
 
-	jetstreamnatsiov1beta2 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	jetstreamnatsiov1beta2 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 )
 
 // ConsumerReconciler reconciles a Consumer object
@@ -41,8 +42,9 @@ type ConsumerReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.17.3/pkg/reconcile
 func (r *ConsumerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := klog.FromContext(ctx)
-	log.Info("reconcile", "namespace", req.Namespace, "name", req.Name)
+	_ = log.FromContext(ctx)
+
+	// TODO(user): your logic here
 
 	return ctrl.Result{}, nil
 }

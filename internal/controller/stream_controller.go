@@ -42,8 +42,7 @@ type StreamReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.17.3/pkg/reconcile
 func (r *StreamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := klog.FromContext(ctx)
-	log.Info("reconcile", "namespace", req.Namespace, "name", req.Name)
-	// TODO(user): your logic here
+	log.Info("reconcile %s", "namespace", req.Namespace, "name", req.Name)
 
 	return ctrl.Result{}, nil
 }

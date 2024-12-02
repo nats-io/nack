@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"github.com/nats-io/nats-server/v2/server"
 	natsserver "github.com/nats-io/nats-server/v2/test"
-	"github.com/nats-io/nats.go/jetstream"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -37,6 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	jetstreamnatsiov1beta2 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
+	//+kubebuilder:scaffold:imports
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -46,7 +46,6 @@ var cfg *rest.Config
 var k8sClient client.Client
 var testEnv *envtest.Environment
 var testServer *server.Server
-var jsClient jetstream.JetStream
 
 func TestControllers(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -80,19 +79,14 @@ var _ = BeforeSuite(func() {
 	err = jetstreamnatsiov1beta2.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
+	//+kubebuilder:scaffold:scheme
+
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
 
 	By("bootstrapping the test server")
 	testServer = CreateTestServer()
-	jsClient, err = CreateJetStreamClient(
-		&NatsConfig{ServerURL: testServer.ClientURL()},
-		true,
-	)
-	Expect(err).NotTo(HaveOccurred())
-	Expect(jsClient).NotTo(BeNil())
-
 })
 
 var _ = AfterSuite(func() {
