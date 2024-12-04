@@ -19,27 +19,19 @@ package controller
 import (
 	"context"
 	"fmt"
-	js "github.com/nats-io/nack/controllers/jetstream"
 	api "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 	"github.com/nats-io/nats.go/jetstream"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"time"
 )
 
 // StreamReconciler reconciles a Stream object
 type StreamReconciler struct {
-	client.Client
-	Scheme    *runtime.Scheme
-	Config    *Config
-	JetStream jetstream.JetStream
+	JetStreamController
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -90,21 +82,29 @@ func (r *StreamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	// Update Status to unknown when no status is set
 	if stream.Status.Conditions == nil || len(stream.Status.Conditions) == 0 {
-		updated, err := r.updateReadyCondition(ctx, stream, v1.ConditionUnknown, "Reconciling", "Starting reconciliation")
+		stream.Status.Conditions = updateReadyCondition(stream.Status.Conditions, v1.ConditionUnknown, "Reconciling", "Starting reconciliation")
+		err := r.Status().Update(ctx, stream)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("set condition unknown: %w", err)
 		}
-		if updated {
-			// re-fetch stream
-			if err := r.Get(ctx, req.NamespacedName, stream); err != nil {
-				if apierrors.IsNotFound(err) {
-					log.Info("stream resource not found. Ignoring since object must be deleted")
-					return ctrl.Result{}, nil
-				}
-				return ctrl.Result{}, fmt.Errorf("re-fetch stream resource: %w", err)
-			}
-		}
 
+		// re-fetch stream
+		if err := r.Get(ctx, req.NamespacedName, stream); err != nil {
+			if apierrors.IsNotFound(err) {
+				log.Info("stream resource not found. Ignoring since object must be deleted")
+				return ctrl.Result{}, nil
+			}
+			return ctrl.Result{}, fmt.Errorf("re-fetch stream resource: %w", err)
+		}
+	}
+
+	// Connection options specific to this spec
+	specConnectionOptions := &connectionOptions{
+		Account: stream.Spec.Account,
+		Creds:   stream.Spec.Creds,
+		Nkey:    stream.Spec.Nkey,
+		Servers: stream.Spec.Servers,
+		TLS:     stream.Spec.TLS,
 	}
 
 	// TODO Check if marked for deletion and delete
@@ -118,117 +118,34 @@ func (r *StreamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, fmt.Errorf("map spec to stream targetConfig: %w", err)
 	}
 
-	// TODO Handle Account, Nkey, Servers and TLS from spec.
-	// TODO Get specific client when there is connection config in the spec.
-	var sm jetstream.StreamManager
-	sm = r.JetStream
-
 	//  TODO honour stream.Spec.PreventUpdate
-	_, err = sm.CreateOrUpdateStream(ctx, targetConfig)
+	err = r.WithJetStreamClient(specConnectionOptions, func(js jetstream.JetStream) error {
+		_, err = js.CreateOrUpdateStream(ctx, targetConfig)
+		return err
+	})
 	if err != nil {
-		_, conditionErr := r.updateReadyCondition(ctx, stream, v1.ConditionFalse, "Errored", fmt.Sprintf("create or update stream: %s", err.Error()))
-		if conditionErr != nil {
-			log.Error(conditionErr, "failed to update ready condition to CreationFailed")
+		msg := fmt.Sprintf("create or update stream: %s", err.Error())
+		stream.Status.Conditions = updateReadyCondition(stream.Status.Conditions, v1.ConditionFalse, "Errored", msg)
+		if err := r.Status().Update(ctx, stream); err != nil {
+			log.Error(err, "failed to update ready condition to Errored")
 		}
 		return ctrl.Result{}, fmt.Errorf("create or update stream: %w", err)
 	}
 
 	// TODO update the generation in the status
 
-	_, err = r.updateReadyCondition(ctx, stream, v1.ConditionTrue, "Reconciling", "Stream successfully created or updated")
+	stream.Status.Conditions = updateReadyCondition(
+		stream.Status.Conditions,
+		v1.ConditionTrue,
+		"Reconciling",
+		"Stream successfully created or updated",
+	)
+	err = r.Status().Update(ctx, stream)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("update ready condition: %w", err)
 	}
 
 	return ctrl.Result{}, nil
-}
-
-// updateReadyCondition sets the status, reason and message.
-// Then updates the resource.
-// Returns true if the resource was updated by this call.
-func (r *StreamReconciler) updateReadyCondition(ctx context.Context, stream *api.Stream, status v1.ConditionStatus, reason string, message string) (bool, error) {
-
-	newCondition := api.Condition{
-		Type:               readyCondType,
-		Status:             status,
-		Reason:             reason,
-		Message:            message,
-		LastTransitionTime: time.Now().UTC().Format(time.RFC3339Nano),
-	}
-
-	// Mapping to and from the metav1.Condition allows using meta.SetStatusCondition,
-	// which properly handles updating conditions.
-	// The mapping happens transparently to the caller.
-
-	cond := mapConditionToMeta(newCondition)
-	var conditions []metav1.Condition
-	for _, condition := range stream.Status.Conditions {
-		conditions = append(conditions, mapConditionToMeta(condition))
-	}
-
-	changed := meta.SetStatusCondition(&conditions, cond)
-	if !changed {
-		return false, nil
-	}
-
-	stream.Status.Conditions = []api.Condition{}
-	for _, condition := range conditions {
-		stream.Status.Conditions = append(stream.Status.Conditions, mapConditionFromMeta(condition))
-	}
-
-	stream.Status.Conditions = js.UpsertCondition(stream.Status.Conditions, newCondition)
-
-	if err := r.Status().Update(ctx, stream); err != nil {
-		return false, fmt.Errorf("update stream status: %w", err)
-	}
-	return true, nil
-}
-
-// mapConditionToMeta transforms a condition according the jetstream v1beta2 spec to a metav1 condition.
-func mapConditionToMeta(condition api.Condition) metav1.Condition {
-
-	status := metav1.ConditionUnknown
-	switch condition.Status {
-	case v1.ConditionTrue:
-		status = metav1.ConditionTrue
-	case v1.ConditionFalse:
-		status = metav1.ConditionFalse
-	}
-
-	lastTransitionTime, err := time.Parse(time.RFC3339Nano, condition.LastTransitionTime)
-	if err != nil {
-		lastTransitionTime = time.Time{}
-	}
-
-	return metav1.Condition{
-		Type:               condition.Type,
-		Status:             status,
-		LastTransitionTime: metav1.NewTime(lastTransitionTime),
-		Reason:             condition.Reason,
-		Message:            condition.Message,
-	}
-}
-
-// mapConditionFromMeta transforms a condition according the metav1 spec to a jetstream v1beta2 condition
-func mapConditionFromMeta(condition metav1.Condition) api.Condition {
-
-	status := v1.ConditionUnknown
-	switch condition.Status {
-	case metav1.ConditionTrue:
-		status = v1.ConditionTrue
-	case metav1.ConditionFalse:
-		status = v1.ConditionFalse
-	}
-
-	lastTransitionTime := condition.LastTransitionTime.Format(time.RFC3339Nano)
-
-	return api.Condition{
-		Type:               condition.Type,
-		Status:             status,
-		LastTransitionTime: lastTransitionTime,
-		Reason:             condition.Reason,
-		Message:            condition.Message,
-	}
 }
 
 // mapSpecToConfig creates a jetstream.StreamConfig matching the given stream resource spec

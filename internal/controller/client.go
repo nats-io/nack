@@ -54,11 +54,18 @@ func (o *NatsConfig) buildOptions() ([]nats.Option, error) {
 	return opts, nil
 }
 
-func CreateJetStreamClient(cfg *NatsConfig, pedantic bool) (jetstream.JetStream, error) {
+type Closable interface {
+	Close()
+}
+
+// CreateJetStreamClient creates new Jetstream client with a connection based on the given NatsConfig.
+// Returns a jetstream.Jetstream client and the Closable of the underlying connection.
+// Close should be called when the client is no longer used.
+func CreateJetStreamClient(cfg *NatsConfig, pedantic bool) (jetstream.JetStream, Closable, error) {
 
 	opts, err := cfg.buildOptions()
 	if err != nil {
-		return nil, fmt.Errorf("nats options: %w", err)
+		return nil, nil, fmt.Errorf("nats options: %w", err)
 	}
 
 	// Set pedantic option
@@ -74,12 +81,12 @@ func CreateJetStreamClient(cfg *NatsConfig, pedantic bool) (jetstream.JetStream,
 
 	nc, err := nats.Connect(cfg.ServerURL, opts...)
 	if err != nil {
-		return nil, fmt.Errorf("nats connect: %w", err)
+		return nil, nil, fmt.Errorf("nats connect: %w", err)
 	}
 
 	js, err := jetstream.New(nc)
 	if err != nil {
-		return nil, fmt.Errorf("new jetstream: %w", err)
+		return nil, nil, fmt.Errorf("new jetstream: %w", err)
 	}
-	return js, nil
+	return js, nc, nil
 }

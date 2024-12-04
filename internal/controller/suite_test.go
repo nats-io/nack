@@ -47,6 +47,7 @@ var k8sClient client.Client
 var testEnv *envtest.Environment
 var testServer *server.Server
 var jsClient jetstream.JetStream
+var baseController JetStreamController
 
 func TestControllers(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -86,13 +87,11 @@ var _ = BeforeSuite(func() {
 
 	By("bootstrapping the test server")
 	testServer = CreateTestServer()
-	jsClient, err = CreateJetStreamClient(
-		&NatsConfig{ServerURL: testServer.ClientURL()},
-		true,
-	)
 	Expect(err).NotTo(HaveOccurred())
-	Expect(jsClient).NotTo(BeNil())
 
+	testNatsConfig := &NatsConfig{ServerURL: testServer.ClientURL()}
+	baseController, err = NewJSController(k8sClient, testNatsConfig, &Config{})
+	jsClient, _, err = CreateJetStreamClient(testNatsConfig, true)
 })
 
 var _ = AfterSuite(func() {

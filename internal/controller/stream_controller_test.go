@@ -87,10 +87,7 @@ var _ = Describe("Stream Controller", func() {
 		It("should successfully create the stream", func(ctx SpecContext) {
 			By("Reconciling the created resource")
 			controllerReconciler := &StreamReconciler{
-				Client:    k8sClient,
-				Scheme:    k8sClient.Scheme(),
-				Config:    &Config{},
-				JetStream: jsClient,
+				baseController,
 			}
 
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
@@ -145,10 +142,7 @@ var _ = Describe("Stream Controller", func() {
 
 			By("Reconciling the created resource")
 			controllerReconciler := &StreamReconciler{
-				Client:    k8sClient,
-				Scheme:    k8sClient.Scheme(),
-				Config:    &Config{},
-				JetStream: jsClient,
+				baseController,
 			}
 
 			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
@@ -190,10 +184,7 @@ var _ = Describe("Stream Controller", func() {
 		It("should not fail on not existing resource", func(ctx SpecContext) {
 			By("Reconciling the created resource")
 			controllerReconciler := &StreamReconciler{
-				Client:    k8sClient,
-				Scheme:    k8sClient.Scheme(),
-				Config:    &Config{},
-				JetStream: jsClient,
+				baseController,
 			}
 
 			result, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
@@ -211,18 +202,13 @@ var _ = Describe("Stream Controller", func() {
 
 			// Setup client for not running server
 			sv := CreateTestServer()
-			js, err := CreateJetStreamClient(&NatsConfig{
-				ServerURL: sv.ClientURL(),
-			}, true)
+			// Is there an easier way to create a failing js client?
+			controller, err := NewJSController(k8sClient, &NatsConfig{ServerURL: sv.ClientURL()}, &Config{})
 			Expect(err).NotTo(HaveOccurred())
 			sv.Shutdown()
-			// Is there an easier way to create a failing js client?
 
 			controllerReconciler := &StreamReconciler{
-				Client:    k8sClient,
-				Scheme:    k8sClient.Scheme(),
-				Config:    &Config{},
-				JetStream: js,
+				controller,
 			}
 
 			result, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
