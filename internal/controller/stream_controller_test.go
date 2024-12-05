@@ -25,6 +25,7 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"testing"
 	"time"
@@ -37,6 +38,7 @@ import (
 var _ = Describe("Stream Controller", func() {
 	When("reconciling a resource", func() {
 		const resourceName = "test-stream"
+		const streamName = "orders"
 
 		typeNamespacedName := types.NamespacedName{
 			Name:      resourceName,
@@ -55,7 +57,7 @@ var _ = Describe("Stream Controller", func() {
 						Namespace: "default",
 					},
 					Spec: api.StreamSpec{
-						Name:        "test-stream",
+						Name:        streamName,
 						Replicas:    1,
 						Subjects:    []string{"tests.*"},
 						Description: "test stream",
@@ -72,16 +74,22 @@ var _ = Describe("Stream Controller", func() {
 		})
 
 		AfterEach(func(ctx SpecContext) {
-			// Remove test stream resource
+			// Get and remove test stream resource if it exists
 			resource := &api.Stream{}
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
-			Expect(err).NotTo(HaveOccurred())
+			if err != nil {
+				Expect(err).To(MatchError(k8serrors.IsNotFound, "Is not found"))
+			} else {
+				By("Removing the finalizer")
+				controllerutil.RemoveFinalizer(resource, streamFinalizer)
+				Expect(k8sClient.Update(ctx, resource)).To(Succeed())
 
-			By("Cleanup the specific resource instance Stream")
-			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+				By("Cleanup the specific resource instance Stream")
+				Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+			}
 
 			By("Deleting the stream")
-			err = jsClient.DeleteStream(ctx, resource.Spec.Name)
+			err = jsClient.DeleteStream(ctx, streamName)
 			if err != nil {
 				Expect(err).To(MatchError(jetstream.ErrStreamNotFound))
 			}
@@ -94,11 +102,6 @@ var _ = Describe("Stream Controller", func() {
 			}
 
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
-			})
-			Expect(err).NotTo(HaveOccurred())
-
-			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: typeNamespacedName,
 			})
 			Expect(err).NotTo(HaveOccurred())
@@ -123,11 +126,11 @@ var _ = Describe("Stream Controller", func() {
 			Expect(stream.Finalizers).To(ContainElement(streamFinalizer))
 
 			By("Checking if the stream was created")
-			natsStream, err := jsClient.Stream(ctx, "test-stream")
+			natsStream, err := jsClient.Stream(ctx, streamName)
 			Expect(err).NotTo(HaveOccurred())
 			streamInfo, err := natsStream.Info(ctx)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(streamInfo.Config.Name).To(Equal("test-stream"))
+			Expect(streamInfo.Config.Name).To(Equal(streamName))
 			Expect(streamInfo.Created).To(BeTemporally("~", time.Now(), time.Second))
 		})
 
@@ -135,7 +138,7 @@ var _ = Describe("Stream Controller", func() {
 
 			By("Creating the stream with empty subjects and description")
 			_, err := jsClient.CreateStream(ctx, jetstream.StreamConfig{
-				Name:      "test-stream",
+				Name:      streamName,
 				Replicas:  1,
 				Retention: jetstream.WorkQueuePolicy,
 				Discard:   jetstream.DiscardOld,
@@ -147,11 +150,6 @@ var _ = Describe("Stream Controller", func() {
 			controllerReconciler := &StreamReconciler{
 				baseController,
 			}
-
-			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
-			})
-			Expect(err).NotTo(HaveOccurred())
 
 			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: typeNamespacedName,
@@ -175,7 +173,7 @@ var _ = Describe("Stream Controller", func() {
 			Expect(gotCondition).To(Equal(readyCondition))
 
 			By("Checking if the stream was updated")
-			natsStream, err := jsClient.Stream(ctx, "test-stream")
+			natsStream, err := jsClient.Stream(ctx, streamName)
 			Expect(err).NotTo(HaveOccurred())
 
 			streamInfo, err := natsStream.Info(ctx)
@@ -238,8 +236,40 @@ var _ = Describe("Stream Controller", func() {
 			Expect(stream.Finalizers).To(ContainElement(streamFinalizer))
 		})
 
-		PIt("should delete stream marked for deletion", func(ctx SpecContext) {
+		It("should delete stream marked for deletion", func(ctx SpecContext) {
 
+			By("Reconciling the created resource once to ensure the finalizer is set and stream created")
+			controllerReconciler := &StreamReconciler{
+				baseController,
+			}
+
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			// Stream exists
+			_, err = jsClient.Stream(ctx, streamName)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Marking the resource as deleted")
+			Expect(k8sClient.Delete(ctx, stream)).To(Succeed())
+
+			By("Reconciling the deleted resource")
+			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Checking if the resource was removed")
+			Eventually(func() error {
+				found := &api.Stream{}
+				return k8sClient.Get(ctx, typeNamespacedName, found)
+			}, 5*time.Second, time.Second).ShouldNot(Succeed())
+
+			By("Checking if the stream was deleted")
+			_, err = jsClient.Stream(ctx, streamName)
+			Expect(err).To(MatchError(jetstream.ErrStreamNotFound))
 		})
 
 		It("should update stream on different server as specified in spec", func(ctx SpecContext) {
@@ -268,12 +298,12 @@ var _ = Describe("Stream Controller", func() {
 			defer closer.Close()
 			Expect(err).NotTo(HaveOccurred())
 
-			got, err := altClient.Stream(ctx, stream.Spec.Name)
+			got, err := altClient.Stream(ctx, streamName)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(got.CachedInfo().Created).To(BeTemporally("~", time.Now(), time.Second))
 
 			By("Checking that the stream was NOT created on the alternative server")
-			got, err = jsClient.Stream(ctx, stream.Spec.Name)
+			got, err = jsClient.Stream(ctx, streamName)
 			Expect(err).To(MatchError(jetstream.ErrStreamNotFound))
 
 		})

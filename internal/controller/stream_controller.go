@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	api "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 	"github.com/nats-io/nats.go/jetstream"
@@ -107,8 +108,55 @@ func (r *StreamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		TLS:     stream.Spec.TLS,
 	}
 
-	// TODO Check if marked for deletion and delete
-	// TODO honour stream.Spec.PreventDelete and
+	// Delete if marked for deletion and has stream finalizer
+	markedForDeletion := stream.GetDeletionTimestamp() != nil
+	if markedForDeletion && controllerutil.ContainsFinalizer(stream, streamFinalizer) {
+		// Set status to not unknown
+		stream.Status.Conditions = updateReadyCondition(stream.Status.Conditions, v1.ConditionUnknown, "Finalizing", "Performing finalizer operations.")
+		if err := r.Status().Update(ctx, stream); err != nil {
+			return ctrl.Result{}, fmt.Errorf("update ready condition: %w", err)
+		}
+
+		// Perform finalizer operations
+		// TODO honour stream.Spec.PreventDelete and readonly
+		// Remove stream
+		err := r.WithJetStreamClient(specConnectionOptions, func(js jetstream.JetStream) error {
+			return js.DeleteStream(ctx, stream.Spec.Name)
+		})
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("delete stream during finalization: %w", err)
+		}
+
+		// Re-Fetch resource
+		if err := r.Get(ctx, req.NamespacedName, stream); err != nil {
+			if apierrors.IsNotFound(err) {
+				log.Info("stream resource not found. Ignoring since object must be deleted")
+				return ctrl.Result{}, nil
+			}
+			return ctrl.Result{}, fmt.Errorf("re-fetch stream resource: %w", err)
+		}
+
+		// Update status to not ready
+		stream.Status.Conditions = updateReadyCondition(stream.Status.Conditions, v1.ConditionFalse, "Finalizing", "Performed finalizer operations.")
+		if err := r.Status().Update(ctx, stream); err != nil {
+			return ctrl.Result{}, fmt.Errorf("update ready condition: %w", err)
+		}
+
+		if err := r.Status().Update(ctx, stream); err != nil {
+			return ctrl.Result{}, fmt.Errorf("update ready condition: %w", err)
+		}
+
+		log.Info("Removing stream finalizer after performing finalizing operations")
+		if ok := controllerutil.RemoveFinalizer(stream, streamFinalizer); !ok {
+			return ctrl.Result{Requeue: true}, errors.New("failed to remove stream finalizer")
+		}
+
+		if err := r.Update(ctx, stream); err != nil {
+			return ctrl.Result{}, fmt.Errorf("remove finalizer: %w", err)
+		}
+
+		return ctrl.Result{}, nil
+	}
 
 	// Create or Update the stream based on the spec
 
