@@ -65,6 +65,9 @@ var _ = Describe("Stream Controller", func() {
 					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+				// Re-fetch stream
+				Expect(k8sClient.Get(ctx, typeNamespacedName, stream)).To(Succeed())
+
 			}
 		})
 
@@ -236,6 +239,42 @@ var _ = Describe("Stream Controller", func() {
 		})
 
 		PIt("should delete stream marked for deletion", func(ctx SpecContext) {
+
+		})
+
+		It("should update stream on different server as specified in spec", func(ctx SpecContext) {
+			By("Setting up the alternative server")
+			// Setup altClient for alternate server
+			altServer := CreateTestServer()
+			defer altServer.Shutdown()
+
+			By("Setting the server in the stream spec")
+			stream.Spec.Servers = []string{altServer.ClientURL()}
+			Expect(k8sClient.Update(ctx, stream)).To(Succeed())
+
+			By("Reconciling the resource")
+			controllerReconciler := &StreamReconciler{
+				baseController,
+			}
+
+			result, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Checking if the stream was created on the alternative server")
+			altClient, closer, err := CreateJetStreamClient(&NatsConfig{ServerURL: altServer.ClientURL()}, true)
+			defer closer.Close()
+			Expect(err).NotTo(HaveOccurred())
+
+			got, err := altClient.Stream(ctx, stream.Spec.Name)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(got.CachedInfo().Created).To(BeTemporally("~", time.Now(), time.Second))
+
+			By("Checking that the stream was NOT created on the alternative server")
+			got, err = jsClient.Stream(ctx, stream.Spec.Name)
+			Expect(err).To(MatchError(jetstream.ErrStreamNotFound))
 
 		})
 	})

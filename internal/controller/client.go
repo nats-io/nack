@@ -12,7 +12,7 @@ type NatsConfig struct {
 	Credentials string
 	NKey        string
 	ServerURL   string
-	CA          string
+	CAs         []string
 	Certificate string
 	Key         string
 	TLSFirst    bool
@@ -46,8 +46,8 @@ func (o *NatsConfig) buildOptions() ([]nats.Option, error) {
 			opts = append(opts, nats.ClientCert(o.Certificate, o.Key))
 		}
 
-		if o.CA != "" {
-			opts = append(opts, nats.RootCAs(o.CA))
+		if o.CAs != nil && len(o.CAs) > 0 {
+			opts = append(opts, nats.RootCAs(o.CAs...))
 		}
 	}
 

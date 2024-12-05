@@ -94,7 +94,7 @@ func run() error {
 			Credentials: *creds,
 			NKey:        *nkey,
 			ServerURL:   *server,
-			CA:          *ca,
+			CAs:         []string{*ca},
 			Certificate: *cert,
 			Key:         *key,
 			TLSFirst:    *tlsfirst,

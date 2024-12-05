@@ -7,6 +7,7 @@ import (
 	api "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 	"github.com/nats-io/nats.go/jetstream"
 	v1 "k8s.io/api/core/v1"
+	"strings"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"time"
@@ -74,19 +75,50 @@ func (c *jsController) Namespace() string {
 }
 
 func (c *jsController) WithJetStreamClient(opts *connectionOptions, op func(js jetstream.JetStream) error) error {
-	// TODO Handle Account, Nkey, Servers and TLS from spec.
-	// TODO Get specific client when there is connection config in the spec.
-
 	if c.baseClient == nil {
 		return errors.New("no client available")
 	}
 
+	// Use base client when no config is given
 	if opts == nil || opts.empty() {
 		return op(c.baseClient)
 	}
 
-	// TODO Build single use client
-	return errors.New("Not Implemented")
+	// Build single use client
+	serverUrl := strings.Join(opts.Servers, ",")
+
+	// TODO needs review:
+	// Here the config from spec takes precedence over base config on a value by value basis.
+	// This could lead to issues when an NKey is set in the spec config and Credentials are set in the base config.
+	// In NatsConfig.buildOptions, Credentials take precedence over the Nkey,
+	// which would lead to the nkey from spec to be ignored.
+	cfg := &NatsConfig{
+		CRDConnect:  false,
+		ClientName:  c.config.ClientName,
+		Credentials: or(opts.Creds, c.config.Credentials),
+		NKey:        or(opts.Nkey, c.config.NKey),
+		ServerURL:   or(serverUrl, c.config.ServerURL),
+		CAs:         *or(&opts.TLS.RootCAs, &c.config.CAs),
+		Certificate: or(opts.TLS.ClientCert, c.config.Certificate),
+		Key:         or(opts.TLS.ClientKey, c.config.Key),
+		TLSFirst:    false,
+	}
+
+	client, closer, err := CreateJetStreamClient(cfg, true)
+	if err != nil {
+		return fmt.Errorf("create jetstream client: %w", err)
+	}
+	defer closer.Close()
+
+	return op(client)
+}
+
+// or returns the value if it is not the null value. Otherwise, the fallback value is returned
+func or[T comparable](v T, fallback T) T {
+	if v == *new(T) {
+		return fallback
+	}
+	return v
 }
 
 // updateReadyCondition returns the conditions with an added or updated ready condition
