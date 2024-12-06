@@ -1,4 +1,4 @@
-// Copyright 2020 The NATS Authors
+// Copyright 2024 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -21,7 +21,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// StreamApplyConfiguration represents an declarative configuration of the Stream type for use
+// StreamApplyConfiguration represents a declarative configuration of the Stream type for use
 // with apply.
 type StreamApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -30,7 +30,7 @@ type StreamApplyConfiguration struct {
 	Status                           *StatusApplyConfiguration     `json:"status,omitempty"`
 }
 
-// Stream constructs an declarative configuration of the Stream type for use with
+// Stream constructs a declarative configuration of the Stream type for use with
 // apply.
 func Stream(name, namespace string) *StreamApplyConfiguration {
 	b := &StreamApplyConfiguration{}
@@ -213,4 +213,10 @@ func (b *StreamApplyConfiguration) WithSpec(value *StreamSpecApplyConfiguration)
 func (b *StreamApplyConfiguration) WithStatus(value *StatusApplyConfiguration) *StreamApplyConfiguration {
 	b.Status = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *StreamApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

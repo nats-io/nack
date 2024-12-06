@@ -1,4 +1,4 @@
-// Copyright 2020 The NATS Authors
+// Copyright 2024 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -21,7 +21,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ConsumerApplyConfiguration represents an declarative configuration of the Consumer type for use
+// ConsumerApplyConfiguration represents a declarative configuration of the Consumer type for use
 // with apply.
 type ConsumerApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -30,7 +30,7 @@ type ConsumerApplyConfiguration struct {
 	Status                           *StatusApplyConfiguration       `json:"status,omitempty"`
 }
 
-// Consumer constructs an declarative configuration of the Consumer type for use with
+// Consumer constructs a declarative configuration of the Consumer type for use with
 // apply.
 func Consumer(name, namespace string) *ConsumerApplyConfiguration {
 	b := &ConsumerApplyConfiguration{}
@@ -213,4 +213,10 @@ func (b *ConsumerApplyConfiguration) WithSpec(value *ConsumerSpecApplyConfigurat
 func (b *ConsumerApplyConfiguration) WithStatus(value *StatusApplyConfiguration) *ConsumerApplyConfiguration {
 	b.Status = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *ConsumerApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

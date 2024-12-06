@@ -1,4 +1,4 @@
-// Copyright 2020 The NATS Authors
+// Copyright 2024 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -41,22 +41,24 @@ var accountsKind = v1beta2.SchemeGroupVersion.WithKind("Account")
 
 // Get takes name of the account, and returns the corresponding account object, and an error if there is any.
 func (c *FakeAccounts) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta2.Account, err error) {
+	emptyResult := &v1beta2.Account{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(accountsResource, c.ns, name), &v1beta2.Account{})
+		Invokes(testing.NewGetActionWithOptions(accountsResource, c.ns, name, options), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1beta2.Account), err
 }
 
 // List takes label and field selectors, and returns the list of Accounts that match those selectors.
 func (c *FakeAccounts) List(ctx context.Context, opts v1.ListOptions) (result *v1beta2.AccountList, err error) {
+	emptyResult := &v1beta2.AccountList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(accountsResource, accountsKind, c.ns, opts), &v1beta2.AccountList{})
+		Invokes(testing.NewListActionWithOptions(accountsResource, accountsKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -75,40 +77,43 @@ func (c *FakeAccounts) List(ctx context.Context, opts v1.ListOptions) (result *v
 // Watch returns a watch.Interface that watches the requested accounts.
 func (c *FakeAccounts) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(accountsResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchActionWithOptions(accountsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a account and creates it.  Returns the server's representation of the account, and an error, if there is any.
 func (c *FakeAccounts) Create(ctx context.Context, account *v1beta2.Account, opts v1.CreateOptions) (result *v1beta2.Account, err error) {
+	emptyResult := &v1beta2.Account{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(accountsResource, c.ns, account), &v1beta2.Account{})
+		Invokes(testing.NewCreateActionWithOptions(accountsResource, c.ns, account, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1beta2.Account), err
 }
 
 // Update takes the representation of a account and updates it. Returns the server's representation of the account, and an error, if there is any.
 func (c *FakeAccounts) Update(ctx context.Context, account *v1beta2.Account, opts v1.UpdateOptions) (result *v1beta2.Account, err error) {
+	emptyResult := &v1beta2.Account{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(accountsResource, c.ns, account), &v1beta2.Account{})
+		Invokes(testing.NewUpdateActionWithOptions(accountsResource, c.ns, account, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1beta2.Account), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeAccounts) UpdateStatus(ctx context.Context, account *v1beta2.Account, opts v1.UpdateOptions) (*v1beta2.Account, error) {
+func (c *FakeAccounts) UpdateStatus(ctx context.Context, account *v1beta2.Account, opts v1.UpdateOptions) (result *v1beta2.Account, err error) {
+	emptyResult := &v1beta2.Account{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(accountsResource, "status", c.ns, account), &v1beta2.Account{})
+		Invokes(testing.NewUpdateSubresourceActionWithOptions(accountsResource, "status", c.ns, account, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1beta2.Account), err
 }
@@ -123,7 +128,7 @@ func (c *FakeAccounts) Delete(ctx context.Context, name string, opts v1.DeleteOp
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeAccounts) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(accountsResource, c.ns, listOpts)
+	action := testing.NewDeleteCollectionActionWithOptions(accountsResource, c.ns, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1beta2.AccountList{})
 	return err
@@ -131,11 +136,12 @@ func (c *FakeAccounts) DeleteCollection(ctx context.Context, opts v1.DeleteOptio
 
 // Patch applies the patch and returns the patched account.
 func (c *FakeAccounts) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta2.Account, err error) {
+	emptyResult := &v1beta2.Account{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(accountsResource, c.ns, name, pt, data, subresources...), &v1beta2.Account{})
+		Invokes(testing.NewPatchSubresourceActionWithOptions(accountsResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1beta2.Account), err
 }
@@ -153,11 +159,12 @@ func (c *FakeAccounts) Apply(ctx context.Context, account *jetstreamv1beta2.Acco
 	if name == nil {
 		return nil, fmt.Errorf("account.Name must be provided to Apply")
 	}
+	emptyResult := &v1beta2.Account{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(accountsResource, c.ns, *name, types.ApplyPatchType, data), &v1beta2.Account{})
+		Invokes(testing.NewPatchSubresourceActionWithOptions(accountsResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1beta2.Account), err
 }
@@ -176,11 +183,12 @@ func (c *FakeAccounts) ApplyStatus(ctx context.Context, account *jetstreamv1beta
 	if name == nil {
 		return nil, fmt.Errorf("account.Name must be provided to Apply")
 	}
+	emptyResult := &v1beta2.Account{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(accountsResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1beta2.Account{})
+		Invokes(testing.NewPatchSubresourceActionWithOptions(accountsResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1beta2.Account), err
 }

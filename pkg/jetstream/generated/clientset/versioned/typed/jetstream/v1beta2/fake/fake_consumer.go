@@ -1,4 +1,4 @@
-// Copyright 2020 The NATS Authors
+// Copyright 2024 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -41,22 +41,24 @@ var consumersKind = v1beta2.SchemeGroupVersion.WithKind("Consumer")
 
 // Get takes name of the consumer, and returns the corresponding consumer object, and an error if there is any.
 func (c *FakeConsumers) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta2.Consumer, err error) {
+	emptyResult := &v1beta2.Consumer{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(consumersResource, c.ns, name), &v1beta2.Consumer{})
+		Invokes(testing.NewGetActionWithOptions(consumersResource, c.ns, name, options), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1beta2.Consumer), err
 }
 
 // List takes label and field selectors, and returns the list of Consumers that match those selectors.
 func (c *FakeConsumers) List(ctx context.Context, opts v1.ListOptions) (result *v1beta2.ConsumerList, err error) {
+	emptyResult := &v1beta2.ConsumerList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(consumersResource, consumersKind, c.ns, opts), &v1beta2.ConsumerList{})
+		Invokes(testing.NewListActionWithOptions(consumersResource, consumersKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -75,40 +77,43 @@ func (c *FakeConsumers) List(ctx context.Context, opts v1.ListOptions) (result *
 // Watch returns a watch.Interface that watches the requested consumers.
 func (c *FakeConsumers) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(consumersResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchActionWithOptions(consumersResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a consumer and creates it.  Returns the server's representation of the consumer, and an error, if there is any.
 func (c *FakeConsumers) Create(ctx context.Context, consumer *v1beta2.Consumer, opts v1.CreateOptions) (result *v1beta2.Consumer, err error) {
+	emptyResult := &v1beta2.Consumer{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(consumersResource, c.ns, consumer), &v1beta2.Consumer{})
+		Invokes(testing.NewCreateActionWithOptions(consumersResource, c.ns, consumer, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1beta2.Consumer), err
 }
 
 // Update takes the representation of a consumer and updates it. Returns the server's representation of the consumer, and an error, if there is any.
 func (c *FakeConsumers) Update(ctx context.Context, consumer *v1beta2.Consumer, opts v1.UpdateOptions) (result *v1beta2.Consumer, err error) {
+	emptyResult := &v1beta2.Consumer{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(consumersResource, c.ns, consumer), &v1beta2.Consumer{})
+		Invokes(testing.NewUpdateActionWithOptions(consumersResource, c.ns, consumer, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1beta2.Consumer), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeConsumers) UpdateStatus(ctx context.Context, consumer *v1beta2.Consumer, opts v1.UpdateOptions) (*v1beta2.Consumer, error) {
+func (c *FakeConsumers) UpdateStatus(ctx context.Context, consumer *v1beta2.Consumer, opts v1.UpdateOptions) (result *v1beta2.Consumer, err error) {
+	emptyResult := &v1beta2.Consumer{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(consumersResource, "status", c.ns, consumer), &v1beta2.Consumer{})
+		Invokes(testing.NewUpdateSubresourceActionWithOptions(consumersResource, "status", c.ns, consumer, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1beta2.Consumer), err
 }
@@ -123,7 +128,7 @@ func (c *FakeConsumers) Delete(ctx context.Context, name string, opts v1.DeleteO
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeConsumers) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(consumersResource, c.ns, listOpts)
+	action := testing.NewDeleteCollectionActionWithOptions(consumersResource, c.ns, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1beta2.ConsumerList{})
 	return err
@@ -131,11 +136,12 @@ func (c *FakeConsumers) DeleteCollection(ctx context.Context, opts v1.DeleteOpti
 
 // Patch applies the patch and returns the patched consumer.
 func (c *FakeConsumers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta2.Consumer, err error) {
+	emptyResult := &v1beta2.Consumer{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(consumersResource, c.ns, name, pt, data, subresources...), &v1beta2.Consumer{})
+		Invokes(testing.NewPatchSubresourceActionWithOptions(consumersResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1beta2.Consumer), err
 }
@@ -153,11 +159,12 @@ func (c *FakeConsumers) Apply(ctx context.Context, consumer *jetstreamv1beta2.Co
 	if name == nil {
 		return nil, fmt.Errorf("consumer.Name must be provided to Apply")
 	}
+	emptyResult := &v1beta2.Consumer{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(consumersResource, c.ns, *name, types.ApplyPatchType, data), &v1beta2.Consumer{})
+		Invokes(testing.NewPatchSubresourceActionWithOptions(consumersResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1beta2.Consumer), err
 }
@@ -176,11 +183,12 @@ func (c *FakeConsumers) ApplyStatus(ctx context.Context, consumer *jetstreamv1be
 	if name == nil {
 		return nil, fmt.Errorf("consumer.Name must be provided to Apply")
 	}
+	emptyResult := &v1beta2.Consumer{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(consumersResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1beta2.Consumer{})
+		Invokes(testing.NewPatchSubresourceActionWithOptions(consumersResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1beta2.Consumer), err
 }

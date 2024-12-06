@@ -1,4 +1,4 @@
-// Copyright 2020 The NATS Authors
+// Copyright 2024 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -21,7 +21,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// AccountApplyConfiguration represents an declarative configuration of the Account type for use
+// AccountApplyConfiguration represents a declarative configuration of the Account type for use
 // with apply.
 type AccountApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -30,7 +30,7 @@ type AccountApplyConfiguration struct {
 	Status                           *StatusApplyConfiguration      `json:"status,omitempty"`
 }
 
-// Account constructs an declarative configuration of the Account type for use with
+// Account constructs a declarative configuration of the Account type for use with
 // apply.
 func Account(name, namespace string) *AccountApplyConfiguration {
 	b := &AccountApplyConfiguration{}
@@ -213,4 +213,10 @@ func (b *AccountApplyConfiguration) WithSpec(value *AccountSpecApplyConfiguratio
 func (b *AccountApplyConfiguration) WithStatus(value *StatusApplyConfiguration) *AccountApplyConfiguration {
 	b.Status = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *AccountApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

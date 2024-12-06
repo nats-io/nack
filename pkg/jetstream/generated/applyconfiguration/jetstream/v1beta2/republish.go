@@ -1,4 +1,4 @@
-// Copyright 2020 The NATS Authors
+// Copyright 2024 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -15,7 +15,7 @@
 
 package v1beta2
 
-// RePublishApplyConfiguration represents an declarative configuration of the RePublish type for use
+// RePublishApplyConfiguration represents a declarative configuration of the RePublish type for use
 // with apply.
 type RePublishApplyConfiguration struct {
 	Source      *string `json:"source,omitempty"`
@@ -23,7 +23,7 @@ type RePublishApplyConfiguration struct {
 	HeadersOnly *bool   `json:"headers_only,omitempty"`
 }
 
-// RePublishApplyConfiguration constructs an declarative configuration of the RePublish type for use with
+// RePublishApplyConfiguration constructs a declarative configuration of the RePublish type for use with
 // apply.
 func RePublish() *RePublishApplyConfiguration {
 	return &RePublishApplyConfiguration{}

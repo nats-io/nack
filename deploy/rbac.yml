@@ -44,6 +44,14 @@ rules:
   - patch
   - update
   - delete
+- apiGroups:
+  - jetstream.nats.io
+  resources:
+  - streams/finalizers
+  - consumers/finalizers
+  - accounts/finalizers
+  verbs:
+  - update
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

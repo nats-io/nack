@@ -1,4 +1,4 @@
-// Copyright 2020 The NATS Authors
+// Copyright 2024 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -15,7 +15,7 @@
 
 package v1beta2
 
-// TLSApplyConfiguration represents an declarative configuration of the TLS type for use
+// TLSApplyConfiguration represents a declarative configuration of the TLS type for use
 // with apply.
 type TLSApplyConfiguration struct {
 	ClientCert *string  `json:"clientCert,omitempty"`
@@ -23,7 +23,7 @@ type TLSApplyConfiguration struct {
 	RootCAs    []string `json:"rootCas,omitempty"`
 }
 
-// TLSApplyConfiguration constructs an declarative configuration of the TLS type for use with
+// TLSApplyConfiguration constructs a declarative configuration of the TLS type for use with
 // apply.
 func TLS() *TLSApplyConfiguration {
 	return &TLSApplyConfiguration{}
