@@ -18,20 +18,23 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/nats-io/nack/controllers/jetstream"
+	"github.com/nats-io/nack/internal/controller"
+	jetstreamnatsiov1beta2 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
+	clientset "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/kubernetes"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
+	klog "k8s.io/klog/v2"
 	"os"
 	"os/signal"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"syscall"
 	"time"
-
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/nats-io/nack/controllers/jetstream"
-	clientset "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned"
-
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
-	klog "k8s.io/klog/v2"
 )
 
 var (
@@ -49,7 +52,10 @@ func main() {
 
 func run() error {
 	klog.InitFlags(nil)
-	kubeConfig := flag.String("kubeconfig", "", "Path to kubeconfig")
+
+	// Explicitly register controller-runtime flags
+	ctrl.RegisterFlags(nil)
+
 	namespace := flag.String("namespace", v1.NamespaceAll, "Restrict to a namespace")
 	version := flag.Bool("version", false, "Print the version and exit")
 	creds := flag.String("creds", "", "NATS Credentials")
@@ -62,6 +68,8 @@ func run() error {
 	crdConnect := flag.Bool("crd-connect", false, "If true, then NATS connections will be made from CRD config, not global config")
 	cleanupPeriod := flag.Duration("cleanup-period", 30*time.Second, "Period to run object cleanup")
 	readOnly := flag.Bool("read-only", false, "Starts the controller without causing changes to the NATS resources")
+	controlLoop := flag.Bool("control-loop", false, "Experimental: Run controller with a full reconciliation control loop.")
+
 	flag.Parse()
 
 	if *version {
@@ -73,18 +81,30 @@ func run() error {
 		return errors.New("NATS Server URL is required")
 	}
 
-	var config *rest.Config
-	var err error
-	if *kubeConfig == "" {
-		config, err = rest.InClusterConfig()
-		if err != nil {
-			return err
+	config, err := ctrl.GetConfig()
+	if err != nil {
+		return fmt.Errorf("get kubernetes rest config: %w", err)
+	}
+
+	if *controlLoop {
+		klog.Warning("Starting jetStream controller in experimental control loop mode")
+		natsCfg := &controller.NatsConfig{
+			CRDConnect:  *crdConnect,
+			ClientName:  "jetstream-controller",
+			Credentials: *creds,
+			NKey:        *nkey,
+			ServerURL:   *server,
+			CA:          *ca,
+			Certificate: *cert,
+			Key:         *key,
+			TLSFirst:    *tlsfirst,
 		}
-	} else {
-		config, err = clientcmd.BuildConfigFromFlags("", *kubeConfig)
-		if err != nil {
-			return err
+
+		controllerCfg := &controller.Config{
+			ReadOnly:  *readOnly,
+			Namespace: *namespace,
 		}
+		return runControlLoop(config, natsCfg, controllerCfg)
 	}
 
 	// K8S API Client.
@@ -127,6 +147,38 @@ func run() error {
 	}
 	go handleSignals(cancel)
 	return ctrl.Run()
+}
+
+func runControlLoop(config *rest.Config, natsCfg *controller.NatsConfig, controllerCfg *controller.Config) error {
+
+	// Setup scheme
+	scheme := runtime.NewScheme()
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(jetstreamnatsiov1beta2.AddToScheme(scheme))
+
+	mgr, err := ctrl.NewManager(config, ctrl.Options{
+		Scheme: scheme,
+		Logger: klog.NewKlogr().WithName("controller-runtime"),
+		// TODO Add full configuration
+	})
+	if err != nil {
+		return fmt.Errorf("unable to start manager: %w", err)
+	}
+
+	err = controller.RegisterAll(mgr, natsCfg, controllerCfg)
+	if err != nil {
+		return fmt.Errorf("register jetstream controllers: %w", err)
+	}
+
+	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
+		return fmt.Errorf("unable to set up health check: %w", err)
+	}
+	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+		return fmt.Errorf("unable to set up ready check: %w", err)
+	}
+
+	klog.Info("starting manager")
+	return mgr.Start(ctrl.SetupSignalHandler())
 }
 
 func handleSignals(cancel context.CancelFunc) {

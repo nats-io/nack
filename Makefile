@@ -2,6 +2,8 @@ export GO111MODULE := on
 
 SHELL=/usr/bin/env bash
 
+ENVTEST_K8S_VERSION = 1.29.0
+
 now := $(shell date -u +%Y-%m-%dT%H:%M:%S%z)
 gitBranch := $(shell git rev-parse --abbrev-ref HEAD)
 gitCommit := $(shell git rev-parse --short HEAD)
@@ -11,7 +13,7 @@ VERSION ?= version-not-set
 linkerVars := -X main.BuildTime=$(now) -X main.GitInfo=$(gitBranch)-$(gitCommit)$(repoDirty) -X main.Version=$(VERSION)
 drepo ?= natsio
 
-jetstreamSrc := $(shell find cmd/jetstream-controller pkg/jetstream controllers/jetstream -name "*.go") pkg/jetstream/apis/jetstream/v1beta2/zz_generated.deepcopy.go
+jetstreamSrc := $(shell find cmd/jetstream-controller pkg/jetstream internal/controller controllers/jetstream -name "*.go") pkg/jetstream/apis/jetstream/v1beta2/zz_generated.deepcopy.go
 
 configReloaderSrc := $(shell find cmd/nats-server-config-reloader/ pkg/natsreloader/ -name "*.go")
 
@@ -169,10 +171,38 @@ fetch-modules:
 .PHONY: build
 build: jetstream-controller nats-server-config-reloader nats-boot-config
 
+# Setup envtest tools based on a operator-sdk project makefile
+LOCALBIN ?= $(shell pwd)/bin
+$(LOCALBIN):
+	mkdir -p $(LOCALBIN)
+
+# go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
+# $1 - target path with name of binary (ideally with version)
+# $2 - package url which can be installed
+# $3 - specific version of package
+define go-install-tool
+@[ -f $(1) ] || { \
+set -e; \
+package=$(2)@$(3) ;\
+echo "Downloading $${package}" ;\
+GOBIN=$(LOCALBIN) go install $${package} ;\
+mv "$$(echo "$(1)" | sed "s/-$(3)$$//")" $(1) ;\
+}
+endef
+
+ENVTEST ?= $(LOCALBIN)/setup-envtest-$(ENVTEST_VERSION)
+ENVTEST_VERSION ?= release-0.17
+
+.PHONY: envtest
+envtest: $(ENVTEST) ## Download setup-envtest locally if necessary.
+$(ENVTEST): $(LOCALBIN)
+	$(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest,$(ENVTEST_VERSION))
+
+
 .PHONY: test
-test:
-	go vet ./controllers/... ./pkg/natsreloader/...
-	go test -race -cover -count=1 -timeout 10s ./controllers/... ./pkg/natsreloader/...
+test: envtest
+	go vet ./controllers/... ./pkg/natsreloader/... ./internal/controller/...
+	go test -race -cover -count=1 -timeout 10s ./controllers/... ./pkg/natsreloader/... ./internal/controller/...
 
 .PHONY: clean
 clean:
