@@ -180,8 +180,8 @@ func (r *StreamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, fmt.Errorf("create or update stream: %w", err)
 	}
 
-	// TODO update the generation in the status
-
+	// update the observed generation and ready status
+	stream.Status.ObservedGeneration = stream.Generation
 	stream.Status.Conditions = updateReadyCondition(
 		stream.Status.Conditions,
 		v1.ConditionTrue,

@@ -122,6 +122,9 @@ var _ = Describe("Stream Controller", func() {
 			gotCondition.LastTransitionTime = ""
 			Expect(gotCondition).To(Equal(readyCondition))
 
+			By("Checking if the observed generation matches")
+			Expect(stream.Status.ObservedGeneration).To(Equal(stream.Generation))
+
 			By("Checking if the finalizer was set")
 			Expect(stream.Finalizers).To(ContainElement(streamFinalizer))
 
@@ -171,6 +174,9 @@ var _ = Describe("Stream Controller", func() {
 			// Unset LastTransitionTime to be equal for assertion
 			gotCondition.LastTransitionTime = ""
 			Expect(gotCondition).To(Equal(readyCondition))
+
+			By("Checking if the observed generation matches")
+			Expect(stream.Status.ObservedGeneration).To(Equal(stream.Generation))
 
 			By("Checking if the stream was updated")
 			natsStream, err := jsClient.Stream(ctx, streamName)
@@ -231,6 +237,9 @@ var _ = Describe("Stream Controller", func() {
 			Expect(cond.Reason).To(Equal("Errored"))
 			Expect(cond.Message).To(Equal("create or update stream: context deadline exceeded"))
 			Expect(cond.LastTransitionTime).NotTo(BeEmpty())
+
+			By("Checking if the observed generation does not match")
+			Expect(stream.Status.ObservedGeneration).ToNot(Equal(stream.Generation))
 
 			By("Checking if the finalizer was set")
 			Expect(stream.Finalizers).To(ContainElement(streamFinalizer))
