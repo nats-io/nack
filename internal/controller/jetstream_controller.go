@@ -135,4 +135,8 @@ func updateReadyCondition(conditions []api.Condition, status v1.ConditionStatus,
 		return js.UpsertCondition(conditions, newCondition)
 	}
 
+// asJsonString returns the given string wrapped in " and converted to []byte.
+// Helper for mapping spec config to jetStream config using UnmarshalJSON.
+func asJsonString(v string) []byte {
+	return []byte("\"" + v + "\"")
 }

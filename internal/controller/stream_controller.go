@@ -366,11 +366,6 @@ func mapStreamSource(ss *api.StreamSource) (*jetstream.StreamSource, error) {
 	return jss, nil
 }
 
-// asJsonString returns the given string wrapped in " and converted to []byte.
-func asJsonString(v string) []byte {
-	return []byte("\"" + v + "\"")
-}
-
 // SetupWithManager sets up the controller with the Manager.
 func (r *StreamReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
