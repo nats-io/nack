@@ -117,14 +117,17 @@ func (r *StreamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			return ctrl.Result{}, fmt.Errorf("update ready condition: %w", err)
 		}
 
-		// Perform finalizer operations
-		// TODO honour stream.Spec.PreventDelete and readonly
-		// Remove stream
-		err := r.WithJetStreamClient(specConnectionOptions, func(js jetstream.JetStream) error {
-			return js.DeleteStream(ctx, stream.Spec.Name)
-		})
-		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("delete stream during finalization: %w", err)
+		log.Info("performing finalizing operations")
+		if stream.Spec.PreventDelete {
+			log.Info("Spec.PreventDelete: skip delete stream during resource deletion.", "streamName", stream.Spec.Name)
+		} else {
+			// Remove stream
+			err := r.WithJetStreamClient(specConnectionOptions, func(js jetstream.JetStream) error {
+				return js.DeleteStream(ctx, stream.Spec.Name)
+			})
+			if err != nil {
+				return ctrl.Result{}, fmt.Errorf("delete stream during finalization: %w", err)
+			}
 		}
 
 		// Re-Fetch resource

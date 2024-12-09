@@ -281,6 +281,48 @@ var _ = Describe("Stream Controller", func() {
 			Expect(err).To(MatchError(jetstream.ErrStreamNotFound))
 		})
 
+		When("PreventDelete is set", func() {
+			It("should not delete stream marked for deletion when ", func(ctx SpecContext) {
+
+				By("Setting preventDelete on the resource")
+				stream.Spec.PreventDelete = true
+				Expect(k8sClient.Update(ctx, stream)).To(Succeed())
+
+				By("Reconciling the updated resource once")
+				controllerReconciler := &StreamReconciler{
+					baseController,
+				}
+
+				_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+					NamespacedName: typeNamespacedName,
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				// Stream exists
+				_, err = jsClient.Stream(ctx, streamName)
+				Expect(err).NotTo(HaveOccurred())
+
+				By("Marking the resource as deleted")
+				Expect(k8sClient.Delete(ctx, stream)).To(Succeed())
+
+				By("Reconciling the deleted resource")
+				_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
+					NamespacedName: typeNamespacedName,
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				By("Checking if the resource was removed")
+				Eventually(func() error {
+					found := &api.Stream{}
+					return k8sClient.Get(ctx, typeNamespacedName, found)
+				}, 5*time.Second, time.Second).ShouldNot(Succeed())
+
+				By("Checking if the stream was *not* deleted")
+				_, err = jsClient.Stream(ctx, streamName)
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+
 		It("should update stream on different server as specified in spec", func(ctx SpecContext) {
 			By("Setting up the alternative server")
 			// Setup altClient for alternate server
