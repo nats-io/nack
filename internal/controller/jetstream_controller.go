@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"errors"
 	"fmt"
 	js "github.com/nats-io/nack/controllers/jetstream"
 	api "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
@@ -24,10 +23,18 @@ type connectionOptions struct {
 type JetStreamController interface {
 	client.Client
 
-	// ReadOnly returns true when this controller
-	readOnly() bool
-	Namespace() string
-	WithJetStreamClient(*connectionOptions, func(js jetstream.JetStream) error) error
+	// ReadOnly returns true when no changes should be made by the controller.
+	ReadOnly() bool
+	// ValidNamespace ok if the controllers namespace restriction allows the given namespace.
+	ValidNamespace(string string) bool
+
+	// WithJetStreamClient provides a jetStream client to the given operation.
+	// The client uses the controllers connection configuration merged with opts.
+	//
+	// The given opts values take precedence over the controllers base configuration.
+	//
+	// Returns the error of the operation or errors during client setup.
+	WithJetStreamClient(opts *connectionOptions, op func(js jetstream.JetStream) error) error
 }
 
 func NewJSController(k8sClient client.Client, natsConfig *NatsConfig, controllerConfig *Config) (JetStreamController, error) {
@@ -45,12 +52,13 @@ type jsController struct {
 	controllerConfig *Config
 }
 
-func (c *jsController) readOnly() bool {
+func (c *jsController) ReadOnly() bool {
 	return c.controllerConfig.ReadOnly
 }
 
-func (c *jsController) Namespace() string {
-	return c.controllerConfig.Namespace
+func (c *jsController) ValidNamespace(targetNamespace string) bool {
+	ns := c.controllerConfig.Namespace
+	return ns == "" || ns == targetNamespace
 }
 
 func (c *jsController) WithJetStreamClient(opts *connectionOptions, op func(js jetstream.JetStream) error) error {
@@ -134,6 +142,7 @@ func updateReadyCondition(conditions []api.Condition, status v1.ConditionStatus,
 	} else {
 		return js.UpsertCondition(conditions, newCondition)
 	}
+}
 
 // asJsonString returns the given string wrapped in " and converted to []byte.
 // Helper for mapping spec config to jetStream config using UnmarshalJSON.

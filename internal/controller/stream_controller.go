@@ -47,7 +47,10 @@ func (r *StreamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	log.Info("reconciling")
 
-	// TODO honour r.Config.ReadOnly and r.Config.Namespace
+	if ok := r.ValidNamespace(req.Namespace); !ok {
+		log.Info("Controller restricted to namespace, skipping reconciliation")
+		return ctrl.Result{}, nil
+	}
 
 	// Fetch stream resource
 	stream := &api.Stream{}
@@ -81,8 +84,9 @@ func (r *StreamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		}
 	}
 
-	// Update Status to unknown when no status is set
+	// Update ready status to unknown when no status is set
 	if stream.Status.Conditions == nil || len(stream.Status.Conditions) == 0 {
+		log.Info("Setting initial ready condition to unknown")
 		stream.Status.Conditions = updateReadyCondition(stream.Status.Conditions, v1.ConditionUnknown, "Reconciling", "Starting reconciliation")
 		err := r.Status().Update(ctx, stream)
 		if err != nil {
@@ -99,9 +103,14 @@ func (r *StreamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		}
 	}
 
+	if r.ReadOnly() {
+		log.Info("read-only enabled, skipping reconciliation")
+		return ctrl.Result{}, nil
+	}
+
 	// Connection options specific to this spec
 	specConnectionOptions := &connectionOptions{
-		Account: stream.Spec.Account,
+		Account: stream.Spec.Account, // TODO(review): Where does Spec.Account have to be considered?
 		Creds:   stream.Spec.Creds,
 		Nkey:    stream.Spec.Nkey,
 		Servers: stream.Spec.Servers,
@@ -110,6 +119,7 @@ func (r *StreamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	// Delete if marked for deletion and has stream finalizer
 	markedForDeletion := stream.GetDeletionTimestamp() != nil
+	// TODO deletion is triggered multiple times?. Set additional status condition?
 	if markedForDeletion && controllerutil.ContainsFinalizer(stream, streamFinalizer) {
 		// Set status to not unknown
 		stream.Status.Conditions = updateReadyCondition(stream.Status.Conditions, v1.ConditionUnknown, "Finalizing", "Performing finalizer operations.")
@@ -162,6 +172,10 @@ func (r *StreamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	// Create or Update the stream based on the spec
+	if stream.Spec.PreventUpdate {
+		log.Info("Spec.PreventUpdate: skip create/updating the stream during reconciliation.", "streamName", stream.Spec.Name)
+		return ctrl.Result{}, nil
+	}
 
 	// Map spec to stream targetConfig
 	targetConfig, err := mapSpecToConfig(&stream.Spec)
@@ -169,7 +183,8 @@ func (r *StreamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, fmt.Errorf("map spec to stream targetConfig: %w", err)
 	}
 
-	//  TODO honour stream.Spec.PreventUpdate
+	// CreateOrUpdateStream is called on every reconciliation when the stream is not to be deleted.
+	// TODO Do we need to check if generation has changed or the config differs?
 	err = r.WithJetStreamClient(specConnectionOptions, func(js jetstream.JetStream) error {
 		_, err = js.CreateOrUpdateStream(ctx, targetConfig)
 		return err
