@@ -21,16 +21,6 @@ type connectionOptions struct {
 	TLS     api.TLS  `json:"tls"`
 }
 
-func (o connectionOptions) empty() bool {
-	return o.Account == "" &&
-		o.Creds == "" &&
-		o.Nkey == "" &&
-		len(o.Servers) == 0 &&
-		o.TLS.ClientCert == "" &&
-		o.TLS.ClientKey == "" &&
-		len(o.TLS.RootCAs) == 0
-}
-
 type JetStreamController interface {
 	client.Client
 
@@ -42,20 +32,10 @@ type JetStreamController interface {
 
 func NewJSController(k8sClient client.Client, natsConfig *NatsConfig, controllerConfig *Config) (JetStreamController, error) {
 
-	var baseClient jetstream.JetStream
-	if natsConfig.ServerURL != "" {
-		var err error
-		baseClient, _, err = CreateJetStreamClient(natsConfig, true)
-		if err != nil {
-			return nil, fmt.Errorf("create base js k8sClient: %w", err)
-		}
-	}
-
 	return &jsController{
 		Client:           k8sClient,
 		config:           natsConfig,
 		controllerConfig: controllerConfig,
-		baseClient:       baseClient,
 	}, nil
 }
 
@@ -63,7 +43,6 @@ type jsController struct {
 	client.Client
 	config           *NatsConfig
 	controllerConfig *Config
-	baseClient       jetstream.JetStream
 }
 
 func (c *jsController) readOnly() bool {
@@ -75,33 +54,37 @@ func (c *jsController) Namespace() string {
 }
 
 func (c *jsController) WithJetStreamClient(opts *connectionOptions, op func(js jetstream.JetStream) error) error {
-	if c.baseClient == nil {
-		return errors.New("no client available")
-	}
-
-	// Use base client when no config is given
-	if opts == nil || opts.empty() {
-		return op(c.baseClient)
-	}
-
 	// Build single use client
+	// TODO(future feature): Use client-pool
 	serverUrl := strings.Join(opts.Servers, ",")
 
-	// TODO needs review:
-	// Here the config from spec takes precedence over base config on a value by value basis.
-	// This could lead to issues when an NKey is set in the spec config and Credentials are set in the base config.
-	// In NatsConfig.buildOptions, Credentials take precedence over the Nkey,
-	// which would lead to the nkey from spec to be ignored.
+	// Build nats config from opts and controller base config.
+	// Takes opts values if present.
 	cfg := &NatsConfig{
-		CRDConnect:  false,
-		ClientName:  c.config.ClientName,
-		Credentials: or(opts.Creds, c.config.Credentials),
-		NKey:        or(opts.Nkey, c.config.NKey),
-		ServerURL:   or(serverUrl, c.config.ServerURL),
-		CAs:         *or(&opts.TLS.RootCAs, &c.config.CAs),
-		Certificate: or(opts.TLS.ClientCert, c.config.Certificate),
-		Key:         or(opts.TLS.ClientKey, c.config.Key),
-		TLSFirst:    false,
+		CRDConnect: false,
+		ClientName: c.config.ClientName,
+		ServerURL:  or(serverUrl, c.config.ServerURL),
+		TLSFirst:   c.config.TLSFirst, // TODO(review): should this value depend on any opts? There is no TLSFirst in the spec
+	}
+
+	// Authentication either from opts or base config
+	if opts.Creds != "" || opts.Nkey != "" {
+		cfg.Credentials = opts.Creds
+		cfg.NKey = opts.Nkey
+	} else {
+		cfg.Credentials = c.config.Credentials
+		cfg.NKey = c.config.NKey
+	}
+
+	// Cert config either from opts or base config
+	if len(opts.TLS.RootCAs) > 0 || opts.TLS.ClientCert != "" || opts.TLS.ClientKey != "" {
+		cfg.CAs = opts.TLS.RootCAs
+		cfg.Certificate = opts.TLS.ClientCert
+		cfg.Key = opts.TLS.ClientKey
+	} else {
+		cfg.CAs = c.config.CAs
+		cfg.Certificate = c.config.Certificate
+		cfg.Key = c.config.Key
 	}
 
 	client, closer, err := CreateJetStreamClient(cfg, true)
