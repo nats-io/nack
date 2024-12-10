@@ -38,8 +38,10 @@ type StreamReconciler struct {
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 //
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.17.3/pkg/reconcile
+// It performs three main operations:
+// - Initialize finalizer and ready condition if not present
+// - Delete stream if it is marked for deletion.
+// - Create or Update the stream
 func (r *StreamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := klog.FromContext(ctx).
 		WithName("StreamReconciler").
@@ -129,7 +131,7 @@ func (r *StreamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 		log.Info("performing finalizing operations")
 		if stream.Spec.PreventDelete {
-			log.Info("Spec.PreventDelete: skip delete stream during resource deletion.", "streamName", stream.Spec.Name)
+			log.Info("skip delete stream during resource deletion.", "streamName", stream.Spec.Name)
 		} else {
 			// Remove stream
 			err := r.WithJetStreamClient(specConnectionOptions, func(js jetstream.JetStream) error {
@@ -184,7 +186,7 @@ func (r *StreamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	// CreateOrUpdateStream is called on every reconciliation when the stream is not to be deleted.
-	// TODO Do we need to check if generation has changed or the config differs?
+	// TODO(future-feature): Do we need to check if generation has changed or the config differs?
 	err = r.WithJetStreamClient(specConnectionOptions, func(js jetstream.JetStream) error {
 		_, err = js.CreateOrUpdateStream(ctx, targetConfig)
 		return err
