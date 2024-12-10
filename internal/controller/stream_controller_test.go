@@ -45,6 +45,14 @@ var _ = Describe("Stream Controller", func() {
 			Namespace: "default", // TODO(user):Modify as needed
 		}
 
+		emptyStreamConfig := jetstream.StreamConfig{
+			Name:      streamName,
+			Replicas:  1,
+			Retention: jetstream.WorkQueuePolicy,
+			Discard:   jetstream.DiscardOld,
+			Storage:   jetstream.FileStorage,
+		}
+
 		stream := &api.Stream{}
 
 		BeforeEach(func(ctx SpecContext) {
@@ -140,13 +148,7 @@ var _ = Describe("Stream Controller", func() {
 		It("should successfully update the stream and update the status", func(ctx SpecContext) {
 
 			By("Creating the stream with empty subjects and description")
-			_, err := jsClient.CreateStream(ctx, jetstream.StreamConfig{
-				Name:      streamName,
-				Replicas:  1,
-				Retention: jetstream.WorkQueuePolicy,
-				Discard:   jetstream.DiscardOld,
-				Storage:   jetstream.FileStorage,
-			})
+			_, err := jsClient.CreateStream(ctx, emptyStreamConfig)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Reconciling the created resource")
@@ -320,6 +322,60 @@ var _ = Describe("Stream Controller", func() {
 				By("Checking if the stream was *not* deleted")
 				_, err = jsClient.Stream(ctx, streamName)
 				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+
+		When("PreventUpdate is set", func() {
+			BeforeEach(func(ctx SpecContext) {
+				By("Setting prevent update")
+
+				stream.Spec.PreventUpdate = true
+				Expect(k8sClient.Update(ctx, stream)).To(Succeed())
+			})
+
+			It("should not create stream", func(ctx SpecContext) {
+				By("Reconciling the updated resource")
+				controllerReconciler := &StreamReconciler{
+					baseController,
+				}
+				_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+					NamespacedName: typeNamespacedName,
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				By("Checking that the stream was not created")
+				_, err = jsClient.Stream(ctx, streamName)
+				Expect(err).To(MatchError(jetstream.ErrStreamNotFound))
+
+				By("Checking that the streams status was not updated")
+				err = k8sClient.Get(ctx, typeNamespacedName, stream)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(stream.Status.ObservedGeneration).To(BeNumerically("<", stream.Generation))
+			})
+
+			It("should not update stream", func(ctx SpecContext) {
+				By("Creating the stream with empty subjects and description")
+				_, err := jsClient.CreateStream(ctx, emptyStreamConfig)
+				Expect(err).NotTo(HaveOccurred())
+
+				By("Reconciling the resource")
+				controllerReconciler := &StreamReconciler{
+					baseController,
+				}
+				_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
+					NamespacedName: typeNamespacedName,
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				By("Checking that the stream was not updated")
+				s, err := jsClient.Stream(ctx, streamName)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(s.CachedInfo().Config.Description).To(BeEmpty())
+
+				By("Checking that the streams generation was not updated")
+				err = k8sClient.Get(ctx, typeNamespacedName, stream)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(stream.Status.ObservedGeneration).To(BeNumerically("<", stream.Generation))
 			})
 		})
 
