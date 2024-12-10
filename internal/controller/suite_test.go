@@ -19,7 +19,6 @@ package controller
 import (
 	"fmt"
 	"github.com/nats-io/nats-server/v2/server"
-	natsserver "github.com/nats-io/nats-server/v2/test"
 	"github.com/nats-io/nats.go/jetstream"
 	"os"
 	"path/filepath"
@@ -105,19 +104,3 @@ var _ = AfterSuite(func() {
 	err = os.RemoveAll(storeDir)
 	Expect(err).NotTo(HaveOccurred())
 })
-
-func CreateTestServer() *server.Server {
-	opts := &natsserver.DefaultTestOptions
-	opts.JetStream = true
-	opts.Port = -1
-	opts.Debug = true
-
-	dir, err := os.MkdirTemp("", "nats-*")
-	Expect(err).NotTo(HaveOccurred())
-	opts.StoreDir = dir
-
-	ns := natsserver.RunServer(opts)
-	Expect(err).NotTo(HaveOccurred())
-
-	return ns
-}

@@ -23,12 +23,12 @@ import (
 	"github.com/go-logr/logr"
 	api "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 	"github.com/nats-io/nats.go/jetstream"
-	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"time"
 )
 
@@ -45,213 +45,124 @@ type StreamReconciler struct {
 // - Delete stream if it is marked for deletion.
 // - Create or Update the stream
 func (r *StreamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := klog.FromContext(ctx).
-		WithName("StreamReconciler").
-		WithValues("namespace", req.Namespace, "name", req.Name)
-
-	log.Info("reconciling")
+	log := klog.FromContext(ctx)
 
 	if ok := r.ValidNamespace(req.Namespace); !ok {
-		log.Info("Controller restricted to namespace, skipping reconciliation")
+		log.Info("Controller restricted to namespace, skipping reconciliation.")
 		return ctrl.Result{}, nil
 	}
-
-	result, err := r.initializationPhase(ctx, &log, req)
-	if err != nil {
-		err = fmt.Errorf("initialization: %w", err)
-		if result == nil {
-			return ctrl.Result{}, err
-		}
-		return *result, err
-	}
-	if result != nil {
-		return *result, nil
-	}
-
-	if r.ReadOnly() {
-		log.Info("read-only enabled, skipping reconciliation")
-		return ctrl.Result{}, nil
-	}
-
-	result, err = r.deletionPhase(ctx, log, req)
-	if err != nil {
-		err = fmt.Errorf("deletion: %w", err)
-		if result == nil {
-			return ctrl.Result{}, err
-		}
-		return *result, err
-	}
-	if result != nil {
-		return *result, nil
-	}
-
-	result, err = r.createUpdatePhase(ctx, log, req)
-	if err != nil {
-		err = fmt.Errorf("deletion: %w", err)
-		if result == nil {
-			return ctrl.Result{}, err
-		}
-		return *result, err
-	}
-	if result != nil {
-		return *result, nil
-	}
-
-	return ctrl.Result{}, nil
-}
-
-func (r *StreamReconciler) initializationPhase(ctx context.Context, log *logr.Logger, req ctrl.Request) (*ctrl.Result, error) {
 
 	// Fetch stream resource
 	stream := &api.Stream{}
 	if err := r.Get(ctx, req.NamespacedName, stream); err != nil {
 		if apierrors.IsNotFound(err) {
-			log.Info("stream resource not found. Ignoring since object must be deleted")
-			return &ctrl.Result{}, nil
+			log.Info("Stream resource not found. Ignoring since object must be deleted.")
+			return ctrl.Result{}, nil
 		}
-		return &ctrl.Result{}, fmt.Errorf("get stream resource '%s': %w", req.NamespacedName.String(), err)
-	}
-
-	// Add finalizer
-	if !controllerutil.ContainsFinalizer(stream, streamFinalizer) {
-		log.Info("Adding stream finalizer")
-		if ok := controllerutil.AddFinalizer(stream, streamFinalizer); !ok {
-			log.Error(nil, "Failed to add finalizer to stream resource")
-			return &ctrl.Result{}, nil // TODO how to handle
-		}
-
-		if err := r.Update(ctx, stream); err != nil {
-			return &ctrl.Result{}, fmt.Errorf("update stream resource to add finalizer: %w", err)
-		}
-
-		// re-fetch stream
-		if err := r.Get(ctx, req.NamespacedName, stream); err != nil {
-			if apierrors.IsNotFound(err) {
-				log.Info("stream resource not found. Ignoring since object must be deleted")
-				return &ctrl.Result{}, nil
-			}
-			return &ctrl.Result{}, fmt.Errorf("re-fetch stream resource: %w", err)
-		}
+		return ctrl.Result{}, fmt.Errorf("get stream resource '%s': %w", req.NamespacedName.String(), err)
 	}
 
 	// Update ready status to unknown when no status is set
 	if stream.Status.Conditions == nil || len(stream.Status.Conditions) == 0 {
-		log.Info("Setting initial ready condition to unknown")
+		log.Info("Setting initial ready condition to unknown.")
 		stream.Status.Conditions = updateReadyCondition(stream.Status.Conditions, v1.ConditionUnknown, "Reconciling", "Starting reconciliation")
 		err := r.Status().Update(ctx, stream)
 		if err != nil {
-			return &ctrl.Result{}, fmt.Errorf("set condition unknown: %w", err)
+			return ctrl.Result{}, fmt.Errorf("set condition unknown: %w", err)
 		}
-
-		// re-fetch stream
-		if err := r.Get(ctx, req.NamespacedName, stream); err != nil {
-			if apierrors.IsNotFound(err) {
-				log.Info("stream resource not found. Ignoring since object must be deleted")
-				return &ctrl.Result{}, nil
-			}
-			return &ctrl.Result{}, fmt.Errorf("re-fetch stream resource: %w", err)
-		}
+		return ctrl.Result{Requeue: true}, nil
 	}
 
-	return nil, nil
-}
-
-func (r *StreamReconciler) deletionPhase(ctx context.Context, logger logr.Logger, req ctrl.Request) (*ctrl.Result, error) {
-	// Fetch stream resource
-	stream := &api.Stream{}
-	if err := r.Get(ctx, req.NamespacedName, stream); err != nil {
-		if apierrors.IsNotFound(err) {
-			log.Info("stream resource not found. Ignoring since object must be deleted")
-			return &ctrl.Result{}, nil
-		}
-		return &ctrl.Result{}, fmt.Errorf("get stream resource '%s': %w", req.NamespacedName.String(), err)
-	}
-
-	// Delete if marked for deletion and has stream finalizer
-	markedForDeletion := stream.GetDeletionTimestamp() != nil
-	// TODO deletion is triggered multiple times?. Set additional status condition?
-	if markedForDeletion && controllerutil.ContainsFinalizer(stream, streamFinalizer) {
-		// Set status to not unknown
-		stream.Status.Conditions = updateReadyCondition(stream.Status.Conditions, v1.ConditionUnknown, "Finalizing", "Performing finalizer operations.")
-		if err := r.Status().Update(ctx, stream); err != nil {
-			return &ctrl.Result{}, fmt.Errorf("update ready condition: %w", err)
-		}
-
-		log.Info("performing finalizing operations")
-		if stream.Spec.PreventDelete {
-			log.Info("skip delete stream during resource deletion.", "streamName", stream.Spec.Name)
-		} else {
-			// Remove stream
-			err := r.WithJetStreamClient(mapToConnectionOptions(stream.Spec), func(js jetstream.JetStream) error {
-				return js.DeleteStream(ctx, stream.Spec.Name)
-			})
-			if errors.Is(err, jetstream.ErrStreamNotFound) {
-				log.Info("managed stream was already deleted")
-			} else if err != nil {
-				return &ctrl.Result{}, fmt.Errorf("delete stream during finalization: %w", err)
-			}
-		}
-
-		// Re-Fetch resource
-		if err := r.Get(ctx, req.NamespacedName, stream); err != nil {
-			if apierrors.IsNotFound(err) {
-				log.Info("stream resource not found. Ignoring since object must be deleted")
-				return &ctrl.Result{}, nil
-			}
-			return &ctrl.Result{}, fmt.Errorf("re-fetch stream resource: %w", err)
-		}
-
-		// Update status to not ready
-		stream.Status.Conditions = updateReadyCondition(stream.Status.Conditions, v1.ConditionFalse, "Finalizing", "Performed finalizer operations.")
-		if err := r.Status().Update(ctx, stream); err != nil {
-			return &ctrl.Result{}, fmt.Errorf("update ready condition: %w", err)
-		}
-
-		if err := r.Status().Update(ctx, stream); err != nil {
-			return &ctrl.Result{}, fmt.Errorf("update ready condition: %w", err)
-		}
-
-		log.Info("Removing stream finalizer after performing finalizing operations")
-		if ok := controllerutil.RemoveFinalizer(stream, streamFinalizer); !ok {
-			return &ctrl.Result{Requeue: true}, errors.New("failed to remove stream finalizer")
+	// Add finalizer
+	if !controllerutil.ContainsFinalizer(stream, streamFinalizer) {
+		log.Info("Adding stream finalizer.")
+		if ok := controllerutil.AddFinalizer(stream, streamFinalizer); !ok {
+			return ctrl.Result{}, errors.New("failed to add finalizer to stream resource")
 		}
 
 		if err := r.Update(ctx, stream); err != nil {
-			return &ctrl.Result{}, fmt.Errorf("remove finalizer: %w", err)
+			return ctrl.Result{}, fmt.Errorf("update stream resource to add finalizer: %w", err)
 		}
-
-		return &ctrl.Result{}, nil
+		return ctrl.Result{}, nil
 	}
 
-	return nil, nil
+	// Check Deletion
+	markedForDeletion := stream.GetDeletionTimestamp() != nil
+	if markedForDeletion {
+		if controllerutil.ContainsFinalizer(stream, streamFinalizer) {
+			err := r.deleteStream(ctx, log, stream)
+			if err != nil {
+				return ctrl.Result{}, fmt.Errorf("delete stream: %w", err)
+			}
+		} else {
+			log.Info("Stream marked for deletion and already finalized. Ignoring.")
+		}
+
+		return ctrl.Result{}, nil
+	}
+
+	// Create or update stream
+	if err := r.createOrUpdate(ctx, log, stream); err != nil {
+		return ctrl.Result{}, fmt.Errorf("create or update: %s", err)
+	}
+	return ctrl.Result{}, nil
 }
 
-func (r *StreamReconciler) createUpdatePhase(ctx context.Context, logger logr.Logger, req ctrl.Request) (*ctrl.Result, error) {
+func (r *StreamReconciler) deleteStream(ctx context.Context, log logr.Logger, stream *api.Stream) error {
 
-	// Fetch stream resource
-	stream := &api.Stream{}
-	if err := r.Get(ctx, req.NamespacedName, stream); err != nil {
-		if apierrors.IsNotFound(err) {
-			log.Info("stream resource not found. Ignoring since object must be deleted")
-			return &ctrl.Result{}, nil
-		}
-		return &ctrl.Result{}, fmt.Errorf("get stream resource '%s': %w", req.NamespacedName.String(), err)
+	// Set status to not false
+	stream.Status.Conditions = updateReadyCondition(stream.Status.Conditions, v1.ConditionFalse, "Finalizing", "Performing finalizer operations.")
+	if err := r.Status().Update(ctx, stream); err != nil {
+		return fmt.Errorf("update ready condition: %w", err)
 	}
+
+	if stream.Spec.PreventDelete {
+		log.Info("PreventDelete set: skipping stream deletion.", "streamName", stream.Spec.Name)
+	} else if r.ReadOnly() {
+		log.Info("Read-only mode: skipping stream deletion.", "streamName", stream.Spec.Name)
+	} else {
+		log.Info("Deleting stream.")
+		err := r.WithJetStreamClient(mapToConnectionOptions(stream.Spec), func(js jetstream.JetStream) error {
+			return js.DeleteStream(ctx, stream.Spec.Name)
+		})
+		if errors.Is(err, jetstream.ErrStreamNotFound) {
+			log.Info("Managed stream was already deleted.")
+		} else if err != nil {
+			return fmt.Errorf("delete stream during finalization: %w", err)
+		}
+	}
+
+	log.Info("Stream deleted. Removing stream finalizer.")
+	if ok := controllerutil.RemoveFinalizer(stream, streamFinalizer); !ok {
+		return errors.New("failed to remove stream finalizer")
+	}
+
+	if err := r.Update(ctx, stream); err != nil {
+		return fmt.Errorf("remove finalizer: %w", err)
+	}
+
+	return nil
+}
+
+func (r *StreamReconciler) createOrUpdate(ctx context.Context, log logr.Logger, stream *api.Stream) error {
 
 	// Create or Update the stream based on the spec
 	if stream.Spec.PreventUpdate {
-		log.Info("Spec.PreventUpdate: skip create/updating the stream during reconciliation.", "streamName", stream.Spec.Name)
-		return &ctrl.Result{}, nil
+		log.Info("PreventUpdate is set: skipping stream creation/update.", "streamName", stream.Spec.Name)
+		return nil
+	} else if r.ReadOnly() {
+		log.Info("Read-only mode: skipping stream creation/update.", "streamName", stream.Spec.Name)
+		return nil
 	}
 
 	// Map spec to stream targetConfig
 	targetConfig, err := mapSpecToConfig(&stream.Spec)
 	if err != nil {
-		return &ctrl.Result{}, fmt.Errorf("map spec to stream targetConfig: %w", err)
+		return fmt.Errorf("map spec to stream targetConfig: %w", err)
 	}
 
 	// CreateOrUpdateStream is called on every reconciliation when the stream is not to be deleted.
-	// TODO(future-feature): Do we need to check if generation has changed or the config differs?
+	// TODO(future-feature): Do we need to check if config differs?
 	err = r.WithJetStreamClient(mapToConnectionOptions(stream.Spec), func(js jetstream.JetStream) error {
 		log.Info("create or update stream", "streamName", targetConfig.Name)
 		_, err = js.CreateOrUpdateStream(ctx, targetConfig)
@@ -261,9 +172,9 @@ func (r *StreamReconciler) createUpdatePhase(ctx context.Context, logger logr.Lo
 		err = fmt.Errorf("create or update stream: %w", err)
 		stream.Status.Conditions = updateReadyCondition(stream.Status.Conditions, v1.ConditionFalse, "Errored", err.Error())
 		if err := r.Status().Update(ctx, stream); err != nil {
-			log.Error(err, "failed to update ready condition to Errored")
+			log.Error(err, "Failed to update ready condition to Errored.")
 		}
-		return &ctrl.Result{}, err
+		return err
 	}
 
 	// update the observed generation and ready status
@@ -272,14 +183,14 @@ func (r *StreamReconciler) createUpdatePhase(ctx context.Context, logger logr.Lo
 		stream.Status.Conditions,
 		v1.ConditionTrue,
 		"Reconciling",
-		"Stream successfully created or updated",
+		"Stream successfully created or updated.",
 	)
 	err = r.Status().Update(ctx, stream)
 	if err != nil {
-		return &ctrl.Result{}, fmt.Errorf("update ready condition: %w", err)
+		return fmt.Errorf("update ready condition: %w", err)
 	}
 
-	return nil, nil
+	return nil
 }
 
 func mapToConnectionOptions(spec api.StreamSpec) *connectionOptions {
@@ -463,5 +374,8 @@ func mapStreamSource(ss *api.StreamSource) (*jetstream.StreamSource, error) {
 func (r *StreamReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.Stream{}).
+		Owns(&api.Stream{}).
+		// Only trigger on generation changes
+		WithEventFilter(predicate.GenerationChangedPredicate{}).
 		Complete(r)
 }

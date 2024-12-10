@@ -36,105 +36,171 @@ import (
 )
 
 var _ = Describe("Stream Controller", func() {
-	When("reconciling a resource", func() {
-		const resourceName = "test-stream"
-		const streamName = "orders"
 
-		typeNamespacedName := types.NamespacedName{
-			Name:      resourceName,
-			Namespace: "default", // TODO(user):Modify as needed
-		}
+	// The test stream resource
+	const resourceName = "test-stream"
+	const streamName = "orders"
+	typeNamespacedName := types.NamespacedName{
+		Name:      resourceName,
+		Namespace: "default",
+	}
+	stream := &api.Stream{}
 
-		emptyStreamConfig := jetstream.StreamConfig{
-			Name:      streamName,
-			Replicas:  1,
-			Retention: jetstream.WorkQueuePolicy,
-			Discard:   jetstream.DiscardOld,
-			Storage:   jetstream.FileStorage,
-		}
+	// The tested controller
+	var controller *StreamReconciler
 
-		stream := &api.Stream{}
+	// Config to create minimal nats stream
+	emptyStreamConfig := jetstream.StreamConfig{
+		Name:      streamName,
+		Replicas:  1,
+		Retention: jetstream.WorkQueuePolicy,
+		Discard:   jetstream.DiscardOld,
+		Storage:   jetstream.FileStorage,
+	}
 
-		BeforeEach(func(ctx SpecContext) {
-			By("creating the custom resource for the Kind Stream")
-			err := k8sClient.Get(ctx, typeNamespacedName, stream)
-			if err != nil && k8serrors.IsNotFound(err) {
-				resource := &api.Stream{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      resourceName,
-						Namespace: "default",
-					},
-					Spec: api.StreamSpec{
-						Name:        streamName,
-						Replicas:    1,
-						Subjects:    []string{"tests.*"},
-						Description: "test stream",
-						Retention:   "workqueue",
-						Discard:     "old",
-						Storage:     "file",
-					},
-				}
-				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
-				// Re-fetch stream
-				Expect(k8sClient.Get(ctx, typeNamespacedName, stream)).To(Succeed())
-
+	BeforeEach(func(ctx SpecContext) {
+		By("creating a test stream resource")
+		err := k8sClient.Get(ctx, typeNamespacedName, stream)
+		if err != nil && k8serrors.IsNotFound(err) {
+			resource := &api.Stream{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      resourceName,
+					Namespace: "default",
+				},
+				Spec: api.StreamSpec{
+					Name:        streamName,
+					Replicas:    1,
+					Subjects:    []string{"tests.*"},
+					Description: "test stream",
+					Retention:   "workqueue",
+					Discard:     "old",
+					Storage:     "file",
+				},
 			}
-		})
+			Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+			// Re-fetch stream
+			Expect(k8sClient.Get(ctx, typeNamespacedName, stream)).To(Succeed())
+		}
 
-		AfterEach(func(ctx SpecContext) {
-			// Get and remove test stream resource if it exists
-			resource := &api.Stream{}
-			err := k8sClient.Get(ctx, typeNamespacedName, resource)
-			if err != nil {
-				Expect(err).To(MatchError(k8serrors.IsNotFound, "Is not found"))
-			} else {
+		By("Checking precondition: nats stream does not exist")
+		_, err = jsClient.Stream(ctx, streamName)
+		Expect(err).To(MatchError(jetstream.ErrStreamNotFound))
+
+		By("Setting up the tested controller")
+		controller = &StreamReconciler{
+			baseController,
+		}
+	})
+
+	AfterEach(func(ctx SpecContext) {
+		By("removing the test stream resource")
+		resource := &api.Stream{}
+		err := k8sClient.Get(ctx, typeNamespacedName, resource)
+		if err != nil {
+			Expect(err).To(MatchError(k8serrors.IsNotFound, "Is not found"))
+		} else {
+			if controllerutil.ContainsFinalizer(resource, streamFinalizer) {
 				By("Removing the finalizer")
 				controllerutil.RemoveFinalizer(resource, streamFinalizer)
 				Expect(k8sClient.Update(ctx, resource)).To(Succeed())
-
-				By("Cleanup the specific resource instance Stream")
-				Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 			}
 
-			By("Deleting the stream")
-			err = jsClient.DeleteStream(ctx, streamName)
-			if err != nil {
-				Expect(err).To(MatchError(jetstream.ErrStreamNotFound))
-			}
-		})
+			By("Removing the stream resource")
+			Expect(k8sClient.Delete(ctx, resource)).
+				To(SatisfyAny(
+					Succeed(),
+					MatchError(k8serrors.IsNotFound, "is not found"),
+				))
+		}
 
-		It("should successfully create the stream", func(ctx SpecContext) {
+		By("deleting the nats stream")
+		Expect(jsClient.DeleteStream(ctx, streamName)).
+			To(SatisfyAny(
+				Succeed(),
+				MatchError(jetstream.ErrStreamNotFound),
+			))
+	})
+
+	When("reconciling a not existing resource", func() {
+		It("stop reconciliation", func(ctx SpecContext) {
+
 			By("Reconciling the created resource")
-			controllerReconciler := &StreamReconciler{
-				baseController,
-			}
-
-			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
+			result, err := controller.Reconcile(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: "fake",
+					Name:      "not-existing",
+				},
 			})
 			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+		})
+	})
+
+	When("reconciling a not initialized resource", func() {
+
+		It("should initialize a new resource", func(ctx SpecContext) {
+
+			By("re-queueing until it is initialized")
+			// Initialization can require multiple reconciliation loops
+			Eventually(func(ctx SpecContext) *api.Stream {
+				_, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+				got := &api.Stream{}
+				Expect(k8sClient.Get(ctx, typeNamespacedName, got)).To(Succeed())
+				return got
+			}).WithContext(ctx).
+				Should(SatisfyAll(
+					HaveField("Finalizers", HaveExactElements(streamFinalizer)),
+					HaveField("Status.Conditions", Not(BeEmpty())),
+				))
+
+			By("validating the ready condition")
+			// Fetch stream
+			Expect(k8sClient.Get(ctx, typeNamespacedName, stream)).To(Succeed())
+			Expect(stream.Status.Conditions).To(HaveLen(1))
+
+			assertReadyStateMatches(stream.Status.Conditions[0], v1.ConditionUnknown, "Reconciling", "Starting reconciliation", time.Now())
+		})
+
+	})
+
+	When("reconciling an initialized resource", func() {
+
+		BeforeEach(func(ctx SpecContext) {
+			By("Initializing the stream resource")
+
+			By("Setting the finalizer")
+			Expect(controllerutil.AddFinalizer(stream, streamFinalizer)).To(BeTrue())
+			Expect(k8sClient.Update(ctx, stream)).To(Succeed())
+
+			By("Setting an unknown ready state")
+			stream.Status.Conditions = []api.Condition{{
+				Type:               readyCondType,
+				Status:             v1.ConditionUnknown,
+				Reason:             "Test",
+				Message:            "start condition",
+				LastTransitionTime: time.Now().Format(time.RFC3339Nano),
+			}}
+			Expect(k8sClient.Status().Update(ctx, stream)).To(Succeed())
+
+		})
+
+		It("should create a new stream", func(ctx SpecContext) {
+
+			By("Running Reconcile")
+			result, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result.IsZero()).To(BeTrue())
 
 			// Fetch resource
-			err = k8sClient.Get(ctx, typeNamespacedName, stream)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(k8sClient.Get(ctx, typeNamespacedName, stream)).To(Succeed())
 
 			By("Checking if the ready state was updated")
-			readyCondition := api.Condition{
-				Type:    readyCondType,
-				Status:  v1.ConditionTrue,
-				Reason:  "Reconciling",
-				Message: "Stream successfully created or updated",
-			}
-			gotCondition := stream.Status.Conditions[0]
-			// Unset LastTransitionTime to be equal for assertion
-			gotCondition.LastTransitionTime = ""
-			Expect(gotCondition).To(Equal(readyCondition))
+			Expect(stream.Status.Conditions).To(HaveLen(1))
+			assertReadyStateMatches(stream.Status.Conditions[0], v1.ConditionTrue, "Reconciling", "created or updated", time.Now())
 
 			By("Checking if the observed generation matches")
 			Expect(stream.Status.ObservedGeneration).To(Equal(stream.Generation))
-
-			By("Checking if the finalizer was set")
-			Expect(stream.Finalizers).To(ContainElement(streamFinalizer))
 
 			By("Checking if the stream was created")
 			natsStream, err := jsClient.Stream(ctx, streamName)
@@ -142,40 +208,141 @@ var _ = Describe("Stream Controller", func() {
 			streamInfo, err := natsStream.Info(ctx)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(streamInfo.Config.Name).To(Equal(streamName))
+			Expect(streamInfo.Config.Description).To(Equal("test stream"))
 			Expect(streamInfo.Created).To(BeTemporally("~", time.Now(), time.Second))
 		})
 
-		It("should successfully update the stream and update the status", func(ctx SpecContext) {
+		When("PreventUpdate is set", func() {
 
-			By("Creating the stream with empty subjects and description")
-			_, err := jsClient.CreateStream(ctx, emptyStreamConfig)
-			Expect(err).NotTo(HaveOccurred())
-
-			By("Reconciling the created resource")
-			controllerReconciler := &StreamReconciler{
-				baseController,
-			}
-
-			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
+			BeforeEach(func(ctx SpecContext) {
+				By("Setting preventDelete on the resource")
+				stream.Spec.PreventUpdate = true
+				Expect(k8sClient.Update(ctx, stream)).To(Succeed())
 			})
+			It("should not create the stream", func(ctx SpecContext) {
+				By("Running Reconcile")
+				result, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result.IsZero()).To(BeTrue())
+
+				By("checking that no stream was created")
+				_, err = jsClient.Stream(ctx, streamName)
+				Expect(err).To(MatchError(jetstream.ErrStreamNotFound))
+			})
+			It("should not update the stream", func(ctx SpecContext) {
+				By("creating the stream")
+				_, err := jsClient.CreateStream(ctx, emptyStreamConfig)
+				Expect(err).NotTo(HaveOccurred())
+
+				By("Running Reconcile")
+				result, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result.IsZero()).To(BeTrue())
+
+				By("checking that stream was not updated")
+				s, err := jsClient.Stream(ctx, streamName)
+				Expect(s.CachedInfo().Config.Description).To(BeEmpty())
+			})
+		})
+
+		When("read-only mode is enabled", func() {
+
+			BeforeEach(func(ctx SpecContext) {
+				By("Setting read only on the controller")
+				readOnly, err := NewJSController(k8sClient, &NatsConfig{ServerURL: testServer.ClientURL()}, &Config{ReadOnly: true})
+				Expect(err).NotTo(HaveOccurred())
+				controller = &StreamReconciler{
+					JetStreamController: readOnly,
+				}
+			})
+
+			It("should not create the stream", func(ctx SpecContext) {
+				By("Running Reconcile")
+				result, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result.IsZero()).To(BeTrue())
+
+				By("checking that no stream was created")
+				_, err = jsClient.Stream(ctx, streamName)
+				Expect(err).To(MatchError(jetstream.ErrStreamNotFound))
+			})
+			It("should not update the stream", func(ctx SpecContext) {
+				By("creating the stream")
+				_, err := jsClient.CreateStream(ctx, emptyStreamConfig)
+				Expect(err).NotTo(HaveOccurred())
+
+				By("Running Reconcile")
+				result, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result.IsZero()).To(BeTrue())
+
+				By("checking that stream was not updated")
+				s, err := jsClient.Stream(ctx, streamName)
+				Expect(s.CachedInfo().Config.Description).To(BeEmpty())
+			})
+		})
+
+		When("namespace restriction is enabled", func() {
+
+			BeforeEach(func(ctx SpecContext) {
+				namespaced, err := NewJSController(k8sClient, &NatsConfig{ServerURL: testServer.ClientURL()}, &Config{Namespace: "other-namespace"})
+				Expect(err).NotTo(HaveOccurred())
+				controller = &StreamReconciler{
+					JetStreamController: namespaced,
+				}
+			})
+
+			It("should not create the stream", func(ctx SpecContext) {
+				By("Running Reconcile")
+				result, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result.IsZero()).To(BeTrue())
+
+				By("checking that no stream was created")
+				_, err = jsClient.Stream(ctx, streamName)
+				Expect(err).To(MatchError(jetstream.ErrStreamNotFound))
+			})
+			It("should not update the stream", func(ctx SpecContext) {
+				By("creating the stream")
+				_, err := jsClient.CreateStream(ctx, emptyStreamConfig)
+				Expect(err).NotTo(HaveOccurred())
+
+				By("Running Reconcile")
+				result, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result.IsZero()).To(BeTrue())
+
+				By("checking that stream was not updated")
+				s, err := jsClient.Stream(ctx, streamName)
+				Expect(s.CachedInfo().Config.Description).To(BeEmpty())
+			})
+		})
+
+		It("should update an existing stream", func(ctx SpecContext) {
+			By("Reconciling once to create the stream")
+			result, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
+			Expect(result.IsZero()).To(BeTrue())
 
 			// Fetch resource
-			err = k8sClient.Get(ctx, typeNamespacedName, stream)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(k8sClient.Get(ctx, typeNamespacedName, stream)).To(Succeed())
+			previousTransitionTime := stream.Status.Conditions[0].LastTransitionTime
 
-			By("Checking if the ready state was updated")
-			readyCondition := api.Condition{
-				Type:    readyCondType,
-				Status:  v1.ConditionTrue,
-				Reason:  "Reconciling",
-				Message: "Stream successfully created or updated",
-			}
-			gotCondition := stream.Status.Conditions[0]
-			// Unset LastTransitionTime to be equal for assertion
-			gotCondition.LastTransitionTime = ""
-			Expect(gotCondition).To(Equal(readyCondition))
+			By("Updating the resource")
+			stream.Spec.Description = "new description"
+			Expect(k8sClient.Update(ctx, stream)).To(Succeed())
+
+			By("reconciling the updated resource")
+			result, err = controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result.IsZero()).To(BeTrue())
+
+			// Fetch resource
+			Expect(k8sClient.Get(ctx, typeNamespacedName, stream)).To(Succeed())
+
+			By("Checking if the state transition time was not updated")
+			Expect(stream.Status.Conditions).To(HaveLen(1))
+			Expect(stream.Status.Conditions[0].LastTransitionTime).To(Equal(previousTransitionTime))
 
 			By("Checking if the observed generation matches")
 			Expect(stream.Status.ObservedGeneration).To(Equal(stream.Generation))
@@ -186,41 +353,27 @@ var _ = Describe("Stream Controller", func() {
 
 			streamInfo, err := natsStream.Info(ctx)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(streamInfo.Config.Description).To(Equal("test stream"))
+			Expect(streamInfo.Config.Description).To(Equal("new description"))
+			// Other fields unchanged
 			Expect(streamInfo.Config.Subjects).To(Equal([]string{"tests.*"}))
 		})
 
-		It("should not fail on not existing resource", func(ctx SpecContext) {
-			By("Reconciling the created resource")
-			controllerReconciler := &StreamReconciler{
-				baseController,
-			}
+		It("should set an error state when the nats server is not available", func(ctx SpecContext) {
 
-			result, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: types.NamespacedName{
-					Namespace: "fake",
-					Name:      "not-existing",
-				},
-			})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
-		})
-
-		It("should set an error state, register finalizer and re-queue when the nats server is not available", func(ctx SpecContext) {
-			By("Reconciling the created resource")
-
+			By("Setting up controller with unavailable nats server")
 			// Setup client for not running server
 			// Use actual test server to ensure port not used by other service on test instance
 			sv := CreateTestServer()
-			controller, err := NewJSController(k8sClient, &NatsConfig{ServerURL: sv.ClientURL()}, &Config{})
+			base, err := NewJSController(k8sClient, &NatsConfig{ServerURL: sv.ClientURL()}, &Config{})
 			Expect(err).NotTo(HaveOccurred())
 			sv.Shutdown()
 
-			controllerReconciler := &StreamReconciler{
-				controller,
+			controller := &StreamReconciler{
+				base,
 			}
 
-			result, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+			By("reconciling resource")
+			result, err := controller.Reconcile(ctx, reconcile.Request{
 				NamespacedName: typeNamespacedName,
 			})
 			Expect(result).To(Equal(ctrl.Result{}))
@@ -232,258 +385,144 @@ var _ = Describe("Stream Controller", func() {
 
 			By("Checking if the status was updated")
 			Expect(stream.Status.Conditions).To(HaveLen(1))
-
-			cond := stream.Status.Conditions[0]
-			Expect(cond.Type).To(Equal(readyCondType))
-			Expect(cond.Status).To(Equal(v1.ConditionFalse))
-			Expect(cond.Reason).To(Equal("Errored"))
-			Expect(cond.Message).To(HavePrefix("create or update stream:"))
-			Expect(cond.LastTransitionTime).NotTo(BeEmpty())
+			assertReadyStateMatches(
+				stream.Status.Conditions[0],
+				v1.ConditionFalse,
+				"Errored",
+				"create or update stream:",
+				time.Now(),
+			)
 
 			By("Checking if the observed generation does not match")
 			Expect(stream.Status.ObservedGeneration).ToNot(Equal(stream.Generation))
-
-			By("Checking if the finalizer was set")
-			Expect(stream.Finalizers).To(ContainElement(streamFinalizer))
 		})
 
-		It("should delete stream marked for deletion", func(ctx SpecContext) {
+		When("the resource is marked for deletion", func() {
 
-			By("Reconciling the created resource once to ensure the finalizer is set and stream created")
-			controllerReconciler := &StreamReconciler{
-				baseController,
-			}
-
-			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
-			})
-			Expect(err).NotTo(HaveOccurred())
-
-			// Stream exists
-			_, err = jsClient.Stream(ctx, streamName)
-			Expect(err).NotTo(HaveOccurred())
-
-			By("Marking the resource as deleted")
-			Expect(k8sClient.Delete(ctx, stream)).To(Succeed())
-
-			By("Reconciling the deleted resource")
-			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
-			})
-			Expect(err).NotTo(HaveOccurred())
-
-			By("Checking if the resource was removed")
-			Eventually(func() error {
-				found := &api.Stream{}
-				return k8sClient.Get(ctx, typeNamespacedName, found)
-			}, 5*time.Second, time.Second).ShouldNot(Succeed())
-
-			By("Checking if the stream was deleted")
-			_, err = jsClient.Stream(ctx, streamName)
-			Expect(err).To(MatchError(jetstream.ErrStreamNotFound))
-		})
-
-		It("should succeed deleting stream resource where the underlying stream was already deleted", func(ctx SpecContext) {
-
-			By("Reconciling the created resource once to ensure the finalizer is set and stream created")
-			controllerReconciler := &StreamReconciler{
-				baseController,
-			}
-
-			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
-			})
-			Expect(err).NotTo(HaveOccurred())
-
-			By("Deleting the managed stream")
-			err = jsClient.DeleteStream(ctx, streamName)
-			Expect(err).NotTo(HaveOccurred())
-
-			By("Marking the resource as deleted")
-			Expect(k8sClient.Delete(ctx, stream)).To(Succeed())
-
-			By("Reconciling the deleted resource")
-			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
-			})
-			Expect(err).NotTo(HaveOccurred())
-
-			By("Checking if the resource was removed")
-			Eventually(func() error {
-				found := &api.Stream{}
-				return k8sClient.Get(ctx, typeNamespacedName, found)
-			}, 5*time.Second, time.Second).ShouldNot(Succeed())
-		})
-
-		When("PreventDelete is set", func() {
-			It("should not delete stream marked for deletion", func(ctx SpecContext) {
-
-				By("Setting preventDelete on the resource")
-				stream.Spec.PreventDelete = true
-				Expect(k8sClient.Update(ctx, stream)).To(Succeed())
-
-				By("Reconciling the updated resource once")
-				controllerReconciler := &StreamReconciler{
-					baseController,
-				}
-
-				_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
-					NamespacedName: typeNamespacedName,
-				})
-				Expect(err).NotTo(HaveOccurred())
-
-				// Stream exists
-				_, err = jsClient.Stream(ctx, streamName)
-				Expect(err).NotTo(HaveOccurred())
-
-				By("Marking the resource as deleted")
-				Expect(k8sClient.Delete(ctx, stream)).To(Succeed())
-
-				By("Reconciling the deleted resource")
-				_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
-					NamespacedName: typeNamespacedName,
-				})
-				Expect(err).NotTo(HaveOccurred())
-
-				By("Checking if the resource was removed")
-				Eventually(func() error {
-					found := &api.Stream{}
-					return k8sClient.Get(ctx, typeNamespacedName, found)
-				}, 5*time.Second, time.Second).ShouldNot(Succeed())
-
-				By("Checking if the stream was *not* deleted")
-				_, err = jsClient.Stream(ctx, streamName)
-				Expect(err).NotTo(HaveOccurred())
-			})
-		})
-
-		When("PreventUpdate is set", func() {
 			BeforeEach(func(ctx SpecContext) {
-				By("Setting prevent update")
-
-				stream.Spec.PreventUpdate = true
-				Expect(k8sClient.Update(ctx, stream)).To(Succeed())
+				By("Marking the resource for deletion")
+				Expect(k8sClient.Delete(ctx, stream)).To(Succeed())
+				Expect(k8sClient.Get(ctx, typeNamespacedName, stream)).To(Succeed()) // re-fetch after update
 			})
 
-			It("should not create stream", func(ctx SpecContext) {
-				By("Reconciling the updated resource")
-				controllerReconciler := &StreamReconciler{
-					baseController,
-				}
-				_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
-					NamespacedName: typeNamespacedName,
-				})
+			It("should succeed deleting a not existing stream", func(ctx SpecContext) {
+				By("Reconciling")
+				result, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
+				Expect(result.IsZero()).To(BeTrue())
 
-				By("Checking that the stream was not created")
-				_, err = jsClient.Stream(ctx, streamName)
-				Expect(err).To(MatchError(jetstream.ErrStreamNotFound))
-
-				By("Checking that the streams status was not updated")
-				err = k8sClient.Get(ctx, typeNamespacedName, stream)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(stream.Status.ObservedGeneration).To(BeNumerically("<", stream.Generation))
+				By("Checking that the resource is deleted")
+				Eventually(k8sClient.Get).
+					WithArguments(ctx, typeNamespacedName, stream).
+					ShouldNot(Succeed())
 			})
 
-			It("should not update stream", func(ctx SpecContext) {
-				By("Creating the stream with empty subjects and description")
-				_, err := jsClient.CreateStream(ctx, emptyStreamConfig)
-				Expect(err).NotTo(HaveOccurred())
-
-				By("Reconciling the resource")
-				controllerReconciler := &StreamReconciler{
-					baseController,
-				}
-				_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
-					NamespacedName: typeNamespacedName,
-				})
-				Expect(err).NotTo(HaveOccurred())
-
-				By("Checking that the stream was not updated")
-				s, err := jsClient.Stream(ctx, streamName)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(s.CachedInfo().Config.Description).To(BeEmpty())
-
-				By("Checking that the streams generation was not updated")
-				err = k8sClient.Get(ctx, typeNamespacedName, stream)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(stream.Status.ObservedGeneration).To(BeNumerically("<", stream.Generation))
-			})
-		})
-
-		DescribeTableSubtree("controller restricted to not perform any updates on resource",
-			func(getController func(SpecContext) StreamReconciler) {
-				var controller StreamReconciler
-
+			When("the underlying stream exists", func() {
 				BeforeEach(func(ctx SpecContext) {
-					controller = getController(ctx)
+					By("Creating the stream on the nats server")
+					_, err := jsClient.CreateStream(ctx, emptyStreamConfig)
+					Expect(err).NotTo(HaveOccurred())
 				})
 
-				It("should not create stream", func(ctx SpecContext) {
-					By("reconciling the resource")
-					_, err := controller.Reconcile(ctx, reconcile.Request{NamespacedName: typeNamespacedName})
-					Expect(err).NotTo(HaveOccurred())
+				AfterEach(func(ctx SpecContext) {
+					err := jsClient.DeleteStream(ctx, streamName)
+					if err != nil {
+						Expect(err).To(MatchError(jetstream.ErrStreamNotFound))
+					}
+				})
 
-					By("Checking that the stream was not created")
+				It("should delete the stream", func(ctx SpecContext) {
+					By("Reconciling")
+					result, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
+					Expect(err).NotTo(HaveOccurred())
+					Expect(result.IsZero()).To(BeTrue())
+
+					By("Checking that the stream is deleted")
 					_, err = jsClient.Stream(ctx, streamName)
 					Expect(err).To(MatchError(jetstream.ErrStreamNotFound))
-				})
-				It("should not update stream", func(ctx SpecContext) {
-					By("creating the stream")
-					_, err := jsClient.CreateStream(ctx, emptyStreamConfig)
-					Expect(err).NotTo(HaveOccurred())
 
-					By("reconciling the resource")
-					_, err = controller.Reconcile(ctx, reconcile.Request{NamespacedName: typeNamespacedName})
-					Expect(err).NotTo(HaveOccurred())
-
-					By("Checking that the stream was not updated")
-					s, err := jsClient.Stream(ctx, streamName)
-					Expect(err).NotTo(HaveOccurred())
-					Expect(s.CachedInfo().Config.Description).To(BeEmpty())
-
-					By("Checking that the streams generation was not updated")
-					err = k8sClient.Get(ctx, typeNamespacedName, stream)
-					Expect(err).NotTo(HaveOccurred())
-					Expect(stream.Status.ObservedGeneration).To(BeNumerically("<", stream.Generation))
-				})
-				It("should not delete stream", func(ctx SpecContext) {
-
-					By("creating the stream")
-					_, err := jsClient.CreateStream(ctx, emptyStreamConfig)
-					Expect(err).NotTo(HaveOccurred())
-
-					By("Marking the resource as deleted")
-					Expect(k8sClient.Delete(ctx, stream)).To(Succeed())
-
-					By("reconciling the resource")
-					_, err = controller.Reconcile(ctx, reconcile.Request{NamespacedName: typeNamespacedName})
-					Expect(err).NotTo(HaveOccurred())
-
-					By("Checking if the resource was removed")
-					Eventually(func() error {
-						found := &api.Stream{}
-						return k8sClient.Get(ctx, typeNamespacedName, found)
-					}, 5*time.Second, time.Second).ShouldNot(Succeed())
-
-					By("Checking if the stream was *not* deleted")
-					_, err = jsClient.Stream(ctx, streamName)
-					Expect(err).NotTo(HaveOccurred())
+					By("Checking that the resource is deleted")
+					Eventually(k8sClient.Get).
+						WithArguments(ctx, typeNamespacedName, stream).
+						ShouldNot(Succeed())
 				})
 
-			},
-			// Test cases provide functions for providing a configured the controller and setup preconditions
-			Entry("read only", func(ctx SpecContext) StreamReconciler {
-				readOnly, err := NewJSController(k8sClient, &NatsConfig{ServerURL: testServer.ClientURL()}, &Config{ReadOnly: true})
-				Expect(err).NotTo(HaveOccurred())
-				return StreamReconciler{readOnly}
-			}),
-			Entry("namespaced", func(ctx SpecContext) StreamReconciler {
-				readOnly, err := NewJSController(k8sClient, &NatsConfig{ServerURL: testServer.ClientURL()}, &Config{Namespace: "some-namespace"})
-				Expect(err).NotTo(HaveOccurred())
-				return StreamReconciler{readOnly}
-			}),
-		)
+				When("PreventDelete is set", func() {
+					BeforeEach(func(ctx SpecContext) {
+						By("Setting preventDelete on the resource")
+						stream.Spec.PreventDelete = true
+						Expect(k8sClient.Update(ctx, stream)).To(Succeed())
+					})
+					It("Should delete the resource and not delete the nats stream", func(ctx SpecContext) {
+						By("Reconciling")
+						result, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
+						Expect(err).NotTo(HaveOccurred())
+						Expect(result.IsZero()).To(BeTrue())
+
+						By("Checking that the stream is not deleted")
+						_, err = jsClient.Stream(ctx, streamName)
+						Expect(err).NotTo(HaveOccurred())
+
+						By("Checking that the resource is deleted")
+						Eventually(k8sClient.Get).
+							WithArguments(ctx, typeNamespacedName, stream).
+							ShouldNot(Succeed())
+					})
+				})
+
+				When("read only is set", func() {
+					BeforeEach(func(ctx SpecContext) {
+						By("Setting read only on the controller")
+						readOnly, err := NewJSController(k8sClient, &NatsConfig{ServerURL: testServer.ClientURL()}, &Config{ReadOnly: true})
+						Expect(err).NotTo(HaveOccurred())
+						controller = &StreamReconciler{
+							JetStreamController: readOnly,
+						}
+					})
+					It("should delete the resource and not delete the stream", func(ctx SpecContext) {
+
+						By("Reconciling")
+						result, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
+						Expect(err).NotTo(HaveOccurred())
+						Expect(result.IsZero()).To(BeTrue())
+
+						By("Checking that the stream is not deleted")
+						_, err = jsClient.Stream(ctx, streamName)
+						Expect(err).NotTo(HaveOccurred())
+
+						By("Checking that the resource is deleted")
+						Eventually(k8sClient.Get).
+							WithArguments(ctx, typeNamespacedName, stream).
+							ShouldNot(Succeed())
+					})
+				})
+
+				When("controller is restricted to different namespace", func() {
+					BeforeEach(func(ctx SpecContext) {
+						namespaced, err := NewJSController(k8sClient, &NatsConfig{ServerURL: testServer.ClientURL()}, &Config{Namespace: "other-namespace"})
+						Expect(err).NotTo(HaveOccurred())
+						controller = &StreamReconciler{
+							JetStreamController: namespaced,
+						}
+					})
+					It("should not delete the resource and stream", func(ctx SpecContext) {
+
+						By("Reconciling")
+						result, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
+						Expect(err).NotTo(HaveOccurred())
+						Expect(result.IsZero()).To(BeTrue())
+
+						By("Checking that the stream is not deleted")
+						_, err = jsClient.Stream(ctx, streamName)
+						Expect(err).NotTo(HaveOccurred())
+
+						By("Checking that the finalizer is not removed")
+						Expect(k8sClient.Get(ctx, typeNamespacedName, stream)).To(Succeed())
+						Expect(stream.Finalizers).To(ContainElement(streamFinalizer))
+					})
+				})
+			})
+		})
 
 		It("should update stream on different server as specified in spec", func(ctx SpecContext) {
 			By("Setting up the alternative server")
@@ -500,15 +539,11 @@ var _ = Describe("Stream Controller", func() {
 			Expect(err).To(MatchError(jetstream.ErrStreamNotFound))
 
 			By("Reconciling the resource")
-			controllerReconciler := &StreamReconciler{
-				baseController,
-			}
-
-			result, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+			result, err := controller.Reconcile(ctx, reconcile.Request{
 				NamespacedName: typeNamespacedName,
 			})
-			Expect(result).To(Equal(ctrl.Result{}))
 			Expect(err).NotTo(HaveOccurred())
+			Expect(result.IsZero()).To(BeTrue())
 
 			By("Checking if the stream was created on the alternative server")
 			altClient, closer, err := CreateJetStreamClient(&NatsConfig{ServerURL: altServer.ClientURL()}, true)
@@ -705,9 +740,9 @@ func Test_mapSpecToConfig(t *testing.T) {
 
 			// Compare nested structs
 			assert.EqualValues(tt.want, got)
-			//if !reflect.DeepEqual(got, tt.want) {
-			//	t.Errorf("mapSpecToConfig() \ngot  = %v\nwant = %v", got, tt.want)
-			//}
+			//	if !reflect.DeepEqual(got, tt.want) {
+			//		t.Errorf("mapSpecToConfig() \ngot  = %v\nwant = %v", got, tt.want)
+			//	}
 		})
 	}
 }
