@@ -20,8 +20,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/go-logr/logr"
 	api "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 	"github.com/nats-io/nats.go/jetstream"
+	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/klog/v2"
@@ -54,14 +56,60 @@ func (r *StreamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, nil
 	}
 
+	result, err := r.initializationPhase(ctx, &log, req)
+	if err != nil {
+		err = fmt.Errorf("initialization: %w", err)
+		if result == nil {
+			return ctrl.Result{}, err
+		}
+		return *result, err
+	}
+	if result != nil {
+		return *result, nil
+	}
+
+	if r.ReadOnly() {
+		log.Info("read-only enabled, skipping reconciliation")
+		return ctrl.Result{}, nil
+	}
+
+	result, err = r.deletionPhase(ctx, log, req)
+	if err != nil {
+		err = fmt.Errorf("deletion: %w", err)
+		if result == nil {
+			return ctrl.Result{}, err
+		}
+		return *result, err
+	}
+	if result != nil {
+		return *result, nil
+	}
+
+	result, err = r.createUpdatePhase(ctx, log, req)
+	if err != nil {
+		err = fmt.Errorf("deletion: %w", err)
+		if result == nil {
+			return ctrl.Result{}, err
+		}
+		return *result, err
+	}
+	if result != nil {
+		return *result, nil
+	}
+
+	return ctrl.Result{}, nil
+}
+
+func (r *StreamReconciler) initializationPhase(ctx context.Context, log *logr.Logger, req ctrl.Request) (*ctrl.Result, error) {
+
 	// Fetch stream resource
 	stream := &api.Stream{}
 	if err := r.Get(ctx, req.NamespacedName, stream); err != nil {
 		if apierrors.IsNotFound(err) {
 			log.Info("stream resource not found. Ignoring since object must be deleted")
-			return ctrl.Result{}, nil
+			return &ctrl.Result{}, nil
 		}
-		return ctrl.Result{}, fmt.Errorf("get stream resource '%s': %w", req.NamespacedName.String(), err)
+		return &ctrl.Result{}, fmt.Errorf("get stream resource '%s': %w", req.NamespacedName.String(), err)
 	}
 
 	// Add finalizer
@@ -69,20 +117,20 @@ func (r *StreamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		log.Info("Adding stream finalizer")
 		if ok := controllerutil.AddFinalizer(stream, streamFinalizer); !ok {
 			log.Error(nil, "Failed to add finalizer to stream resource")
-			return ctrl.Result{Requeue: true}, nil
+			return &ctrl.Result{}, nil // TODO how to handle
 		}
 
 		if err := r.Update(ctx, stream); err != nil {
-			return ctrl.Result{}, fmt.Errorf("update stream resource to add finalizer: %w", err)
+			return &ctrl.Result{}, fmt.Errorf("update stream resource to add finalizer: %w", err)
 		}
 
 		// re-fetch stream
 		if err := r.Get(ctx, req.NamespacedName, stream); err != nil {
 			if apierrors.IsNotFound(err) {
 				log.Info("stream resource not found. Ignoring since object must be deleted")
-				return ctrl.Result{}, nil
+				return &ctrl.Result{}, nil
 			}
-			return ctrl.Result{}, fmt.Errorf("re-fetch stream resource: %w", err)
+			return &ctrl.Result{}, fmt.Errorf("re-fetch stream resource: %w", err)
 		}
 	}
 
@@ -92,31 +140,31 @@ func (r *StreamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		stream.Status.Conditions = updateReadyCondition(stream.Status.Conditions, v1.ConditionUnknown, "Reconciling", "Starting reconciliation")
 		err := r.Status().Update(ctx, stream)
 		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("set condition unknown: %w", err)
+			return &ctrl.Result{}, fmt.Errorf("set condition unknown: %w", err)
 		}
 
 		// re-fetch stream
 		if err := r.Get(ctx, req.NamespacedName, stream); err != nil {
 			if apierrors.IsNotFound(err) {
 				log.Info("stream resource not found. Ignoring since object must be deleted")
-				return ctrl.Result{}, nil
+				return &ctrl.Result{}, nil
 			}
-			return ctrl.Result{}, fmt.Errorf("re-fetch stream resource: %w", err)
+			return &ctrl.Result{}, fmt.Errorf("re-fetch stream resource: %w", err)
 		}
 	}
 
-	if r.ReadOnly() {
-		log.Info("read-only enabled, skipping reconciliation")
-		return ctrl.Result{}, nil
-	}
+	return nil, nil
+}
 
-	// Connection options specific to this spec
-	specConnectionOptions := &connectionOptions{
-		Account: stream.Spec.Account, // TODO(review): Where does Spec.Account have to be considered?
-		Creds:   stream.Spec.Creds,
-		Nkey:    stream.Spec.Nkey,
-		Servers: stream.Spec.Servers,
-		TLS:     stream.Spec.TLS,
+func (r *StreamReconciler) deletionPhase(ctx context.Context, logger logr.Logger, req ctrl.Request) (*ctrl.Result, error) {
+	// Fetch stream resource
+	stream := &api.Stream{}
+	if err := r.Get(ctx, req.NamespacedName, stream); err != nil {
+		if apierrors.IsNotFound(err) {
+			log.Info("stream resource not found. Ignoring since object must be deleted")
+			return &ctrl.Result{}, nil
+		}
+		return &ctrl.Result{}, fmt.Errorf("get stream resource '%s': %w", req.NamespacedName.String(), err)
 	}
 
 	// Delete if marked for deletion and has stream finalizer
@@ -126,7 +174,7 @@ func (r *StreamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		// Set status to not unknown
 		stream.Status.Conditions = updateReadyCondition(stream.Status.Conditions, v1.ConditionUnknown, "Finalizing", "Performing finalizer operations.")
 		if err := r.Status().Update(ctx, stream); err != nil {
-			return ctrl.Result{}, fmt.Errorf("update ready condition: %w", err)
+			return &ctrl.Result{}, fmt.Errorf("update ready condition: %w", err)
 		}
 
 		log.Info("performing finalizing operations")
@@ -134,13 +182,13 @@ func (r *StreamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			log.Info("skip delete stream during resource deletion.", "streamName", stream.Spec.Name)
 		} else {
 			// Remove stream
-			err := r.WithJetStreamClient(specConnectionOptions, func(js jetstream.JetStream) error {
+			err := r.WithJetStreamClient(mapToConnectionOptions(stream.Spec), func(js jetstream.JetStream) error {
 				return js.DeleteStream(ctx, stream.Spec.Name)
 			})
 			if errors.Is(err, jetstream.ErrStreamNotFound) {
 				log.Info("managed stream was already deleted")
 			} else if err != nil {
-				return ctrl.Result{}, fmt.Errorf("delete stream during finalization: %w", err)
+				return &ctrl.Result{}, fmt.Errorf("delete stream during finalization: %w", err)
 			}
 		}
 
@@ -148,48 +196,64 @@ func (r *StreamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		if err := r.Get(ctx, req.NamespacedName, stream); err != nil {
 			if apierrors.IsNotFound(err) {
 				log.Info("stream resource not found. Ignoring since object must be deleted")
-				return ctrl.Result{}, nil
+				return &ctrl.Result{}, nil
 			}
-			return ctrl.Result{}, fmt.Errorf("re-fetch stream resource: %w", err)
+			return &ctrl.Result{}, fmt.Errorf("re-fetch stream resource: %w", err)
 		}
 
 		// Update status to not ready
 		stream.Status.Conditions = updateReadyCondition(stream.Status.Conditions, v1.ConditionFalse, "Finalizing", "Performed finalizer operations.")
 		if err := r.Status().Update(ctx, stream); err != nil {
-			return ctrl.Result{}, fmt.Errorf("update ready condition: %w", err)
+			return &ctrl.Result{}, fmt.Errorf("update ready condition: %w", err)
 		}
 
 		if err := r.Status().Update(ctx, stream); err != nil {
-			return ctrl.Result{}, fmt.Errorf("update ready condition: %w", err)
+			return &ctrl.Result{}, fmt.Errorf("update ready condition: %w", err)
 		}
 
 		log.Info("Removing stream finalizer after performing finalizing operations")
 		if ok := controllerutil.RemoveFinalizer(stream, streamFinalizer); !ok {
-			return ctrl.Result{Requeue: true}, errors.New("failed to remove stream finalizer")
+			return &ctrl.Result{Requeue: true}, errors.New("failed to remove stream finalizer")
 		}
 
 		if err := r.Update(ctx, stream); err != nil {
-			return ctrl.Result{}, fmt.Errorf("remove finalizer: %w", err)
+			return &ctrl.Result{}, fmt.Errorf("remove finalizer: %w", err)
 		}
 
-		return ctrl.Result{}, nil
+		return &ctrl.Result{}, nil
+	}
+
+	return nil, nil
+}
+
+func (r *StreamReconciler) createUpdatePhase(ctx context.Context, logger logr.Logger, req ctrl.Request) (*ctrl.Result, error) {
+
+	// Fetch stream resource
+	stream := &api.Stream{}
+	if err := r.Get(ctx, req.NamespacedName, stream); err != nil {
+		if apierrors.IsNotFound(err) {
+			log.Info("stream resource not found. Ignoring since object must be deleted")
+			return &ctrl.Result{}, nil
+		}
+		return &ctrl.Result{}, fmt.Errorf("get stream resource '%s': %w", req.NamespacedName.String(), err)
 	}
 
 	// Create or Update the stream based on the spec
 	if stream.Spec.PreventUpdate {
 		log.Info("Spec.PreventUpdate: skip create/updating the stream during reconciliation.", "streamName", stream.Spec.Name)
-		return ctrl.Result{}, nil
+		return &ctrl.Result{}, nil
 	}
 
 	// Map spec to stream targetConfig
 	targetConfig, err := mapSpecToConfig(&stream.Spec)
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("map spec to stream targetConfig: %w", err)
+		return &ctrl.Result{}, fmt.Errorf("map spec to stream targetConfig: %w", err)
 	}
 
 	// CreateOrUpdateStream is called on every reconciliation when the stream is not to be deleted.
 	// TODO(future-feature): Do we need to check if generation has changed or the config differs?
-	err = r.WithJetStreamClient(specConnectionOptions, func(js jetstream.JetStream) error {
+	err = r.WithJetStreamClient(mapToConnectionOptions(stream.Spec), func(js jetstream.JetStream) error {
+		log.Info("create or update stream", "streamName", targetConfig.Name)
 		_, err = js.CreateOrUpdateStream(ctx, targetConfig)
 		return err
 	})
@@ -199,7 +263,7 @@ func (r *StreamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		if err := r.Status().Update(ctx, stream); err != nil {
 			log.Error(err, "failed to update ready condition to Errored")
 		}
-		return ctrl.Result{}, err
+		return &ctrl.Result{}, err
 	}
 
 	// update the observed generation and ready status
@@ -212,10 +276,20 @@ func (r *StreamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	)
 	err = r.Status().Update(ctx, stream)
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("update ready condition: %w", err)
+		return &ctrl.Result{}, fmt.Errorf("update ready condition: %w", err)
 	}
 
-	return ctrl.Result{}, nil
+	return nil, nil
+}
+
+func mapToConnectionOptions(spec api.StreamSpec) *connectionOptions {
+	return &connectionOptions{
+		Account: spec.Account, // TODO(review): Where does Spec.Account have to be considered?
+		Creds:   spec.Creds,
+		Nkey:    spec.Nkey,
+		Servers: spec.Servers,
+		TLS:     spec.TLS,
+	}
 }
 
 // mapSpecToConfig creates a jetstream.StreamConfig matching the given stream resource spec
