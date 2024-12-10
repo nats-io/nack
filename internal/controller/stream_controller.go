@@ -137,7 +137,9 @@ func (r *StreamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			err := r.WithJetStreamClient(specConnectionOptions, func(js jetstream.JetStream) error {
 				return js.DeleteStream(ctx, stream.Spec.Name)
 			})
-			if err != nil {
+			if errors.Is(err, jetstream.ErrStreamNotFound) {
+				log.Info("managed stream was already deleted")
+			} else if err != nil {
 				return ctrl.Result{}, fmt.Errorf("delete stream during finalization: %w", err)
 			}
 		}
