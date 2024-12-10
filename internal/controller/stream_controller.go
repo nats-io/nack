@@ -192,12 +192,12 @@ func (r *StreamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return err
 	})
 	if err != nil {
-		msg := fmt.Sprintf("create or update stream: %s", err.Error())
-		stream.Status.Conditions = updateReadyCondition(stream.Status.Conditions, v1.ConditionFalse, "Errored", msg)
+		err = fmt.Errorf("create or update stream: %w", err)
+		stream.Status.Conditions = updateReadyCondition(stream.Status.Conditions, v1.ConditionFalse, "Errored", err.Error())
 		if err := r.Status().Update(ctx, stream); err != nil {
 			log.Error(err, "failed to update ready condition to Errored")
 		}
-		return ctrl.Result{}, fmt.Errorf("create or update stream: %w", err)
+		return ctrl.Result{}, err
 	}
 
 	// update the observed generation and ready status
