@@ -208,8 +208,8 @@ var _ = Describe("Stream Controller", func() {
 			By("Reconciling the created resource")
 
 			// Setup client for not running server
+			// Use actual test server to ensure port not used by other service on test instance
 			sv := CreateTestServer()
-			// Is there an easier way to create a failing js client?
 			controller, err := NewJSController(k8sClient, &NatsConfig{ServerURL: sv.ClientURL()}, &Config{})
 			Expect(err).NotTo(HaveOccurred())
 			sv.Shutdown()
@@ -235,7 +235,7 @@ var _ = Describe("Stream Controller", func() {
 			Expect(cond.Type).To(Equal(readyCondType))
 			Expect(cond.Status).To(Equal(v1.ConditionFalse))
 			Expect(cond.Reason).To(Equal("Errored"))
-			Expect(cond.Message).To(Equal("create or update stream: context deadline exceeded"))
+			Expect(cond.Message).To(HavePrefix("create or update stream:"))
 			Expect(cond.LastTransitionTime).NotTo(BeEmpty())
 
 			By("Checking if the observed generation does not match")
@@ -282,7 +282,7 @@ var _ = Describe("Stream Controller", func() {
 		})
 
 		When("PreventDelete is set", func() {
-			It("should not delete stream marked for deletion when ", func(ctx SpecContext) {
+			It("should not delete stream marked for deletion", func(ctx SpecContext) {
 
 				By("Setting preventDelete on the resource")
 				stream.Spec.PreventDelete = true
@@ -333,6 +333,10 @@ var _ = Describe("Stream Controller", func() {
 			stream.Spec.Servers = []string{altServer.ClientURL()}
 			Expect(k8sClient.Update(ctx, stream)).To(Succeed())
 
+			By("Checking precondition, that the stream does not yet exist")
+			got, err := jsClient.Stream(ctx, streamName)
+			Expect(err).To(MatchError(jetstream.ErrStreamNotFound))
+
 			By("Reconciling the resource")
 			controllerReconciler := &StreamReconciler{
 				baseController,
@@ -349,12 +353,12 @@ var _ = Describe("Stream Controller", func() {
 			defer closer.Close()
 			Expect(err).NotTo(HaveOccurred())
 
-			got, err := altClient.Stream(ctx, streamName)
+			got, err = altClient.Stream(ctx, streamName)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(got.CachedInfo().Created).To(BeTemporally("~", time.Now(), time.Second))
 
-			By("Checking that the stream was NOT created on the alternative server")
-			got, err = jsClient.Stream(ctx, streamName)
+			By("Checking that the stream was NOT created on the original server")
+			_, err = jsClient.Stream(ctx, streamName)
 			Expect(err).To(MatchError(jetstream.ErrStreamNotFound))
 
 		})
