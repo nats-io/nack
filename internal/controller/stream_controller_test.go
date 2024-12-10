@@ -379,6 +379,80 @@ var _ = Describe("Stream Controller", func() {
 			})
 		})
 
+		DescribeTableSubtree("controller restricted to not perform any updates on resource",
+			func(getController func(SpecContext) StreamReconciler) {
+				var controller StreamReconciler
+
+				BeforeEach(func(ctx SpecContext) {
+					controller = getController(ctx)
+				})
+
+				It("should not create stream", func(ctx SpecContext) {
+					By("reconciling the resource")
+					_, err := controller.Reconcile(ctx, reconcile.Request{NamespacedName: typeNamespacedName})
+					Expect(err).NotTo(HaveOccurred())
+
+					By("Checking that the stream was not created")
+					_, err = jsClient.Stream(ctx, streamName)
+					Expect(err).To(MatchError(jetstream.ErrStreamNotFound))
+				})
+				It("should not update stream", func(ctx SpecContext) {
+					By("creating the stream")
+					_, err := jsClient.CreateStream(ctx, emptyStreamConfig)
+					Expect(err).NotTo(HaveOccurred())
+
+					By("reconciling the resource")
+					_, err = controller.Reconcile(ctx, reconcile.Request{NamespacedName: typeNamespacedName})
+					Expect(err).NotTo(HaveOccurred())
+
+					By("Checking that the stream was not updated")
+					s, err := jsClient.Stream(ctx, streamName)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(s.CachedInfo().Config.Description).To(BeEmpty())
+
+					By("Checking that the streams generation was not updated")
+					err = k8sClient.Get(ctx, typeNamespacedName, stream)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(stream.Status.ObservedGeneration).To(BeNumerically("<", stream.Generation))
+				})
+				It("should not delete stream", func(ctx SpecContext) {
+
+					By("creating the stream")
+					_, err := jsClient.CreateStream(ctx, emptyStreamConfig)
+					Expect(err).NotTo(HaveOccurred())
+
+					By("Marking the resource as deleted")
+					Expect(k8sClient.Delete(ctx, stream)).To(Succeed())
+
+					By("reconciling the resource")
+					_, err = controller.Reconcile(ctx, reconcile.Request{NamespacedName: typeNamespacedName})
+					Expect(err).NotTo(HaveOccurred())
+
+					By("Checking if the resource was removed")
+					Eventually(func() error {
+						found := &api.Stream{}
+						return k8sClient.Get(ctx, typeNamespacedName, found)
+					}, 5*time.Second, time.Second).ShouldNot(Succeed())
+
+					By("Checking if the stream was *not* deleted")
+					_, err = jsClient.Stream(ctx, streamName)
+					Expect(err).NotTo(HaveOccurred())
+				})
+
+			},
+			// Test cases provide functions for providing a configured the controller and setup preconditions
+			Entry("read only", func(ctx SpecContext) StreamReconciler {
+				readOnly, err := NewJSController(k8sClient, &NatsConfig{ServerURL: testServer.ClientURL()}, &Config{ReadOnly: true})
+				Expect(err).NotTo(HaveOccurred())
+				return StreamReconciler{readOnly}
+			}),
+			Entry("namespaced", func(ctx SpecContext) StreamReconciler {
+				readOnly, err := NewJSController(k8sClient, &NatsConfig{ServerURL: testServer.ClientURL()}, &Config{Namespace: "some-namespace"})
+				Expect(err).NotTo(HaveOccurred())
+				return StreamReconciler{readOnly}
+			}),
+		)
+
 		It("should update stream on different server as specified in spec", func(ctx SpecContext) {
 			By("Setting up the alternative server")
 			// Setup altClient for alternate server
