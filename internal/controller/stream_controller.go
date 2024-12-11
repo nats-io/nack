@@ -152,7 +152,7 @@ func (r *StreamReconciler) deleteStream(ctx context.Context, log logr.Logger, st
 func (r *StreamReconciler) createOrUpdate(ctx context.Context, log logr.Logger, stream *api.Stream) error {
 
 	// Create or Update the stream based on the spec
-	if stream.Spec.PreventDelete || r.ReadOnly() {
+	if stream.Spec.PreventUpdate || r.ReadOnly() {
 		log.Info("Skipping stream creation or update.",
 			"streamName", stream.Spec.Name,
 			"preventDelete", stream.Spec.PreventDelete,
