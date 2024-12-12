@@ -18,21 +18,15 @@ package controller
 
 import (
 	"context"
-	"github.com/nats-io/nats.go/jetstream"
 	"k8s.io/klog/v2"
 
 	jetstreamnatsiov1beta2 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
-	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // ConsumerReconciler reconciles a Consumer object
 type ConsumerReconciler struct {
-	client.Client
-	Scheme    *runtime.Scheme
-	Config    *Config
-	JetStream jetstream.JetStream
+	JetStreamController
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to

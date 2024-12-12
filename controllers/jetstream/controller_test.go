@@ -186,7 +186,7 @@ func TestUpsertCondition(t *testing.T) {
 
 	var cs []apis.Condition
 
-	cs = upsertCondition(cs, apis.Condition{
+	cs = UpsertCondition(cs, apis.Condition{
 		Type:               readyCondType,
 		Status:             k8sapis.ConditionTrue,
 		LastTransitionTime: time.Now().UTC().Format(time.RFC3339Nano),
@@ -202,7 +202,7 @@ func TestUpsertCondition(t *testing.T) {
 		t.Fatalf("got=%s; want=%s", got, want)
 	}
 
-	cs = upsertCondition(cs, apis.Condition{
+	cs = UpsertCondition(cs, apis.Condition{
 		Type:               readyCondType,
 		Status:             k8sapis.ConditionFalse,
 		LastTransitionTime: time.Now().UTC().Format(time.RFC3339Nano),
@@ -218,7 +218,7 @@ func TestUpsertCondition(t *testing.T) {
 		t.Fatalf("got=%s; want=%s", got, want)
 	}
 
-	cs = upsertCondition(cs, apis.Condition{
+	cs = UpsertCondition(cs, apis.Condition{
 		Type:               "Foo",
 		Status:             k8sapis.ConditionTrue,
 		LastTransitionTime: time.Now().UTC().Format(time.RFC3339Nano),

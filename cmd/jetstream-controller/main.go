@@ -88,16 +88,21 @@ func run() error {
 
 	if *controlLoop {
 		klog.Warning("Starting jetStream controller in experimental control loop mode")
+
 		natsCfg := &controller.NatsConfig{
 			CRDConnect:  *crdConnect,
 			ClientName:  "jetstream-controller",
 			Credentials: *creds,
 			NKey:        *nkey,
 			ServerURL:   *server,
-			CA:          *ca,
+			CAs:         []string{},
 			Certificate: *cert,
 			Key:         *key,
 			TLSFirst:    *tlsfirst,
+		}
+
+		if *ca != "" {
+			natsCfg.CAs = []string{*ca}
 		}
 
 		controllerCfg := &controller.Config{

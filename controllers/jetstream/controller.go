@@ -495,7 +495,7 @@ func processQueueNext(q workqueue.RateLimitingInterface, jmsClient jsmClientFunc
 	q.Forget(item)
 }
 
-func upsertCondition(cs []apis.Condition, next apis.Condition) []apis.Condition {
+func UpsertCondition(cs []apis.Condition, next apis.Condition) []apis.Condition {
 	for i := 0; i < len(cs); i++ {
 		if cs[i].Type != next.Type {
 			continue
