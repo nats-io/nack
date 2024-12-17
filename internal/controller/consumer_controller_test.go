@@ -416,6 +416,22 @@ var _ = Describe("Consumer Controller", func() {
 						ShouldNot(Succeed())
 				})
 
+				It("should succeed deleting a consumer of a deleted stream", func(ctx SpecContext) {
+					By("Setting not existing stream")
+					consumer.Spec.StreamName = "deleted-stream"
+					Expect(k8sClient.Update(ctx, consumer)).To(Succeed())
+
+					By("reconciling")
+					result, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
+					Expect(err).NotTo(HaveOccurred())
+					Expect(result.IsZero()).To(BeTrue())
+
+					By("checking that the resource is deleted")
+					Eventually(k8sClient.Get).
+						WithArguments(ctx, typeNamespacedName, consumer).
+						ShouldNot(Succeed())
+				})
+
 				When("the underlying consumer exists", func() {
 					BeforeEach(func(ctx SpecContext) {
 						By("creating the consumer on the nats server")

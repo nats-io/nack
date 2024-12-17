@@ -119,10 +119,13 @@ func (r *ConsumerReconciler) deleteConsumer(ctx context.Context, log logr.Logger
 		err := r.WithJetStreamClient(consumerConnOpts(consumer.Spec), func(js jetstream.JetStream) error {
 			return js.DeleteConsumer(ctx, consumer.Spec.StreamName, consumer.Spec.DurableName)
 		})
-		if errors.Is(err, jetstream.ErrConsumerNotFound) {
+		switch {
+		case errors.Is(err, jetstream.ErrConsumerNotFound):
 			log.Info("Managed consumer was already deleted.")
-		} else if err != nil {
-			return fmt.Errorf("delete consumer during finalization: %w", err)
+		case errors.Is(err, jetstream.ErrStreamNotFound):
+			log.Info("Underlying stream of managed consumer was already deleted.")
+		case err != nil:
+			return fmt.Errorf("delete jetstream consumer: %w", err)
 		}
 	} else {
 		log.Info("Skipping consumer deletion.",
@@ -149,7 +152,7 @@ func (r *ConsumerReconciler) createOrUpdate(ctx context.Context, log klog.Logger
 	if consumer.Spec.PreventUpdate || r.ReadOnly() {
 		log.Info("Skipping consumer creation or update.",
 			"streamName", consumer.Spec.StreamName,
-			"consumerName", consumer.Name,
+			"consumerName", consumer.Spec.DurableName,
 			"preventDelete", consumer.Spec.PreventDelete,
 			"read-only", r.ReadOnly(),
 		)
@@ -182,7 +185,7 @@ func (r *ConsumerReconciler) createOrUpdate(ctx context.Context, log klog.Logger
 		consumer.Status.Conditions,
 		v1.ConditionTrue,
 		"Reconciling",
-		"Stream successfully created or updated.",
+		"Consumer successfully created or updated.",
 	)
 	err = r.Status().Update(ctx, consumer)
 	if err != nil {
