@@ -122,7 +122,7 @@ func (r *StreamReconciler) deleteStream(ctx context.Context, log logr.Logger, st
 
 	if !stream.Spec.PreventDelete && !r.ReadOnly() {
 		log.Info("Deleting stream.")
-		err := r.WithJetStreamClient(getConnOpts(stream.Spec), func(js jetstream.JetStream) error {
+		err := r.WithJetStreamClient(streamConnOpts(stream.Spec), func(js jetstream.JetStream) error {
 			return js.DeleteStream(ctx, stream.Spec.Name)
 		})
 		if errors.Is(err, jetstream.ErrStreamNotFound) {
@@ -162,14 +162,14 @@ func (r *StreamReconciler) createOrUpdate(ctx context.Context, log logr.Logger, 
 	}
 
 	// Map spec to stream targetConfig
-	targetConfig, err := mapSpecToConfig(&stream.Spec)
+	targetConfig, err := streamSpecToConfig(&stream.Spec)
 	if err != nil {
 		return fmt.Errorf("map spec to stream targetConfig: %w", err)
 	}
 
 	// CreateOrUpdateStream is called on every reconciliation when the stream is not to be deleted.
 	// TODO(future-feature): Do we need to check if config differs?
-	err = r.WithJetStreamClient(getConnOpts(stream.Spec), func(js jetstream.JetStream) error {
+	err = r.WithJetStreamClient(streamConnOpts(stream.Spec), func(js jetstream.JetStream) error {
 		log.Info("create or update stream", "streamName", targetConfig.Name)
 		_, err = js.CreateOrUpdateStream(ctx, targetConfig)
 		return err
@@ -199,8 +199,8 @@ func (r *StreamReconciler) createOrUpdate(ctx context.Context, log logr.Logger, 
 	return nil
 }
 
-// getConnOpts extracts nats connection relevant fields from the given stream spec as connectionOptions.
-func getConnOpts(spec api.StreamSpec) *connectionOptions {
+// streamConnOpts extracts nats connection relevant fields from the given stream spec as connectionOptions.
+func streamConnOpts(spec api.StreamSpec) *connectionOptions {
 	return &connectionOptions{
 		Account: spec.Account, // TODO(review): Where does Spec.Account have to be considered?
 		Creds:   spec.Creds,
@@ -210,8 +210,8 @@ func getConnOpts(spec api.StreamSpec) *connectionOptions {
 	}
 }
 
-// mapSpecToConfig creates a jetstream.StreamConfig matching the given stream resource spec
-func mapSpecToConfig(spec *api.StreamSpec) (jetstream.StreamConfig, error) {
+// streamSpecToConfig creates a jetstream.StreamConfig matching the given stream resource spec
+func streamSpecToConfig(spec *api.StreamSpec) (jetstream.StreamConfig, error) {
 
 	// Set directly mapped fields
 	config := jetstream.StreamConfig{
