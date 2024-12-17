@@ -18,9 +18,13 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/nats-io/nats.go/jetstream"
+	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/klog/v2"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"time"
 
 	api "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
@@ -39,9 +43,52 @@ type ConsumerReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.17.3/pkg/reconcile
 func (r *ConsumerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := klog.FromContext(ctx)
-	log.Info("reconcile", "namespace", req.Namespace, "name", req.Name)
+
+	// Fetch consumer resource
+	consumer := &api.Consumer{}
+	if err := r.Get(ctx, req.NamespacedName, consumer); err != nil {
+		if apierrors.IsNotFound(err) {
+			log.Info("Consumer resource not found. Ignoring since object must be deleted.")
+			return ctrl.Result{}, nil
+		}
+		return ctrl.Result{}, fmt.Errorf("get consumer resource '%s': %w", req.NamespacedName.String(), err)
+	}
+
+	// Update ready status to unknown when no status is set
+	if consumer.Status.Conditions == nil || len(consumer.Status.Conditions) == 0 {
+		log.Info("Setting initial ready condition to unknown.")
+		consumer.Status.Conditions = updateReadyCondition(consumer.Status.Conditions, v1.ConditionUnknown, "Reconciling", "Starting reconciliation")
+		err := r.Status().Update(ctx, consumer)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("set condition unknown: %w", err)
+		}
+		return ctrl.Result{Requeue: true}, nil
+	}
+
+	// Add finalizer
+	if !controllerutil.ContainsFinalizer(consumer, consumerFinalizer) {
+		log.Info("Adding consumer finalizer.")
+		if ok := controllerutil.AddFinalizer(consumer, consumerFinalizer); !ok {
+			return ctrl.Result{}, errors.New("failed to add finalizer to consumer resource")
+		}
+
+		if err := r.Update(ctx, consumer); err != nil {
+			return ctrl.Result{}, fmt.Errorf("update consumer resource to add finalizer: %w", err)
+		}
+		return ctrl.Result{}, nil
+	}
 
 	return ctrl.Result{}, nil
+}
+
+func consumerConnOpts(spec api.ConsumerSpec) *connectionOptions {
+	return &connectionOptions{
+		Account: spec.Account,
+		Creds:   spec.Creds,
+		Nkey:    spec.Nkey,
+		Servers: spec.Servers,
+		TLS:     spec.TLS,
+	}
 }
 
 func consumerSpecToConfig(spec *api.ConsumerSpec) (*jetstream.ConsumerConfig, error) {

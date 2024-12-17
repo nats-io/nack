@@ -17,17 +17,19 @@ limitations under the License.
 package controller
 
 import (
-	"context"
 	"github.com/nats-io/nats.go/jetstream"
-	"github.com/stretchr/testify/assert"
-	"testing"
-	"time"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"testing"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -38,7 +40,8 @@ var _ = Describe("Consumer Controller", func() {
 	Context("When reconciling a resource", func() {
 		const resourceName = "test-resource"
 
-		ctx := context.Background()
+		const streamName = "orders"
+		const consumerName = "test-consumer"
 
 		typeNamespacedName := types.NamespacedName{
 			Name:      resourceName,
@@ -46,7 +49,10 @@ var _ = Describe("Consumer Controller", func() {
 		}
 		consumer := &api.Consumer{}
 
-		BeforeEach(func() {
+		// Tested coontroller
+		var controller *ConsumerReconciler
+
+		BeforeEach(func(ctx SpecContext) {
 			By("creating the custom resource for the Kind Consumer")
 			err := k8sClient.Get(ctx, typeNamespacedName, consumer)
 			if err != nil && errors.IsNotFound(err) {
@@ -58,36 +64,99 @@ var _ = Describe("Consumer Controller", func() {
 					Spec: api.ConsumerSpec{
 						AckPolicy:     "none",
 						DeliverPolicy: "new",
-						DurableName:   "test-consumer",
+						DurableName:   consumerName,
+						StreamName:    streamName,
 						ReplayPolicy:  "instant",
 					},
-					// TODO(user): Specify other spec details if needed.
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+				// Fetch consumer
+				Expect(k8sClient.Get(ctx, typeNamespacedName, consumer)).To(Succeed())
 			}
-		})
 
-		AfterEach(func() {
-			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			resource := &api.Consumer{}
-			err := k8sClient.Get(ctx, typeNamespacedName, resource)
-			Expect(err).NotTo(HaveOccurred())
-
-			By("Cleanup the specific resource instance Consumer")
-			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
-		})
-		It("should successfully reconcile the resource", func() {
-			By("Reconciling the created resource")
-			controllerReconciler := &ConsumerReconciler{
+			By("setting up the tested controller")
+			controller = &ConsumerReconciler{
 				baseController,
 			}
+		})
 
-			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
+		AfterEach(func(ctx SpecContext) {
+			By("removing the consumer resource")
+			resource := &api.Consumer{}
+			err := k8sClient.Get(ctx, typeNamespacedName, resource)
+			if err != nil {
+				Expect(err).To(MatchError(k8serrors.IsNotFound, "Is not found"))
+			} else {
+				if controllerutil.ContainsFinalizer(resource, consumerFinalizer) {
+					By("removing the finalizer")
+					controllerutil.RemoveFinalizer(resource, consumerFinalizer)
+					Expect(k8sClient.Update(ctx, resource)).To(Succeed())
+				}
+
+				By("removing the consumer resource")
+				Expect(k8sClient.Delete(ctx, resource)).
+					To(SatisfyAny(
+						Succeed(),
+						MatchError(k8serrors.IsNotFound, "is not found"),
+					))
+			}
+
+			By("deleting the nats consumer")
+			Expect(jsClient.DeleteConsumer(ctx, streamName, consumerName)).
+				To(SatisfyAny(
+					Succeed(),
+					MatchError(jetstream.ErrStreamNotFound),
+					MatchError(jetstream.ErrConsumerNotFound),
+				))
+
+			By("deleting the consumers nats stream")
+			Expect(jsClient.DeleteStream(ctx, streamName)).
+				To(SatisfyAny(
+					Succeed(),
+					MatchError(jetstream.ErrStreamNotFound),
+				))
+		})
+
+		When("reconciling a not existing resource", func() {
+			It("should stop reconciliation without error", func(ctx SpecContext) {
+				By("reconciling the created resource")
+				result, err := controller.Reconcile(ctx, reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Namespace: "fake",
+						Name:      "not-existing",
+					},
+				})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result).To(Equal(ctrl.Result{}))
 			})
-			Expect(err).NotTo(HaveOccurred())
-			// TODO(user): Add more specific assertions depending on your controller's reconciliation logic.
-			// Example: If you expect a certain status condition after reconciliation, verify it here.
+		})
+
+		When("reconciling a not initialized resource", func() {
+
+			It("should initialize a new resource", func(ctx SpecContext) {
+
+				By("re-queueing until it is initialized")
+				// Initialization can require multiple reconciliation loops
+				Eventually(func(ctx SpecContext) *api.Consumer {
+					_, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
+					Expect(err).NotTo(HaveOccurred())
+					got := &api.Consumer{}
+					Expect(k8sClient.Get(ctx, typeNamespacedName, got)).To(Succeed())
+					return got
+				}).WithContext(ctx).
+					Within(time.Second).
+					Should(SatisfyAll(
+						HaveField("Finalizers", HaveExactElements(consumerFinalizer)),
+						HaveField("Status.Conditions", Not(BeEmpty())),
+					))
+
+				By("validating the ready condition")
+				// Fetch consumer
+				Expect(k8sClient.Get(ctx, typeNamespacedName, consumer)).To(Succeed())
+				Expect(consumer.Status.Conditions).To(HaveLen(1))
+
+				assertReadyStateMatches(consumer.Status.Conditions[0], v1.ConditionUnknown, "Reconciling", "Starting reconciliation", time.Now())
+			})
 		})
 	})
 })
