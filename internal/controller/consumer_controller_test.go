@@ -396,6 +396,133 @@ var _ = Describe("Consumer Controller", func() {
 				})
 			})
 
+			When("the resource is marked for deletion", func() {
+
+				BeforeEach(func(ctx SpecContext) {
+					By("marking the resource for deletion")
+					Expect(k8sClient.Delete(ctx, consumer)).To(Succeed())
+					Expect(k8sClient.Get(ctx, typeNamespacedName, consumer)).To(Succeed()) // re-fetch after update
+				})
+
+				It("should succeed deleting a not existing consumer", func(ctx SpecContext) {
+					By("reconciling")
+					result, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
+					Expect(err).NotTo(HaveOccurred())
+					Expect(result.IsZero()).To(BeTrue())
+
+					By("checking that the resource is deleted")
+					Eventually(k8sClient.Get).
+						WithArguments(ctx, typeNamespacedName, consumer).
+						ShouldNot(Succeed())
+				})
+
+				When("the underlying consumer exists", func() {
+					BeforeEach(func(ctx SpecContext) {
+						By("creating the consumer on the nats server")
+						_, err := jsClient.CreateConsumer(ctx, streamName, emptyConsumerConfig)
+						Expect(err).NotTo(HaveOccurred())
+					})
+
+					AfterEach(func(ctx SpecContext) {
+						err := jsClient.DeleteConsumer(ctx, streamName, consumerName)
+						if err != nil {
+							Expect(err).To(MatchError(jetstream.ErrConsumerNotFound))
+						}
+					})
+
+					It("should delete the consumer", func(ctx SpecContext) {
+						By("reconciling")
+						result, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
+						Expect(err).NotTo(HaveOccurred())
+						Expect(result.IsZero()).To(BeTrue())
+
+						By("checking that the consumer is deleted")
+						_, err = jsClient.Consumer(ctx, streamName, consumerName)
+						Expect(err).To(MatchError(jetstream.ErrConsumerNotFound))
+
+						By("checking that the resource is deleted")
+						Eventually(k8sClient.Get).
+							WithArguments(ctx, typeNamespacedName, consumer).
+							ShouldNot(Succeed())
+					})
+
+					When("PreventDelete is set", func() {
+						BeforeEach(func(ctx SpecContext) {
+							By("setting preventDelete on the resource")
+							consumer.Spec.PreventDelete = true
+							Expect(k8sClient.Update(ctx, consumer)).To(Succeed())
+						})
+						It("Should delete the resource and not delete the nats consumer", func(ctx SpecContext) {
+							By("reconciling")
+							result, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
+							Expect(err).NotTo(HaveOccurred())
+							Expect(result.IsZero()).To(BeTrue())
+
+							By("checking that the consumer is not deleted")
+							_, err = jsClient.Consumer(ctx, streamName, consumerName)
+							Expect(err).NotTo(HaveOccurred())
+
+							By("checking that the resource is deleted")
+							Eventually(k8sClient.Get).
+								WithArguments(ctx, typeNamespacedName, consumer).
+								ShouldNot(Succeed())
+						})
+					})
+
+					When("read only is set", func() {
+						BeforeEach(func(ctx SpecContext) {
+							By("setting read only on the controller")
+							readOnly, err := NewJSController(k8sClient, &NatsConfig{ServerURL: testServer.ClientURL()}, &Config{ReadOnly: true})
+							Expect(err).NotTo(HaveOccurred())
+							controller = &ConsumerReconciler{
+								JetStreamController: readOnly,
+							}
+						})
+						It("should delete the resource and not delete the consumer", func(ctx SpecContext) {
+
+							By("reconciling")
+							result, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
+							Expect(err).NotTo(HaveOccurred())
+							Expect(result.IsZero()).To(BeTrue())
+
+							By("checking that the consumer is not deleted")
+							_, err = jsClient.Consumer(ctx, streamName, consumerName)
+							Expect(err).NotTo(HaveOccurred())
+
+							By("checking that the resource is deleted")
+							Eventually(k8sClient.Get).
+								WithArguments(ctx, typeNamespacedName, consumer).
+								ShouldNot(Succeed())
+						})
+					})
+
+					When("controller is restricted to different namespace", func() {
+						BeforeEach(func(ctx SpecContext) {
+							namespaced, err := NewJSController(k8sClient, &NatsConfig{ServerURL: testServer.ClientURL()}, &Config{Namespace: "other-namespace"})
+							Expect(err).NotTo(HaveOccurred())
+							controller = &ConsumerReconciler{
+								JetStreamController: namespaced,
+							}
+						})
+						It("should not delete the resource and consumer", func(ctx SpecContext) {
+
+							By("reconciling")
+							result, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
+							Expect(err).NotTo(HaveOccurred())
+							Expect(result.IsZero()).To(BeTrue())
+
+							By("checking that the consumer is not deleted")
+							_, err = jsClient.Consumer(ctx, streamName, consumerName)
+							Expect(err).NotTo(HaveOccurred())
+
+							By("checking that the finalizer is not removed")
+							Expect(k8sClient.Get(ctx, typeNamespacedName, consumer)).To(Succeed())
+							Expect(consumer.Finalizers).To(ContainElement(consumerFinalizer))
+						})
+					})
+				})
+			})
+
 			It("should create consumer on different server as specified in spec", func(ctx SpecContext) {
 
 				By("setting up the alternative server")

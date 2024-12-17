@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/go-logr/logr"
 	"github.com/nats-io/nats.go/jetstream"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -83,11 +84,63 @@ func (r *ConsumerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, nil
 	}
 
+	// Check Deletion
+	markedForDeletion := consumer.GetDeletionTimestamp() != nil
+	if markedForDeletion {
+		if controllerutil.ContainsFinalizer(consumer, consumerFinalizer) {
+			err := r.deleteConsumer(ctx, log, consumer)
+			if err != nil {
+				return ctrl.Result{}, fmt.Errorf("delete consumer: %w", err)
+			}
+		} else {
+			log.Info("Consumer marked for deletion and already finalized. Ignoring.")
+		}
+
+		return ctrl.Result{}, nil
+	}
+
 	// Create or update stream
 	if err := r.createOrUpdate(ctx, log, consumer); err != nil {
 		return ctrl.Result{}, fmt.Errorf("create or update: %s", err)
 	}
 	return ctrl.Result{}, nil
+}
+
+func (r *ConsumerReconciler) deleteConsumer(ctx context.Context, log logr.Logger, consumer *api.Consumer) error {
+
+	// Set status to not false
+	consumer.Status.Conditions = updateReadyCondition(consumer.Status.Conditions, v1.ConditionFalse, "Finalizing", "Performing finalizer operations.")
+	if err := r.Status().Update(ctx, consumer); err != nil {
+		return fmt.Errorf("update ready condition: %w", err)
+	}
+
+	if !consumer.Spec.PreventDelete && !r.ReadOnly() {
+		log.Info("Deleting consumer.")
+		err := r.WithJetStreamClient(consumerConnOpts(consumer.Spec), func(js jetstream.JetStream) error {
+			return js.DeleteConsumer(ctx, consumer.Spec.StreamName, consumer.Spec.DurableName)
+		})
+		if errors.Is(err, jetstream.ErrConsumerNotFound) {
+			log.Info("Managed consumer was already deleted.")
+		} else if err != nil {
+			return fmt.Errorf("delete consumer during finalization: %w", err)
+		}
+	} else {
+		log.Info("Skipping consumer deletion.",
+			"consumerName", consumer.Spec.DurableName,
+			"preventDelete", consumer.Spec.PreventDelete,
+			"read-only", r.ReadOnly(),
+		)
+	}
+
+	log.Info("Removing consumer finalizer.")
+	if ok := controllerutil.RemoveFinalizer(consumer, consumerFinalizer); !ok {
+		return errors.New("failed to remove consumer finalizer")
+	}
+	if err := r.Update(ctx, consumer); err != nil {
+		return fmt.Errorf("remove finalizer: %w", err)
+	}
+
+	return nil
 }
 
 func (r *ConsumerReconciler) createOrUpdate(ctx context.Context, log klog.Logger, consumer *api.Consumer) error {
