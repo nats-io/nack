@@ -49,6 +49,14 @@ var _ = Describe("Consumer Controller", func() {
 		}
 		consumer := &api.Consumer{}
 
+		emptyStreamConfig := jetstream.StreamConfig{
+			Name:      streamName,
+			Replicas:  1,
+			Retention: jetstream.WorkQueuePolicy,
+			Discard:   jetstream.DiscardOld,
+			Storage:   jetstream.FileStorage,
+		}
+
 		// Tested coontroller
 		var controller *ConsumerReconciler
 
@@ -62,9 +70,10 @@ var _ = Describe("Consumer Controller", func() {
 						Namespace: "default",
 					},
 					Spec: api.ConsumerSpec{
-						AckPolicy:     "none",
-						DeliverPolicy: "new",
+						AckPolicy:     "explicit",
+						DeliverPolicy: "all",
 						DurableName:   consumerName,
+						Description:   "test consumer",
 						StreamName:    streamName,
 						ReplayPolicy:  "instant",
 					},
@@ -73,6 +82,10 @@ var _ = Describe("Consumer Controller", func() {
 				// Fetch consumer
 				Expect(k8sClient.Get(ctx, typeNamespacedName, consumer)).To(Succeed())
 			}
+
+			By("creating the underlying stream")
+			_, err = jsClient.CreateStream(ctx, emptyStreamConfig)
+			Expect(err).ToNot(HaveOccurred())
 
 			By("setting up the tested controller")
 			controller = &ConsumerReconciler{
@@ -157,6 +170,121 @@ var _ = Describe("Consumer Controller", func() {
 
 				assertReadyStateMatches(consumer.Status.Conditions[0], v1.ConditionUnknown, "Reconciling", "Starting reconciliation", time.Now())
 			})
+		})
+
+		When("reconciling an initialized resource", func() {
+
+			BeforeEach(func(ctx SpecContext) {
+				By("initializing the stream resource")
+
+				By("setting the finalizer")
+				Expect(controllerutil.AddFinalizer(consumer, consumerFinalizer)).To(BeTrue())
+				Expect(k8sClient.Update(ctx, consumer)).To(Succeed())
+
+				By("setting an unknown ready state")
+				consumer.Status.Conditions = []api.Condition{{
+					Type:               readyCondType,
+					Status:             v1.ConditionUnknown,
+					Reason:             "Test",
+					Message:            "start condition",
+					LastTransitionTime: time.Now().Format(time.RFC3339Nano),
+				}}
+				Expect(k8sClient.Status().Update(ctx, consumer)).To(Succeed())
+				Expect(k8sClient.Get(ctx, typeNamespacedName, consumer)).To(Succeed())
+			})
+
+			When("the underlying stream does not exist", func() {
+				It("should set false ready state and errr", func(ctx SpecContext) {
+					By("setting a not existing stream on the resource")
+					consumer.Spec.StreamName = "not-existing"
+					Expect(k8sClient.Update(ctx, consumer)).To(Succeed())
+
+					By("running Reconcile")
+					result, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
+					Expect(err).To(HaveOccurred())
+					Expect(result.IsZero()).To(BeTrue())
+
+					By("checking for expected ready state")
+					Expect(k8sClient.Get(ctx, typeNamespacedName, consumer)).To(Succeed())
+					Expect(consumer.Status.Conditions).To(HaveLen(1))
+					assertReadyStateMatches(
+						consumer.Status.Conditions[0],
+						v1.ConditionFalse,
+						"Errored",
+						"stream", // Not existing stream as message
+						time.Now(),
+					)
+				})
+			})
+
+			It("should create a new consumer", func(ctx SpecContext) {
+
+				By("running Reconcile")
+				result, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result.IsZero()).To(BeTrue())
+
+				// Fetch resource
+				Expect(k8sClient.Get(ctx, typeNamespacedName, consumer)).To(Succeed())
+
+				By("checking if the ready state was updated")
+				Expect(consumer.Status.Conditions).To(HaveLen(1))
+				assertReadyStateMatches(consumer.Status.Conditions[0], v1.ConditionTrue, "Reconciling", "created or updated", time.Now())
+
+				By("checking if the observed generation matches")
+				Expect(consumer.Status.ObservedGeneration).To(Equal(consumer.Generation))
+
+				By("checking if the consumer was created")
+				natsconsumer, err := jsClient.Consumer(ctx, streamName, consumerName)
+				Expect(err).NotTo(HaveOccurred())
+				consumerInfo, err := natsconsumer.Info(ctx)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(consumerInfo.Config.Name).To(Equal(consumerName))
+				Expect(consumerInfo.Config.Description).To(Equal("test consumer"))
+				Expect(consumerInfo.Created).To(BeTemporally("~", time.Now(), time.Second))
+			})
+
+			It("should update an existing consumer", func(ctx SpecContext) {
+
+				By("reconciling once to create the consumer")
+				result, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result.IsZero()).To(BeTrue())
+
+				// Fetch resource
+				Expect(k8sClient.Get(ctx, typeNamespacedName, consumer)).To(Succeed())
+				previousTransitionTime := consumer.Status.Conditions[0].LastTransitionTime
+
+				By("updating the resource")
+				consumer.Spec.Description = "new description"
+				Expect(k8sClient.Update(ctx, consumer)).To(Succeed())
+
+				By("reconciling the updated resource")
+				result, err = controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result.IsZero()).To(BeTrue())
+
+				// Fetch resource
+				Expect(k8sClient.Get(ctx, typeNamespacedName, consumer)).To(Succeed())
+
+				By("checking if the state transition time was not updated")
+				Expect(consumer.Status.Conditions).To(HaveLen(1))
+				Expect(consumer.Status.Conditions[0].LastTransitionTime).To(Equal(previousTransitionTime))
+
+				By("checking if the observed generation matches")
+				Expect(consumer.Status.ObservedGeneration).To(Equal(consumer.Generation))
+
+				By("checking if the consumer was updated")
+				natsStream, err := jsClient.Consumer(ctx, streamName, consumerName)
+				Expect(err).NotTo(HaveOccurred())
+
+				streamInfo, err := natsStream.Info(ctx)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(streamInfo.Config.Description).To(Equal("new description"))
+				// Other fields unchanged
+				Expect(streamInfo.Config.ReplayPolicy).To(Equal(jetstream.ReplayInstantPolicy))
+			})
+
 		})
 	})
 })

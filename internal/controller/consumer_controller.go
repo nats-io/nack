@@ -78,7 +78,48 @@ func (r *ConsumerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, nil
 	}
 
+	// Create or update stream
+	if err := r.createOrUpdate(ctx, log, consumer); err != nil {
+		return ctrl.Result{}, fmt.Errorf("create or update: %s", err)
+	}
 	return ctrl.Result{}, nil
+}
+
+func (r *ConsumerReconciler) createOrUpdate(ctx context.Context, log klog.Logger, consumer *api.Consumer) error {
+
+	targetConfig, err := consumerSpecToConfig(&consumer.Spec)
+	if err != nil {
+		return fmt.Errorf("map consumer spec to target config: %w", err)
+	}
+
+	err = r.WithJetStreamClient(consumerConnOpts(consumer.Spec), func(js jetstream.JetStream) error {
+		log.Info("create or update consumer", "streamName", consumer.Spec.StreamName, "name", consumer.Spec.DurableName)
+		_, err := js.CreateOrUpdateConsumer(ctx, consumer.Spec.StreamName, *targetConfig)
+		return err
+	})
+	if err != nil {
+		err = fmt.Errorf("create or update consumer: %w", err)
+		consumer.Status.Conditions = updateReadyCondition(consumer.Status.Conditions, v1.ConditionFalse, "Errored", err.Error())
+		if err := r.Status().Update(ctx, consumer); err != nil {
+			log.Error(err, "Failed to update ready condition to Errored.")
+		}
+		return err
+	}
+
+	// update the observed generation and ready status
+	consumer.Status.ObservedGeneration = consumer.Generation
+	consumer.Status.Conditions = updateReadyCondition(
+		consumer.Status.Conditions,
+		v1.ConditionTrue,
+		"Reconciling",
+		"Stream successfully created or updated.",
+	)
+	err = r.Status().Update(ctx, consumer)
+	if err != nil {
+		return fmt.Errorf("update ready condition: %w", err)
+	}
+
+	return nil
 }
 
 func consumerConnOpts(spec api.ConsumerSpec) *connectionOptions {
