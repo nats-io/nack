@@ -18,9 +18,12 @@ package controller
 
 import (
 	"context"
+	"fmt"
+	"github.com/nats-io/nats.go/jetstream"
 	"k8s.io/klog/v2"
+	"time"
 
-	jetstreamnatsiov1beta2 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
+	api "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
@@ -41,9 +44,98 @@ func (r *ConsumerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	return ctrl.Result{}, nil
 }
 
+func consumerSpecToConfig(spec *api.ConsumerSpec) (*jetstream.ConsumerConfig, error) {
+
+	config := &jetstream.ConsumerConfig{
+		Durable:            spec.DurableName,
+		Description:        spec.Description,
+		OptStartSeq:        uint64(spec.OptStartSeq),
+		MaxDeliver:         spec.MaxDeliver,
+		FilterSubject:      spec.FilterSubject,
+		RateLimit:          uint64(spec.RateLimitBps),
+		SampleFrequency:    spec.SampleFreq,
+		MaxWaiting:         spec.MaxWaiting,
+		MaxAckPending:      spec.MaxAckPending,
+		HeadersOnly:        spec.HeadersOnly,
+		MaxRequestBatch:    spec.MaxRequestBatch,
+		MaxRequestMaxBytes: spec.MaxRequestMaxBytes,
+		Replicas:           spec.Replicas,
+		MemoryStorage:      spec.MemStorage,
+		FilterSubjects:     spec.FilterSubjects,
+		Metadata:           spec.Metadata,
+
+		// Explicitly set not (yet) mapped fields
+		Name:              "",
+		InactiveThreshold: 0,
+	}
+
+	// DeliverPolicy
+	if spec.DeliverPolicy != "" {
+		err := config.DeliverPolicy.UnmarshalJSON(asJsonString(spec.DeliverPolicy))
+		if err != nil {
+			return nil, fmt.Errorf("invalid delivery policy: %w", err)
+		}
+	}
+
+	//	OptStartTime RFC3339
+	if spec.OptStartTime != "" {
+		t, err := time.Parse(time.RFC3339, spec.OptStartTime)
+		if err != nil {
+			return nil, fmt.Errorf("invalid opt start time: %w", err)
+		}
+		config.OptStartTime = &t
+	}
+
+	//	AckPolicy
+	if spec.AckPolicy != "" {
+		err := config.AckPolicy.UnmarshalJSON(asJsonString(spec.AckPolicy))
+		if err != nil {
+			return nil, fmt.Errorf("invalid ack policy: %w", err)
+		}
+	}
+
+	//	AckWait
+	if spec.AckWait != "" {
+		d, err := time.ParseDuration(spec.AckWait)
+		if err != nil {
+			return nil, fmt.Errorf("invalid ack wait duration: %w", err)
+		}
+		config.AckWait = d
+	}
+
+	//BackOff
+	for _, bo := range spec.BackOff {
+		d, err := time.ParseDuration(bo)
+		if err != nil {
+			return nil, fmt.Errorf("invalid backoff: %w", err)
+		}
+
+		config.BackOff = append(config.BackOff, d)
+	}
+
+	//	ReplayPolicy
+	if spec.ReplayPolicy != "" {
+		err := config.ReplayPolicy.UnmarshalJSON(asJsonString(spec.ReplayPolicy))
+		if err != nil {
+			return nil, fmt.Errorf("invalid replay policy: %w", err)
+		}
+	}
+
+	//	MaxRequestExpires
+	if spec.MaxRequestExpires != "" {
+		d, err := time.ParseDuration(spec.MaxRequestExpires)
+		if err != nil {
+			return nil, fmt.Errorf("invalid opt start time: %w", err)
+		}
+		config.MaxRequestExpires = d
+	}
+
+	return config, nil
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *ConsumerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&jetstreamnatsiov1beta2.Consumer{}).
+		For(&api.Consumer{}).
 		Complete(r)
 }
