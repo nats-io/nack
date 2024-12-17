@@ -57,6 +57,10 @@ var _ = Describe("Consumer Controller", func() {
 			Storage:   jetstream.FileStorage,
 		}
 
+		emptyConsumerConfig := jetstream.ConsumerConfig{
+			Durable: consumerName,
+		}
+
 		// Tested coontroller
 		var controller *ConsumerReconciler
 
@@ -194,7 +198,7 @@ var _ = Describe("Consumer Controller", func() {
 			})
 
 			When("the underlying stream does not exist", func() {
-				It("should set false ready state and errr", func(ctx SpecContext) {
+				It("should set false ready state and error", func(ctx SpecContext) {
 					By("setting a not existing stream on the resource")
 					consumer.Spec.StreamName = "not-existing"
 					Expect(k8sClient.Update(ctx, consumer)).To(Succeed())
@@ -283,6 +287,113 @@ var _ = Describe("Consumer Controller", func() {
 				Expect(streamInfo.Config.Description).To(Equal("new description"))
 				// Other fields unchanged
 				Expect(streamInfo.Config.ReplayPolicy).To(Equal(jetstream.ReplayInstantPolicy))
+			})
+
+			When("PreventUpdate is set", func() {
+
+				BeforeEach(func(ctx SpecContext) {
+					By("setting preventUpdate on the resource")
+					consumer.Spec.PreventUpdate = true
+					Expect(k8sClient.Update(ctx, consumer)).To(Succeed())
+				})
+				It("should not create the consumer", func(ctx SpecContext) {
+					By("running Reconcile")
+					result, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
+					Expect(err).NotTo(HaveOccurred())
+					Expect(result.IsZero()).To(BeTrue())
+
+					By("checking that no consumer was created")
+					_, err = jsClient.Consumer(ctx, streamName, consumerName)
+					Expect(err).To(MatchError(jetstream.ErrConsumerNotFound))
+				})
+				It("should not update the consumer", func(ctx SpecContext) {
+					By("creating the consumer")
+					_, err := jsClient.CreateConsumer(ctx, streamName, emptyConsumerConfig)
+					Expect(err).NotTo(HaveOccurred())
+
+					By("running Reconcile")
+					result, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
+					Expect(err).NotTo(HaveOccurred())
+					Expect(result.IsZero()).To(BeTrue())
+
+					By("checking that consumer was not updated")
+					c, err := jsClient.Consumer(ctx, streamName, consumerName)
+					Expect(c.CachedInfo().Config.Description).To(BeEmpty())
+				})
+			})
+
+			When("read-only mode is enabled", func() {
+
+				BeforeEach(func(ctx SpecContext) {
+					By("setting read only on the controller")
+					readOnly, err := NewJSController(k8sClient, &NatsConfig{ServerURL: testServer.ClientURL()}, &Config{ReadOnly: true})
+					Expect(err).NotTo(HaveOccurred())
+					controller = &ConsumerReconciler{
+						JetStreamController: readOnly,
+					}
+				})
+
+				It("should not create the consumer", func(ctx SpecContext) {
+					By("running Reconcile")
+					result, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
+					Expect(err).NotTo(HaveOccurred())
+					Expect(result.IsZero()).To(BeTrue())
+
+					By("checking that no consumer was created")
+					_, err = jsClient.Consumer(ctx, streamName, consumerName)
+					Expect(err).To(MatchError(jetstream.ErrConsumerNotFound))
+				})
+				It("should not update the consumer", func(ctx SpecContext) {
+					By("creating the consumer")
+					_, err := jsClient.CreateConsumer(ctx, streamName, emptyConsumerConfig)
+					Expect(err).NotTo(HaveOccurred())
+
+					By("running Reconcile")
+					result, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
+					Expect(err).NotTo(HaveOccurred())
+					Expect(result.IsZero()).To(BeTrue())
+
+					By("checking that consumer was not updated")
+					s, err := jsClient.Consumer(ctx, streamName, consumerName)
+					Expect(s.CachedInfo().Config.Description).To(BeEmpty())
+				})
+			})
+
+			When("namespace restriction is enabled", func() {
+
+				BeforeEach(func(ctx SpecContext) {
+					By("setting a namespace on the resource")
+					namespaced, err := NewJSController(k8sClient, &NatsConfig{ServerURL: testServer.ClientURL()}, &Config{Namespace: "other-namespace"})
+					Expect(err).NotTo(HaveOccurred())
+					controller = &ConsumerReconciler{
+						JetStreamController: namespaced,
+					}
+				})
+
+				It("should not create the consumer", func(ctx SpecContext) {
+					By("running Reconcile")
+					result, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
+					Expect(err).NotTo(HaveOccurred())
+					Expect(result.IsZero()).To(BeTrue())
+
+					By("checking that no consumer was created")
+					_, err = jsClient.Consumer(ctx, streamName, consumerName)
+					Expect(err).To(MatchError(jetstream.ErrConsumerNotFound))
+				})
+				It("should not update the consumer", func(ctx SpecContext) {
+					By("creating the consumer")
+					_, err := jsClient.CreateConsumer(ctx, streamName, emptyConsumerConfig)
+					Expect(err).NotTo(HaveOccurred())
+
+					By("running Reconcile")
+					result, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
+					Expect(err).NotTo(HaveOccurred())
+					Expect(result.IsZero()).To(BeTrue())
+
+					By("checking that consumer was not updated")
+					s, err := jsClient.Consumer(ctx, streamName, consumerName)
+					Expect(s.CachedInfo().Config.Description).To(BeEmpty())
+				})
 			})
 
 		})

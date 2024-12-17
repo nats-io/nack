@@ -44,6 +44,11 @@ type ConsumerReconciler struct {
 func (r *ConsumerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := klog.FromContext(ctx)
 
+	if ok := r.ValidNamespace(req.Namespace); !ok {
+		log.Info("Controller restricted to namespace, skipping reconciliation.")
+		return ctrl.Result{}, nil
+	}
+
 	// Fetch consumer resource
 	consumer := &api.Consumer{}
 	if err := r.Get(ctx, req.NamespacedName, consumer); err != nil {
@@ -87,6 +92,18 @@ func (r *ConsumerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 func (r *ConsumerReconciler) createOrUpdate(ctx context.Context, log klog.Logger, consumer *api.Consumer) error {
 
+	// Create or Update the stream based on the spec
+	if consumer.Spec.PreventUpdate || r.ReadOnly() {
+		log.Info("Skipping consumer creation or update.",
+			"streamName", consumer.Spec.StreamName,
+			"consumerName", consumer.Name,
+			"preventDelete", consumer.Spec.PreventDelete,
+			"read-only", r.ReadOnly(),
+		)
+		return nil
+	}
+
+	// Map spec to consumer target config
 	targetConfig, err := consumerSpecToConfig(&consumer.Spec)
 	if err != nil {
 		return fmt.Errorf("map consumer spec to target config: %w", err)
