@@ -396,6 +396,44 @@ var _ = Describe("Consumer Controller", func() {
 				})
 			})
 
+			It("should create consumer on different server as specified in spec", func(ctx SpecContext) {
+
+				By("setting up the alternative server")
+				altServer := CreateTestServer()
+				defer altServer.Shutdown()
+				// Setup altClient for alternate server
+				altClient, closer, err := CreateJetStreamClient(&NatsConfig{ServerURL: altServer.ClientURL()}, true)
+				defer closer.Close()
+				Expect(err).NotTo(HaveOccurred())
+
+				By("setting up the stream on the alternative server")
+				_, err = altClient.CreateStream(ctx, emptyStreamConfig)
+				Expect(err).NotTo(HaveOccurred())
+
+				By("setting the server in the consumer spec")
+				consumer.Spec.Servers = []string{altServer.ClientURL()}
+				Expect(k8sClient.Update(ctx, consumer)).To(Succeed())
+
+				By("checking precondition, that the consumer does not yet exist")
+				got, err := jsClient.Consumer(ctx, streamName, consumerName)
+				Expect(err).To(MatchError(jetstream.ErrConsumerNotFound))
+
+				By("reconciling the resource")
+				result, err := controller.Reconcile(ctx, reconcile.Request{
+					NamespacedName: typeNamespacedName,
+				})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result.IsZero()).To(BeTrue())
+
+				By("checking if the consumer was created on the alternative server")
+				got, err = altClient.Consumer(ctx, streamName, consumerName)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(got.CachedInfo().Created).To(BeTemporally("~", time.Now(), time.Second))
+
+				By("checking that the consumer was NOT created on the original server")
+				_, err = jsClient.Consumer(ctx, streamName, consumerName)
+				Expect(err).To(MatchError(jetstream.ErrConsumerNotFound))
+			})
 		})
 	})
 })
