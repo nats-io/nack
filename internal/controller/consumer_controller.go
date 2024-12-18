@@ -61,6 +61,11 @@ func (r *ConsumerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, fmt.Errorf("get consumer resource '%s': %w", req.NamespacedName.String(), err)
 	}
 
+	log = log.WithValues(
+		"streamName", consumer.Spec.StreamName,
+		"consumerName", consumer.Spec.DurableName,
+	)
+
 	// Update ready status to unknown when no status is set
 	if consumer.Status.Conditions == nil || len(consumer.Status.Conditions) == 0 {
 		log.Info("Setting initial ready condition to unknown.")
@@ -116,17 +121,18 @@ func (r *ConsumerReconciler) deleteConsumer(ctx context.Context, log logr.Logger
 	}
 
 	if !consumer.Spec.PreventDelete && !r.ReadOnly() {
-		log.Info("Deleting consumer.")
 		err := r.WithJetStreamClient(consumerConnOpts(consumer.Spec), func(js jetstream.JetStream) error {
 			return js.DeleteConsumer(ctx, consumer.Spec.StreamName, consumer.Spec.DurableName)
 		})
 		switch {
 		case errors.Is(err, jetstream.ErrConsumerNotFound):
-			log.Info("Managed consumer was already deleted.")
+			log.Info("Consumer does not exist. Unable to delete.")
 		case errors.Is(err, jetstream.ErrStreamNotFound):
-			log.Info("Underlying stream of managed consumer was already deleted.")
+			log.Info("Stream of consumer does not exist. Unable to delete.")
 		case err != nil:
 			return fmt.Errorf("delete jetstream consumer: %w", err)
+		default:
+			log.Info("Consumer deleted.")
 		}
 	} else {
 		log.Info("Skipping consumer deletion.",
@@ -152,8 +158,6 @@ func (r *ConsumerReconciler) createOrUpdate(ctx context.Context, log klog.Logger
 	// Create or Update the stream based on the spec
 	if consumer.Spec.PreventUpdate || r.ReadOnly() {
 		log.Info("Skipping consumer creation or update.",
-			"streamName", consumer.Spec.StreamName,
-			"consumerName", consumer.Spec.DurableName,
 			"preventDelete", consumer.Spec.PreventDelete,
 			"read-only", r.ReadOnly(),
 		)
@@ -167,7 +171,7 @@ func (r *ConsumerReconciler) createOrUpdate(ctx context.Context, log klog.Logger
 	}
 
 	err = r.WithJetStreamClient(consumerConnOpts(consumer.Spec), func(js jetstream.JetStream) error {
-		log.Info("create or update consumer", "streamName", consumer.Spec.StreamName, "name", consumer.Spec.DurableName)
+		log.Info("Consumer created or updated.")
 		_, err := js.CreateOrUpdateConsumer(ctx, consumer.Spec.StreamName, *targetConfig)
 		return err
 	})
