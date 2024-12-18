@@ -103,13 +103,18 @@ func (c *jsController) buildNatsConfig(opts *connectionOptions) *NatsConfig {
 		cfg.NKey = c.config.NKey
 	}
 
-	// Cert config either from opts or base config
-	if len(opts.TLS.RootCAs) > 0 || opts.TLS.ClientCert != "" || opts.TLS.ClientKey != "" {
+	// CAs from opts or base config
+	if len(opts.TLS.RootCAs) > 0 {
 		cfg.CAs = opts.TLS.RootCAs
+	} else {
+		cfg.CAs = c.config.CAs
+	}
+
+	// Client Cert and Key either from opts or base config
+	if opts.TLS.ClientCert != "" && opts.TLS.ClientKey != "" {
 		cfg.Certificate = opts.TLS.ClientCert
 		cfg.Key = opts.TLS.ClientKey
 	} else {
-		cfg.CAs = c.config.CAs
 		cfg.Certificate = c.config.Certificate
 		cfg.Key = c.config.Key
 	}
