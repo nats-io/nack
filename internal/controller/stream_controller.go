@@ -126,7 +126,7 @@ func (r *StreamReconciler) deleteStream(ctx context.Context, log logr.Logger, st
 			return js.DeleteStream(ctx, stream.Spec.Name)
 		})
 		if errors.Is(err, jetstream.ErrStreamNotFound) {
-			log.Info("Managed stream was already deleted.")
+			log.Info("Stream does not exist, unable to delete.", "streamName", stream.Spec.Name)
 		} else if err != nil {
 			return fmt.Errorf("delete stream during finalization: %w", err)
 		}
