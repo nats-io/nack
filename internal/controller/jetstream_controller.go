@@ -27,7 +27,7 @@ type JetStreamController interface {
 	ReadOnly() bool
 
 	// ValidNamespace ok if the controllers namespace restriction allows the given namespace.
-	ValidNamespace(string string) bool
+	ValidNamespace(namespace string) bool
 
 	// WithJetStreamClient provides a jetStream client to the given operation.
 	// The client uses the controllers connection configuration merged with opts.
@@ -57,9 +57,9 @@ func (c *jsController) ReadOnly() bool {
 	return c.controllerConfig.ReadOnly
 }
 
-func (c *jsController) ValidNamespace(targetNamespace string) bool {
+func (c *jsController) ValidNamespace(namespace string) bool {
 	ns := c.controllerConfig.Namespace
-	return ns == "" || ns == targetNamespace
+	return ns == "" || ns == namespace
 }
 
 func (c *jsController) WithJetStreamClient(opts *connectionOptions, op func(js jetstream.JetStream) error) error {
