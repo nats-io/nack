@@ -202,7 +202,7 @@ func (r *StreamReconciler) createOrUpdate(ctx context.Context, log logr.Logger, 
 // streamConnOpts extracts nats connection relevant fields from the given stream spec as connectionOptions.
 func streamConnOpts(spec api.StreamSpec) *connectionOptions {
 	return &connectionOptions{
-		Account: spec.Account, // TODO(review): Where does Spec.Account have to be considered?
+		Account: spec.Account,
 		Creds:   spec.Creds,
 		Nkey:    spec.Nkey,
 		Servers: spec.Servers,

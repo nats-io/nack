@@ -87,8 +87,12 @@ func (c *jsController) buildNatsConfig(opts *connectionOptions) *NatsConfig {
 		CRDConnect: false,
 		ClientName: c.config.ClientName,
 		ServerURL:  or(serverUrls, c.config.ServerURL),
-		TLSFirst:   c.config.TLSFirst, // TODO(review): should this value depend on any opts? There is no TLSFirst in the spec
+		TLSFirst:   c.config.TLSFirst, // TODO(future-feature): expose TLSFirst in the spec config
 	}
+
+	// Note: The opts.Account value coming from the resource spec is currently not considered.
+	// creds/nkey are associated with an account, the account field might be redundant.
+	// See https://github.com/nats-io/nack/pull/211#pullrequestreview-2511111670
 
 	// Authentication either from opts or base config
 	if opts.Creds != "" || opts.Nkey != "" {
