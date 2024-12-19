@@ -208,6 +208,7 @@ $(ENVTEST): $(LOCALBIN)
 .PHONY: test
 test: envtest
 	go vet ./controllers/... ./pkg/natsreloader/... ./internal/controller/...
+	$(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path ## Get k8s binaries
 	go test -race -cover -count=1 -timeout 10s ./controllers/... ./pkg/natsreloader/... ./internal/controller/...
 
 .PHONY: clean

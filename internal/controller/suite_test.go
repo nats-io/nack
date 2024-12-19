@@ -19,7 +19,6 @@ package controller
 import (
 	"fmt"
 	"github.com/nats-io/nats-server/v2/server"
-	natsserver "github.com/nats-io/nats-server/v2/test"
 	"github.com/nats-io/nats.go/jetstream"
 	"os"
 	"path/filepath"
@@ -47,6 +46,7 @@ var k8sClient client.Client
 var testEnv *envtest.Environment
 var testServer *server.Server
 var jsClient jetstream.JetStream
+var baseController JetStreamController
 
 func TestControllers(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -86,13 +86,11 @@ var _ = BeforeSuite(func() {
 
 	By("bootstrapping the test server")
 	testServer = CreateTestServer()
-	jsClient, err = CreateJetStreamClient(
-		&NatsConfig{ServerURL: testServer.ClientURL()},
-		true,
-	)
 	Expect(err).NotTo(HaveOccurred())
-	Expect(jsClient).NotTo(BeNil())
 
+	testNatsConfig := &NatsConfig{ServerURL: testServer.ClientURL()}
+	baseController, err = NewJSController(k8sClient, testNatsConfig, &Config{})
+	jsClient, _, err = CreateJetStreamClient(testNatsConfig, true)
 })
 
 var _ = AfterSuite(func() {
@@ -106,19 +104,3 @@ var _ = AfterSuite(func() {
 	err = os.RemoveAll(storeDir)
 	Expect(err).NotTo(HaveOccurred())
 })
-
-func CreateTestServer() *server.Server {
-	opts := &natsserver.DefaultTestOptions
-	opts.JetStream = true
-	opts.Port = -1
-	opts.Debug = true
-
-	dir, err := os.MkdirTemp("", "nats-*")
-	Expect(err).NotTo(HaveOccurred())
-	opts.StoreDir = dir
-
-	ns := natsserver.RunServer(opts)
-	Expect(err).NotTo(HaveOccurred())
-
-	return ns
-}

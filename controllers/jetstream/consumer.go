@@ -354,7 +354,7 @@ func setConsumerOK(ctx context.Context, s *apis.Consumer, i typed.ConsumerInterf
 	sc := s.DeepCopy()
 
 	sc.Status.ObservedGeneration = s.Generation
-	sc.Status.Conditions = upsertCondition(sc.Status.Conditions, apis.Condition{
+	sc.Status.Conditions = UpsertCondition(sc.Status.Conditions, apis.Condition{
 		Type:               readyCondType,
 		Status:             k8sapi.ConditionTrue,
 		LastTransitionTime: time.Now().UTC().Format(time.RFC3339Nano),
@@ -382,7 +382,7 @@ func setConsumerErrored(ctx context.Context, s *apis.Consumer, sif typed.Consume
 	}
 
 	sc := s.DeepCopy()
-	sc.Status.Conditions = upsertCondition(sc.Status.Conditions, apis.Condition{
+	sc.Status.Conditions = UpsertCondition(sc.Status.Conditions, apis.Condition{
 		Type:               readyCondType,
 		Status:             k8sapi.ConditionFalse,
 		LastTransitionTime: time.Now().UTC().Format(time.RFC3339Nano),

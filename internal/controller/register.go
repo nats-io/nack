@@ -20,36 +20,26 @@ type Config struct {
 // controllerCfg defines behaviour of the registered controllers.
 func RegisterAll(mgr ctrl.Manager, clientConfig *NatsConfig, config *Config) error {
 
-	// Controllers need access to a nats client in pedantic mode
-	js, err := CreateJetStreamClient(clientConfig, true)
+	baseController, err := NewJSController(mgr.GetClient(), clientConfig, config)
 	if err != nil {
-		return fmt.Errorf("create jetstream client: %w", err)
+		return fmt.Errorf("create base jetstream controller: %w", err)
 	}
 
 	// Register controllers
 	if err := (&AccountReconciler{
-		Client:    mgr.GetClient(),
-		Config:    config,
-		Scheme:    mgr.GetScheme(),
-		JetStream: js,
+		baseController,
 	}).SetupWithManager(mgr); err != nil {
 		return fmt.Errorf("unable to create account controller: %w", err)
 	}
 
 	if err := (&ConsumerReconciler{
-		Client:    mgr.GetClient(),
-		Config:    config,
-		Scheme:    mgr.GetScheme(),
-		JetStream: js,
+		baseController,
 	}).SetupWithManager(mgr); err != nil {
 		return fmt.Errorf("unable to create consumer controller: %w", err)
 	}
 
 	if err := (&StreamReconciler{
-		Client:    mgr.GetClient(),
-		Config:    config,
-		Scheme:    mgr.GetScheme(),
-		JetStream: js,
+		JetStreamController: baseController,
 	}).SetupWithManager(mgr); err != nil {
 		return fmt.Errorf("unable to create stream controller: %w", err)
 	}

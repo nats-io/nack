@@ -69,8 +69,7 @@ var _ = Describe("Account Controller", func() {
 		It("should successfully reconcile the resource", func() {
 			By("Reconciling the created resource")
 			controllerReconciler := &AccountReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
+				baseController,
 			}
 
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
