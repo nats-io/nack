@@ -1,4 +1,4 @@
-// Copyright 2024 The NATS Authors
+// Copyright 2025 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -16,10 +16,10 @@
 package v1beta2
 
 import (
-	"context"
+	context "context"
 
-	v1beta2 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
-	jetstreamv1beta2 "github.com/nats-io/nack/pkg/jetstream/generated/applyconfiguration/jetstream/v1beta2"
+	jetstreamv1beta2 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
+	applyconfigurationjetstreamv1beta2 "github.com/nats-io/nack/pkg/jetstream/generated/applyconfiguration/jetstream/v1beta2"
 	scheme "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -35,36 +35,37 @@ type ConsumersGetter interface {
 
 // ConsumerInterface has methods to work with Consumer resources.
 type ConsumerInterface interface {
-	Create(ctx context.Context, consumer *v1beta2.Consumer, opts v1.CreateOptions) (*v1beta2.Consumer, error)
-	Update(ctx context.Context, consumer *v1beta2.Consumer, opts v1.UpdateOptions) (*v1beta2.Consumer, error)
+	Create(ctx context.Context, consumer *jetstreamv1beta2.Consumer, opts v1.CreateOptions) (*jetstreamv1beta2.Consumer, error)
+	Update(ctx context.Context, consumer *jetstreamv1beta2.Consumer, opts v1.UpdateOptions) (*jetstreamv1beta2.Consumer, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, consumer *v1beta2.Consumer, opts v1.UpdateOptions) (*v1beta2.Consumer, error)
+	UpdateStatus(ctx context.Context, consumer *jetstreamv1beta2.Consumer, opts v1.UpdateOptions) (*jetstreamv1beta2.Consumer, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta2.Consumer, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1beta2.ConsumerList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*jetstreamv1beta2.Consumer, error)
+	List(ctx context.Context, opts v1.ListOptions) (*jetstreamv1beta2.ConsumerList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta2.Consumer, err error)
-	Apply(ctx context.Context, consumer *jetstreamv1beta2.ConsumerApplyConfiguration, opts v1.ApplyOptions) (result *v1beta2.Consumer, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *jetstreamv1beta2.Consumer, err error)
+	Apply(ctx context.Context, consumer *applyconfigurationjetstreamv1beta2.ConsumerApplyConfiguration, opts v1.ApplyOptions) (result *jetstreamv1beta2.Consumer, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, consumer *jetstreamv1beta2.ConsumerApplyConfiguration, opts v1.ApplyOptions) (result *v1beta2.Consumer, err error)
+	ApplyStatus(ctx context.Context, consumer *applyconfigurationjetstreamv1beta2.ConsumerApplyConfiguration, opts v1.ApplyOptions) (result *jetstreamv1beta2.Consumer, err error)
 	ConsumerExpansion
 }
 
 // consumers implements ConsumerInterface
 type consumers struct {
-	*gentype.ClientWithListAndApply[*v1beta2.Consumer, *v1beta2.ConsumerList, *jetstreamv1beta2.ConsumerApplyConfiguration]
+	*gentype.ClientWithListAndApply[*jetstreamv1beta2.Consumer, *jetstreamv1beta2.ConsumerList, *applyconfigurationjetstreamv1beta2.ConsumerApplyConfiguration]
 }
 
 // newConsumers returns a Consumers
 func newConsumers(c *JetstreamV1beta2Client, namespace string) *consumers {
 	return &consumers{
-		gentype.NewClientWithListAndApply[*v1beta2.Consumer, *v1beta2.ConsumerList, *jetstreamv1beta2.ConsumerApplyConfiguration](
+		gentype.NewClientWithListAndApply[*jetstreamv1beta2.Consumer, *jetstreamv1beta2.ConsumerList, *applyconfigurationjetstreamv1beta2.ConsumerApplyConfiguration](
 			"consumers",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1beta2.Consumer { return &v1beta2.Consumer{} },
-			func() *v1beta2.ConsumerList { return &v1beta2.ConsumerList{} }),
+			func() *jetstreamv1beta2.Consumer { return &jetstreamv1beta2.Consumer{} },
+			func() *jetstreamv1beta2.ConsumerList { return &jetstreamv1beta2.ConsumerList{} },
+		),
 	}
 }

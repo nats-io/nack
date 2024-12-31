@@ -77,7 +77,7 @@ func (c *Controller) processConsumerObject(cns *apis.Consumer, jsm jsmClientFunc
 
 			// Write this to the cacheDir
 			accDir := filepath.Join(c.cacheDir, ns, spec.Account)
-			if err := os.MkdirAll(accDir, 0755); err != nil {
+			if err := os.MkdirAll(accDir, 0o755); err != nil {
 				return err
 			}
 
@@ -101,7 +101,7 @@ func (c *Controller) processConsumerObject(cns *apis.Consumer, jsm jsmClientFunc
 
 			// Write the user credentials to the cache dir.
 			accDir := filepath.Join(c.cacheDir, ns, spec.Account)
-			if err := os.MkdirAll(accDir, 0755); err != nil {
+			if err := os.MkdirAll(accDir, 0o755); err != nil {
 				return err
 			}
 			for k, v := range secret.Data {
@@ -352,7 +352,7 @@ func consumerSpecToOpts(spec apis.ConsumerSpec) ([]jsm.ConsumerOption, error) {
 		opts = append(opts, jsm.AcknowledgeExplicit())
 	case "":
 	default:
-		return nil, fmt.Errorf("invalid value for 'ackPolicy': '%s'. Must be one of 'none', 'all', 'explicit'.", spec.AckPolicy)
+		return nil, fmt.Errorf("invalid value for 'ackPolicy': '%s'. Must be one of 'none', 'all', 'explicit'", spec.AckPolicy)
 	}
 
 	if spec.AckWait != "" {
@@ -370,7 +370,7 @@ func consumerSpecToOpts(spec apis.ConsumerSpec) ([]jsm.ConsumerOption, error) {
 		opts = append(opts, jsm.ReplayAsReceived())
 	case "":
 	default:
-		return nil, fmt.Errorf("invalid value for 'replayPolicy': '%s'. Must be one of 'instant', 'original'.", spec.ReplayPolicy)
+		return nil, fmt.Errorf("invalid value for 'replayPolicy': '%s'. Must be one of 'instant', 'original'", spec.ReplayPolicy)
 	}
 
 	if spec.SampleFreq != "" {

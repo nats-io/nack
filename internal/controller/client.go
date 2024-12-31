@@ -2,6 +2,7 @@ package controller
 
 import (
 	"fmt"
+
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 )
@@ -46,7 +47,7 @@ func (o *NatsConfig) buildOptions() ([]nats.Option, error) {
 			opts = append(opts, nats.ClientCert(o.Certificate, o.Key))
 		}
 
-		if o.CAs != nil && len(o.CAs) > 0 {
+		if len(o.CAs) > 0 {
 			opts = append(opts, nats.RootCAs(o.CAs...))
 		}
 	}
@@ -62,7 +63,6 @@ type Closable interface {
 // Returns a jetstream.Jetstream client and the Closable of the underlying connection.
 // Close should be called when the client is no longer used.
 func CreateJetStreamClient(cfg *NatsConfig, pedantic bool) (jetstream.JetStream, Closable, error) {
-
 	opts, err := cfg.buildOptions()
 	if err != nil {
 		return nil, nil, fmt.Errorf("nats options: %w", err)

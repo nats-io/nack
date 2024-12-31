@@ -2,14 +2,15 @@ package controller
 
 import (
 	"fmt"
+	"strings"
+	"time"
+
 	js "github.com/nats-io/nack/controllers/jetstream"
 	api "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 	"github.com/nats-io/nats.go/jetstream"
 	v1 "k8s.io/api/core/v1"
-	"strings"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"time"
 )
 
 type connectionOptions struct {
@@ -39,7 +40,6 @@ type JetStreamController interface {
 }
 
 func NewJSController(k8sClient client.Client, natsConfig *NatsConfig, controllerConfig *Config) (JetStreamController, error) {
-
 	return &jsController{
 		Client:           k8sClient,
 		config:           natsConfig,
@@ -63,7 +63,6 @@ func (c *jsController) ValidNamespace(namespace string) bool {
 }
 
 func (c *jsController) WithJetStreamClient(opts *connectionOptions, op func(js jetstream.JetStream) error) error {
-
 	// Build single use client
 	// TODO(future-feature): Use client-pool instead of single use client
 	cfg := c.buildNatsConfig(opts)
@@ -79,7 +78,6 @@ func (c *jsController) WithJetStreamClient(opts *connectionOptions, op func(js j
 
 // buildNatsConfig uses given opts to override the base NatsConfig.
 func (c *jsController) buildNatsConfig(opts *connectionOptions) *NatsConfig {
-
 	serverUrls := strings.Join(opts.Servers, ",")
 
 	// Takes opts values if present
@@ -132,7 +130,6 @@ func or[T comparable](v T, fallback T) T {
 
 // updateReadyCondition returns the given conditions with an added or updated ready condition.
 func updateReadyCondition(conditions []api.Condition, status v1.ConditionStatus, reason string, message string) []api.Condition {
-
 	var currentStatus v1.ConditionStatus
 	var lastTransitionTime string
 	for _, condition := range conditions {

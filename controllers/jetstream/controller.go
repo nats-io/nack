@@ -97,11 +97,11 @@ type Controller struct {
 
 	strLister listers.StreamLister
 	strSynced cache.InformerSynced
-	strQueue  workqueue.RateLimitingInterface
+	strQueue  workqueue.TypedRateLimitingInterface[any]
 
 	cnsLister listers.ConsumerLister
 	cnsSynced cache.InformerSynced
-	cnsQueue  workqueue.RateLimitingInterface
+	cnsQueue  workqueue.TypedRateLimitingInterface[any]
 
 	accLister listers.AccountLister
 
@@ -136,8 +136,8 @@ func NewController(opt Options) *Controller {
 	}
 
 	ji := opt.JetstreamIface.JetstreamV1beta2()
-	streamQueue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Streams")
-	consumerQueue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Consumers")
+	streamQueue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[any](), "Streams")
+	consumerQueue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[any](), "Consumers")
 
 	streamInformer.Informer().AddEventHandler(
 		eventHandlers(
@@ -155,6 +155,7 @@ func NewController(opt Options) *Controller {
 	if err != nil {
 		panic(err)
 	}
+	defer os.RemoveAll(cacheDir)
 
 	return &Controller{
 		ctx:  opt.Ctx,
@@ -179,7 +180,6 @@ func NewController(opt Options) *Controller {
 }
 
 func (c *Controller) Run() error {
-
 	// Connect to NATS.
 	opts := make([]nats.Option, 0)
 	// Always attempt to have a connection to NATS.
@@ -447,7 +447,7 @@ func getStorageType(s string) (jsmapi.StorageType, error) {
 	}
 }
 
-func enqueueWork(q workqueue.RateLimitingInterface, item interface{}) (err error) {
+func enqueueWork(q workqueue.TypedRateLimitingInterface[any], item interface{}) (err error) {
 	key, err := cache.MetaNamespaceKeyFunc(item)
 	if err != nil {
 		return fmt.Errorf("failed to enqueue work: %w", err)
@@ -457,10 +457,12 @@ func enqueueWork(q workqueue.RateLimitingInterface, item interface{}) (err error
 	return nil
 }
 
-type jsmClientFunc func(*natsContext) (jsmClient, error)
-type processorFunc func(ns, name string, jmsClient jsmClientFunc) error
+type (
+	jsmClientFunc func(*natsContext) (jsmClient, error)
+	processorFunc func(ns, name string, jmsClient jsmClientFunc) error
+)
 
-func processQueueNext(q workqueue.RateLimitingInterface, jmsClient jsmClientFunc, process processorFunc) {
+func processQueueNext(q workqueue.TypedRateLimitingInterface[any], jmsClient jsmClientFunc, process processorFunc) {
 	item, shutdown := q.Get()
 	if shutdown {
 		return
@@ -530,7 +532,7 @@ func shouldEnqueue(prevObj, nextObj interface{}) bool {
 	return markedDelete || specChanged
 }
 
-func eventHandlers(q workqueue.RateLimitingInterface) cache.ResourceEventHandlerFuncs {
+func eventHandlers(q workqueue.TypedRateLimitingInterface[any]) cache.ResourceEventHandlerFuncs {
 	return cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			if err := enqueueWork(q, obj); err != nil {
