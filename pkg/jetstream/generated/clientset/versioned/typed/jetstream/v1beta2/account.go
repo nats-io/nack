@@ -1,4 +1,4 @@
-// Copyright 2024 The NATS Authors
+// Copyright 2025 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -16,10 +16,10 @@
 package v1beta2
 
 import (
-	"context"
+	context "context"
 
-	v1beta2 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
-	jetstreamv1beta2 "github.com/nats-io/nack/pkg/jetstream/generated/applyconfiguration/jetstream/v1beta2"
+	jetstreamv1beta2 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
+	applyconfigurationjetstreamv1beta2 "github.com/nats-io/nack/pkg/jetstream/generated/applyconfiguration/jetstream/v1beta2"
 	scheme "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -35,36 +35,37 @@ type AccountsGetter interface {
 
 // AccountInterface has methods to work with Account resources.
 type AccountInterface interface {
-	Create(ctx context.Context, account *v1beta2.Account, opts v1.CreateOptions) (*v1beta2.Account, error)
-	Update(ctx context.Context, account *v1beta2.Account, opts v1.UpdateOptions) (*v1beta2.Account, error)
+	Create(ctx context.Context, account *jetstreamv1beta2.Account, opts v1.CreateOptions) (*jetstreamv1beta2.Account, error)
+	Update(ctx context.Context, account *jetstreamv1beta2.Account, opts v1.UpdateOptions) (*jetstreamv1beta2.Account, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, account *v1beta2.Account, opts v1.UpdateOptions) (*v1beta2.Account, error)
+	UpdateStatus(ctx context.Context, account *jetstreamv1beta2.Account, opts v1.UpdateOptions) (*jetstreamv1beta2.Account, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta2.Account, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1beta2.AccountList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*jetstreamv1beta2.Account, error)
+	List(ctx context.Context, opts v1.ListOptions) (*jetstreamv1beta2.AccountList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta2.Account, err error)
-	Apply(ctx context.Context, account *jetstreamv1beta2.AccountApplyConfiguration, opts v1.ApplyOptions) (result *v1beta2.Account, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *jetstreamv1beta2.Account, err error)
+	Apply(ctx context.Context, account *applyconfigurationjetstreamv1beta2.AccountApplyConfiguration, opts v1.ApplyOptions) (result *jetstreamv1beta2.Account, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, account *jetstreamv1beta2.AccountApplyConfiguration, opts v1.ApplyOptions) (result *v1beta2.Account, err error)
+	ApplyStatus(ctx context.Context, account *applyconfigurationjetstreamv1beta2.AccountApplyConfiguration, opts v1.ApplyOptions) (result *jetstreamv1beta2.Account, err error)
 	AccountExpansion
 }
 
 // accounts implements AccountInterface
 type accounts struct {
-	*gentype.ClientWithListAndApply[*v1beta2.Account, *v1beta2.AccountList, *jetstreamv1beta2.AccountApplyConfiguration]
+	*gentype.ClientWithListAndApply[*jetstreamv1beta2.Account, *jetstreamv1beta2.AccountList, *applyconfigurationjetstreamv1beta2.AccountApplyConfiguration]
 }
 
 // newAccounts returns a Accounts
 func newAccounts(c *JetstreamV1beta2Client, namespace string) *accounts {
 	return &accounts{
-		gentype.NewClientWithListAndApply[*v1beta2.Account, *v1beta2.AccountList, *jetstreamv1beta2.AccountApplyConfiguration](
+		gentype.NewClientWithListAndApply[*jetstreamv1beta2.Account, *jetstreamv1beta2.AccountList, *applyconfigurationjetstreamv1beta2.AccountApplyConfiguration](
 			"accounts",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1beta2.Account { return &v1beta2.Account{} },
-			func() *v1beta2.AccountList { return &v1beta2.AccountList{} }),
+			func() *jetstreamv1beta2.Account { return &jetstreamv1beta2.Account{} },
+			func() *jetstreamv1beta2.AccountList { return &jetstreamv1beta2.AccountList{} },
+		),
 	}
 }

@@ -88,10 +88,12 @@ tls: {
 `
 )
 
-var configContents = `port = 2222`
-var newConfigContents = `port = 2222
+var (
+	configContents    = `port = 2222`
+	newConfigContents = `port = 2222
 someOtherThing = "bar"
 `
+)
 
 func TestReloader(t *testing.T) {
 	// Setup a pidfile that points to us
@@ -261,7 +263,6 @@ func TestInclude(t *testing.T) {
 			t.Fatal("Expected include paths do not match")
 		}
 	}
-
 }
 
 func TestFileFinder(t *testing.T) {

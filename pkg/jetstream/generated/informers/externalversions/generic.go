@@ -1,4 +1,4 @@
-// Copyright 2024 The NATS Authors
+// Copyright 2025 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -16,7 +16,7 @@
 package externalversions
 
 import (
-	"fmt"
+	fmt "fmt"
 
 	v1beta2 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -54,6 +54,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Jetstream().V1beta2().Accounts().Informer()}, nil
 	case v1beta2.SchemeGroupVersion.WithResource("consumers"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Jetstream().V1beta2().Consumers().Informer()}, nil
+	case v1beta2.SchemeGroupVersion.WithResource("keyvalues"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Jetstream().V1beta2().KeyValues().Informer()}, nil
 	case v1beta2.SchemeGroupVersion.WithResource("streams"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Jetstream().V1beta2().Streams().Informer()}, nil
 

@@ -1,4 +1,4 @@
-// Copyright 2024 The NATS Authors
+// Copyright 2025 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -25,6 +25,8 @@ type Interface interface {
 	Accounts() AccountInformer
 	// Consumers returns a ConsumerInformer.
 	Consumers() ConsumerInformer
+	// KeyValues returns a KeyValueInformer.
+	KeyValues() KeyValueInformer
 	// Streams returns a StreamInformer.
 	Streams() StreamInformer
 }
@@ -48,6 +50,11 @@ func (v *version) Accounts() AccountInformer {
 // Consumers returns a ConsumerInformer.
 func (v *version) Consumers() ConsumerInformer {
 	return &consumerInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// KeyValues returns a KeyValueInformer.
+func (v *version) KeyValues() KeyValueInformer {
+	return &keyValueInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // Streams returns a StreamInformer.

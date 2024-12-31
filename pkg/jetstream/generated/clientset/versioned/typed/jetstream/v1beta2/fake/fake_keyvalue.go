@@ -22,24 +22,24 @@ import (
 	gentype "k8s.io/client-go/gentype"
 )
 
-// fakeAccounts implements AccountInterface
-type fakeAccounts struct {
-	*gentype.FakeClientWithListAndApply[*v1beta2.Account, *v1beta2.AccountList, *jetstreamv1beta2.AccountApplyConfiguration]
+// fakeKeyValues implements KeyValueInterface
+type fakeKeyValues struct {
+	*gentype.FakeClientWithListAndApply[*v1beta2.KeyValue, *v1beta2.KeyValueList, *jetstreamv1beta2.KeyValueApplyConfiguration]
 	Fake *FakeJetstreamV1beta2
 }
 
-func newFakeAccounts(fake *FakeJetstreamV1beta2, namespace string) typedjetstreamv1beta2.AccountInterface {
-	return &fakeAccounts{
-		gentype.NewFakeClientWithListAndApply[*v1beta2.Account, *v1beta2.AccountList, *jetstreamv1beta2.AccountApplyConfiguration](
+func newFakeKeyValues(fake *FakeJetstreamV1beta2, namespace string) typedjetstreamv1beta2.KeyValueInterface {
+	return &fakeKeyValues{
+		gentype.NewFakeClientWithListAndApply[*v1beta2.KeyValue, *v1beta2.KeyValueList, *jetstreamv1beta2.KeyValueApplyConfiguration](
 			fake.Fake,
 			namespace,
-			v1beta2.SchemeGroupVersion.WithResource("accounts"),
-			v1beta2.SchemeGroupVersion.WithKind("Account"),
-			func() *v1beta2.Account { return &v1beta2.Account{} },
-			func() *v1beta2.AccountList { return &v1beta2.AccountList{} },
-			func(dst, src *v1beta2.AccountList) { dst.ListMeta = src.ListMeta },
-			func(list *v1beta2.AccountList) []*v1beta2.Account { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1beta2.AccountList, items []*v1beta2.Account) {
+			v1beta2.SchemeGroupVersion.WithResource("keyvalues"),
+			v1beta2.SchemeGroupVersion.WithKind("KeyValue"),
+			func() *v1beta2.KeyValue { return &v1beta2.KeyValue{} },
+			func() *v1beta2.KeyValueList { return &v1beta2.KeyValueList{} },
+			func(dst, src *v1beta2.KeyValueList) { dst.ListMeta = src.ListMeta },
+			func(list *v1beta2.KeyValueList) []*v1beta2.KeyValue { return gentype.ToPointerSlice(list.Items) },
+			func(list *v1beta2.KeyValueList, items []*v1beta2.KeyValue) {
 				list.Items = gentype.FromPointerSlice(items)
 			},
 		),

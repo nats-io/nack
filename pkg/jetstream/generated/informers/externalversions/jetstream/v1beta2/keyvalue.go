@@ -29,59 +29,59 @@ import (
 	cache "k8s.io/client-go/tools/cache"
 )
 
-// ConsumerInformer provides access to a shared informer and lister for
-// Consumers.
-type ConsumerInformer interface {
+// KeyValueInformer provides access to a shared informer and lister for
+// KeyValues.
+type KeyValueInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() jetstreamv1beta2.ConsumerLister
+	Lister() jetstreamv1beta2.KeyValueLister
 }
 
-type consumerInformer struct {
+type keyValueInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
 	namespace        string
 }
 
-// NewConsumerInformer constructs a new informer for Consumer type.
+// NewKeyValueInformer constructs a new informer for KeyValue type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewConsumerInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredConsumerInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewKeyValueInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredKeyValueInformer(client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredConsumerInformer constructs a new informer for Consumer type.
+// NewFilteredKeyValueInformer constructs a new informer for KeyValue type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredConsumerInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredKeyValueInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.JetstreamV1beta2().Consumers(namespace).List(context.TODO(), options)
+				return client.JetstreamV1beta2().KeyValues(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.JetstreamV1beta2().Consumers(namespace).Watch(context.TODO(), options)
+				return client.JetstreamV1beta2().KeyValues(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&apisjetstreamv1beta2.Consumer{},
+		&apisjetstreamv1beta2.KeyValue{},
 		resyncPeriod,
 		indexers,
 	)
 }
 
-func (f *consumerInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredConsumerInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *keyValueInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredKeyValueInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *consumerInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apisjetstreamv1beta2.Consumer{}, f.defaultInformer)
+func (f *keyValueInformer) Informer() cache.SharedIndexInformer {
+	return f.factory.InformerFor(&apisjetstreamv1beta2.KeyValue{}, f.defaultInformer)
 }
 
-func (f *consumerInformer) Lister() jetstreamv1beta2.ConsumerLister {
-	return jetstreamv1beta2.NewConsumerLister(f.Informer().GetIndexer())
+func (f *keyValueInformer) Lister() jetstreamv1beta2.KeyValueLister {
+	return jetstreamv1beta2.NewKeyValueLister(f.Informer().GetIndexer())
 }

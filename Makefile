@@ -2,7 +2,7 @@ export GO111MODULE := on
 
 SHELL=/usr/bin/env bash
 
-ENVTEST_K8S_VERSION = 1.29.0
+ENVTEST_K8S_VERSION = 1.31.0
 
 now := $(shell date -u +%Y-%m-%dT%H:%M:%S%z)
 gitBranch := $(shell git rev-parse --abbrev-ref HEAD)
@@ -191,7 +191,7 @@ mv "$$(echo "$(1)" | sed "s/-$(3)$$//")" $(1) ;\
 endef
 
 ENVTEST ?= $(LOCALBIN)/setup-envtest-$(ENVTEST_VERSION)
-ENVTEST_VERSION ?= release-0.17
+ENVTEST_VERSION ?= release-0.19
 
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download setup-envtest locally if necessary.

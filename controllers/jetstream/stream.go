@@ -23,7 +23,6 @@ import (
 	"time"
 
 	jsm "github.com/nats-io/jsm.go"
-	"github.com/nats-io/jsm.go/api"
 	jsmapi "github.com/nats-io/jsm.go/api"
 	apis "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 	typed "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/typed/jetstream/v1beta2"
@@ -331,9 +330,9 @@ func createStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 
 	switch spec.Compression {
 	case "s2":
-		opts = append(opts, jsm.Compression(api.S2Compression))
+		opts = append(opts, jsm.Compression(jsmapi.S2Compression))
 	case "none":
-		opts = append(opts, jsm.Compression(api.NoCompression))
+		opts = append(opts, jsm.Compression(jsmapi.NoCompression))
 	}
 
 	if spec.NoAck {
@@ -397,7 +396,7 @@ func createStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 	}
 
 	if spec.SubjectTransform != nil {
-		opts = append(opts, func(o *api.StreamConfig) error {
+		opts = append(opts, func(o *jsmapi.StreamConfig) error {
 			o.SubjectTransform = &jsmapi.SubjectTransformConfig{
 				Source:      spec.SubjectTransform.Source,
 				Destination: spec.SubjectTransform.Dest,
@@ -533,9 +532,9 @@ func updateStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 
 	switch spec.Compression {
 	case "s2":
-		config.Compression = api.S2Compression
+		config.Compression = jsmapi.S2Compression
 	case "none":
-		config.Compression = api.NoCompression
+		config.Compression = jsmapi.NoCompression
 	}
 
 	return js.UpdateConfiguration(config)

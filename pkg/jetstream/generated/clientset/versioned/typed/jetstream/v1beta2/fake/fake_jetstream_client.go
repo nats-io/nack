@@ -1,4 +1,4 @@
-// Copyright 2024 The NATS Authors
+// Copyright 2025 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -26,15 +26,19 @@ type FakeJetstreamV1beta2 struct {
 }
 
 func (c *FakeJetstreamV1beta2) Accounts(namespace string) v1beta2.AccountInterface {
-	return &FakeAccounts{c, namespace}
+	return newFakeAccounts(c, namespace)
 }
 
 func (c *FakeJetstreamV1beta2) Consumers(namespace string) v1beta2.ConsumerInterface {
-	return &FakeConsumers{c, namespace}
+	return newFakeConsumers(c, namespace)
+}
+
+func (c *FakeJetstreamV1beta2) KeyValues(namespace string) v1beta2.KeyValueInterface {
+	return newFakeKeyValues(c, namespace)
 }
 
 func (c *FakeJetstreamV1beta2) Streams(namespace string) v1beta2.StreamInterface {
-	return &FakeStreams{c, namespace}
+	return newFakeStreams(c, namespace)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

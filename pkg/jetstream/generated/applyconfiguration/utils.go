@@ -1,4 +1,4 @@
-// Copyright 2024 The NATS Authors
+// Copyright 2025 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -41,6 +41,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &jetstreamv1beta2.ConsumerSpecApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("CredsSecret"):
 		return &jetstreamv1beta2.CredsSecretApplyConfiguration{}
+	case v1beta2.SchemeGroupVersion.WithKind("KeyValue"):
+		return &jetstreamv1beta2.KeyValueApplyConfiguration{}
+	case v1beta2.SchemeGroupVersion.WithKind("KeyValueSpec"):
+		return &jetstreamv1beta2.KeyValueSpecApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("RePublish"):
 		return &jetstreamv1beta2.RePublishApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("SecretRef"):

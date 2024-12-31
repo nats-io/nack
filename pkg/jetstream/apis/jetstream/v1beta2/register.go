@@ -33,6 +33,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&Stream{},
 		&StreamList{},
+		&KeyValue{},
+		&KeyValueList{},
 		&Consumer{},
 		&ConsumerList{},
 		&Account{},

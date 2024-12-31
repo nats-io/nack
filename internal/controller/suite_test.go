@@ -18,12 +18,13 @@ package controller
 
 import (
 	"fmt"
-	"github.com/nats-io/nats-server/v2/server"
-	"github.com/nats-io/nats.go/jetstream"
 	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
+
+	"github.com/nats-io/nats-server/v2/server"
+	"github.com/nats-io/nats.go/jetstream"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -41,12 +42,14 @@ import (
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
-var cfg *rest.Config
-var k8sClient client.Client
-var testEnv *envtest.Environment
-var testServer *server.Server
-var jsClient jetstream.JetStream
-var baseController JetStreamController
+var (
+	cfg            *rest.Config
+	k8sClient      client.Client
+	testEnv        *envtest.Environment
+	testServer     *server.Server
+	jsClient       jetstream.JetStream
+	baseController JetStreamController
+)
 
 func TestControllers(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -68,7 +71,7 @@ var _ = BeforeSuite(func() {
 		// Note that you must have the required binaries setup under the bin directory to perform
 		// the tests directly. When we run make test it will be setup and used automatically.
 		BinaryAssetsDirectory: filepath.Join("..", "..", "bin", "k8s",
-			fmt.Sprintf("1.29.0-%s-%s", runtime.GOOS, runtime.GOARCH)),
+			fmt.Sprintf("1.31.0-%s-%s", runtime.GOOS, runtime.GOARCH)),
 	}
 
 	var err error
@@ -90,7 +93,9 @@ var _ = BeforeSuite(func() {
 
 	testNatsConfig := &NatsConfig{ServerURL: testServer.ClientURL()}
 	baseController, err = NewJSController(k8sClient, testNatsConfig, &Config{})
+	Expect(err).NotTo(HaveOccurred())
 	jsClient, _, err = CreateJetStreamClient(testNatsConfig, true)
+	Expect(err).NotTo(HaveOccurred())
 })
 
 var _ = AfterSuite(func() {

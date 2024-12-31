@@ -1,4 +1,4 @@
-// Copyright 2024 The NATS Authors
+// Copyright 2025 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -16,13 +16,13 @@
 package v1beta2
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	jetstreamv1beta2 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
+	apisjetstreamv1beta2 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 	versioned "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned"
 	internalinterfaces "github.com/nats-io/nack/pkg/jetstream/generated/informers/externalversions/internalinterfaces"
-	v1beta2 "github.com/nats-io/nack/pkg/jetstream/generated/listers/jetstream/v1beta2"
+	jetstreamv1beta2 "github.com/nats-io/nack/pkg/jetstream/generated/listers/jetstream/v1beta2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -33,7 +33,7 @@ import (
 // Accounts.
 type AccountInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1beta2.AccountLister
+	Lister() jetstreamv1beta2.AccountLister
 }
 
 type accountInformer struct {
@@ -68,7 +68,7 @@ func NewFilteredAccountInformer(client versioned.Interface, namespace string, re
 				return client.JetstreamV1beta2().Accounts(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&jetstreamv1beta2.Account{},
+		&apisjetstreamv1beta2.Account{},
 		resyncPeriod,
 		indexers,
 	)
@@ -79,9 +79,9 @@ func (f *accountInformer) defaultInformer(client versioned.Interface, resyncPeri
 }
 
 func (f *accountInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&jetstreamv1beta2.Account{}, f.defaultInformer)
+	return f.factory.InformerFor(&apisjetstreamv1beta2.Account{}, f.defaultInformer)
 }
 
-func (f *accountInformer) Lister() v1beta2.AccountLister {
-	return v1beta2.NewAccountLister(f.Informer().GetIndexer())
+func (f *accountInformer) Lister() jetstreamv1beta2.AccountLister {
+	return jetstreamv1beta2.NewAccountLister(f.Informer().GetIndexer())
 }

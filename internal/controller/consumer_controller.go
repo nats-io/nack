@@ -20,6 +20,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/go-logr/logr"
 	"github.com/nats-io/nats.go/jetstream"
 	v1 "k8s.io/api/core/v1"
@@ -27,7 +29,6 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	"time"
 
 	api "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -67,7 +68,7 @@ func (r *ConsumerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	)
 
 	// Update ready status to unknown when no status is set
-	if consumer.Status.Conditions == nil || len(consumer.Status.Conditions) == 0 {
+	if len(consumer.Status.Conditions) == 0 {
 		log.Info("Setting initial ready condition to unknown.")
 		consumer.Status.Conditions = updateReadyCondition(consumer.Status.Conditions, v1.ConditionUnknown, "Reconciling", "Starting reconciliation")
 		err := r.Status().Update(ctx, consumer)
@@ -113,7 +114,6 @@ func (r *ConsumerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 }
 
 func (r *ConsumerReconciler) deleteConsumer(ctx context.Context, log logr.Logger, consumer *api.Consumer) error {
-
 	// Set status to not false
 	consumer.Status.Conditions = updateReadyCondition(consumer.Status.Conditions, v1.ConditionFalse, "Finalizing", "Performing finalizer operations.")
 	if err := r.Status().Update(ctx, consumer); err != nil {
@@ -154,11 +154,9 @@ func (r *ConsumerReconciler) deleteConsumer(ctx context.Context, log logr.Logger
 }
 
 func (r *ConsumerReconciler) createOrUpdate(ctx context.Context, log klog.Logger, consumer *api.Consumer) error {
-
 	// Create or Update the stream based on the spec
-	if consumer.Spec.PreventUpdate || r.ReadOnly() {
+	if r.ReadOnly() {
 		log.Info("Skipping consumer creation or update.",
-			"preventDelete", consumer.Spec.PreventDelete,
 			"read-only", r.ReadOnly(),
 		)
 		return nil
@@ -171,9 +169,36 @@ func (r *ConsumerReconciler) createOrUpdate(ctx context.Context, log klog.Logger
 	}
 
 	err = r.WithJetStreamClient(consumerConnOpts(consumer.Spec), func(js jetstream.JetStream) error {
-		log.Info("Consumer created or updated.")
-		_, err := js.CreateOrUpdateConsumer(ctx, consumer.Spec.StreamName, *targetConfig)
-		return err
+		consumerName := targetConfig.Name
+		if consumerName == "" {
+			consumerName = targetConfig.Durable
+		}
+
+		exists := false
+		_, err := js.Consumer(ctx, consumer.Spec.StreamName, consumerName)
+		if err == nil {
+			exists = true
+		} else if !errors.Is(err, jetstream.ErrConsumerNotFound) {
+			return err
+		}
+
+		if !exists {
+			log.Info("Creating Consumer.")
+			_, err := js.CreateConsumer(ctx, consumer.Spec.StreamName, *targetConfig)
+			return err
+		}
+
+		if !consumer.Spec.PreventUpdate {
+			log.Info("Updating Consumer.")
+			_, err := js.UpdateConsumer(ctx, consumer.Spec.StreamName, *targetConfig)
+			return err
+		} else {
+			log.Info("Skipping Consumer update.",
+				"preventUpdate", consumer.Spec.PreventUpdate,
+			)
+		}
+
+		return nil
 	})
 	if err != nil {
 		err = fmt.Errorf("create or update consumer: %w", err)
@@ -211,7 +236,6 @@ func consumerConnOpts(spec api.ConsumerSpec) *connectionOptions {
 }
 
 func consumerSpecToConfig(spec *api.ConsumerSpec) (*jetstream.ConsumerConfig, error) {
-
 	config := &jetstream.ConsumerConfig{
 		Durable:            spec.DurableName,
 		Description:        spec.Description,
@@ -269,7 +293,7 @@ func consumerSpecToConfig(spec *api.ConsumerSpec) (*jetstream.ConsumerConfig, er
 		config.AckWait = d
 	}
 
-	//BackOff
+	// BackOff
 	for _, bo := range spec.BackOff {
 		d, err := time.ParseDuration(bo)
 		if err != nil {

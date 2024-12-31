@@ -1,4 +1,4 @@
-// Copyright 2024 The NATS Authors
+// Copyright 2025 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -16,10 +16,10 @@
 package v1beta2
 
 import (
-	"net/http"
+	http "net/http"
 
-	v1beta2 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
-	"github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/scheme"
+	jetstreamv1beta2 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
+	scheme "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/scheme"
 	rest "k8s.io/client-go/rest"
 )
 
@@ -27,6 +27,7 @@ type JetstreamV1beta2Interface interface {
 	RESTClient() rest.Interface
 	AccountsGetter
 	ConsumersGetter
+	KeyValuesGetter
 	StreamsGetter
 }
 
@@ -41,6 +42,10 @@ func (c *JetstreamV1beta2Client) Accounts(namespace string) AccountInterface {
 
 func (c *JetstreamV1beta2Client) Consumers(namespace string) ConsumerInterface {
 	return newConsumers(c, namespace)
+}
+
+func (c *JetstreamV1beta2Client) KeyValues(namespace string) KeyValueInterface {
+	return newKeyValues(c, namespace)
 }
 
 func (c *JetstreamV1beta2Client) Streams(namespace string) StreamInterface {
@@ -92,10 +97,10 @@ func New(c rest.Interface) *JetstreamV1beta2Client {
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	gv := v1beta2.SchemeGroupVersion
+	gv := jetstreamv1beta2.SchemeGroupVersion
 	config.GroupVersion = &gv
 	config.APIPath = "/apis"
-	config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
+	config.NegotiatedSerializer = rest.CodecFactoryForGeneratedClient(scheme.Scheme, scheme.Codecs).WithoutConversion()
 
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()

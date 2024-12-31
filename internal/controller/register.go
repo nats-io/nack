@@ -2,6 +2,7 @@ package controller
 
 import (
 	"fmt"
+
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
@@ -19,7 +20,6 @@ type Config struct {
 // natsCfg is specific to the nats server connection.
 // controllerCfg defines behaviour of the registered controllers.
 func RegisterAll(mgr ctrl.Manager, clientConfig *NatsConfig, config *Config) error {
-
 	baseController, err := NewJSController(mgr.GetClient(), clientConfig, config)
 	if err != nil {
 		return fmt.Errorf("create base jetstream controller: %w", err)
