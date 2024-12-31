@@ -172,6 +172,8 @@ func (r *KeyValueReconciler) createOrUpdate(ctx context.Context, log logr.Logger
 		_, err := js.KeyValue(ctx, targetConfig.Bucket)
 		if err == nil {
 			exists = true
+		} else if !errors.Is(err, jetstream.ErrBucketNotFound) {
+			return err
 		}
 
 		if !exists {

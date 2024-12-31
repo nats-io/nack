@@ -178,6 +178,8 @@ func (r *ConsumerReconciler) createOrUpdate(ctx context.Context, log klog.Logger
 		_, err := js.Consumer(ctx, consumer.Spec.StreamName, consumerName)
 		if err == nil {
 			exists = true
+		} else if !errors.Is(err, jetstream.ErrConsumerNotFound) {
+			return err
 		}
 
 		if !exists {

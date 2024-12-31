@@ -172,6 +172,8 @@ func (r *StreamReconciler) createOrUpdate(ctx context.Context, log logr.Logger, 
 		_, err := js.Stream(ctx, targetConfig.Name)
 		if err == nil {
 			exists = true
+		} else if !errors.Is(err, jetstream.ErrStreamNotFound) {
+			return err
 		}
 
 		if !exists {
