@@ -40,6 +40,17 @@ type CredsSecret struct {
 	Secret SecretRef `json:"secret"`
 }
 
+type TokenSecret struct {
+	Token  string    `json:"token"`
+	Secret SecretRef `json:"secret"`
+}
+
+type UserWithPassword struct {
+	User     string    `json:"user"`
+	Password string    `json:"password"`
+	Secret   SecretRef `json:"secret"`
+}
+
 type SecretRef struct {
 	Name string `json:"name"`
 }

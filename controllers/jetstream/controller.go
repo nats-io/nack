@@ -17,6 +17,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -412,6 +413,180 @@ func (c *Controller) warningEvent(o runtime.Object, reason, message string) {
 	if c.rec != nil {
 		c.rec.Event(o, k8sapi.EventTypeWarning, reason, message)
 	}
+}
+
+type accountOverrides struct {
+	remoteClientCert string
+	remoteClientKey  string
+	remoteRootCA     string
+	servers          []string
+	userCreds        string
+	user             string
+	password         string
+	token            string
+}
+
+func (c *Controller) getAccountOverrides(account string, ns string) (*accountOverrides, error) {
+	overrides := &accountOverrides{}
+
+	if account == "" || !c.opts.CRDConnect {
+		return overrides, nil
+	}
+
+	// Lookup the account using the REST client.
+	ctx, done := context.WithTimeout(context.Background(), 5*time.Second)
+	defer done()
+	acc, err := c.ji.Accounts(ns).Get(ctx, account, k8smeta.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	overrides.servers = acc.Spec.Servers
+
+	// Lookup the TLS secrets
+	if acc.Spec.TLS != nil && acc.Spec.TLS.Secret != nil {
+		secretName := acc.Spec.TLS.Secret.Name
+		secret, err := c.ki.Secrets(ns).Get(c.ctx, secretName, k8smeta.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+
+		// Write this to the cacheDir.
+		accDir := filepath.Join(c.cacheDir, ns, account)
+		if err := os.MkdirAll(accDir, 0o755); err != nil {
+			return nil, err
+		}
+
+		overrides.remoteClientCert = filepath.Join(accDir, acc.Spec.TLS.ClientCert)
+		overrides.remoteClientKey = filepath.Join(accDir, acc.Spec.TLS.ClientKey)
+		overrides.remoteRootCA = filepath.Join(accDir, acc.Spec.TLS.RootCAs)
+
+		for k, v := range secret.Data {
+			if err := os.WriteFile(filepath.Join(accDir, k), v, 0o644); err != nil {
+				return nil, err
+			}
+		}
+	}
+	// Lookup the UserCredentials.
+	if acc.Spec.Creds != nil {
+		secretName := acc.Spec.Creds.Secret.Name
+		secret, err := c.ki.Secrets(ns).Get(c.ctx, secretName, k8smeta.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+
+		// Write the user credentials to the cache dir.
+		accDir := filepath.Join(c.cacheDir, ns, account)
+		if err := os.MkdirAll(accDir, 0o755); err != nil {
+			return nil, err
+		}
+		for k, v := range secret.Data {
+			if k == acc.Spec.Creds.File {
+				overrides.userCreds = filepath.Join(c.cacheDir, ns, account, k)
+				if err := os.WriteFile(filepath.Join(accDir, k), v, 0o644); err != nil {
+					return nil, err
+				}
+			}
+		}
+	}
+
+	// Lookup the Token.
+	if acc.Spec.Token != nil {
+		secretName := acc.Spec.Token.Secret.Name
+		secret, err := c.ki.Secrets(ns).Get(c.ctx, secretName, k8smeta.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+
+		for k, v := range secret.Data {
+			if k == acc.Spec.Token.Token {
+				overrides.token = string(v)
+			}
+		}
+	}
+
+	// Lookup the UserWithPassword.
+	if acc.Spec.UserWithPassword != nil {
+		secretName := acc.Spec.UserWithPassword.Secret.Name
+		secret, err := c.ki.Secrets(ns).Get(c.ctx, secretName, k8smeta.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+
+		for k, v := range secret.Data {
+			if k == acc.Spec.UserWithPassword.User {
+				overrides.user = string(v)
+			}
+			if k == acc.Spec.UserWithPassword.Password {
+				overrides.password = string(v)
+			}
+		}
+	}
+
+	return overrides, nil
+}
+
+type jsmcSpecOverrides struct {
+	servers []string
+	tls     apis.TLS
+	creds   string
+	nkey    string
+}
+
+func (c *Controller) runWithJsmc(jsm jsmClientFunc, acc *accountOverrides, spec *jsmcSpecOverrides, o runtime.Object, op func(jsmClient) error) error {
+	if !c.opts.CRDConnect {
+		jsmc, err := jsm(&natsContext{})
+		if err != nil {
+			return err
+		}
+
+		return op(jsmc)
+	}
+
+	// Create a new client
+	natsCtx := &natsContext{}
+	// Use JWT/NKEYS based credentials if present.
+	if spec.creds != "" {
+		natsCtx.Credentials = spec.creds
+	} else if spec.nkey != "" {
+		natsCtx.Nkey = spec.nkey
+	}
+	if spec.tls.ClientCert != "" && spec.tls.ClientKey != "" {
+		natsCtx.TLSCert = spec.tls.ClientCert
+		natsCtx.TLSKey = spec.tls.ClientKey
+	}
+
+	// Use fetched secrets for the account and server if defined.
+	if acc.remoteClientCert != "" && acc.remoteClientKey != "" {
+		natsCtx.TLSCert = acc.remoteClientCert
+		natsCtx.TLSKey = acc.remoteClientKey
+	}
+	if acc.remoteRootCA != "" {
+		natsCtx.TLSCAs = []string{acc.remoteRootCA}
+	}
+	if acc.userCreds != "" {
+		natsCtx.Credentials = acc.userCreds
+	}
+
+	natsCtx.Username = acc.user
+	natsCtx.Password = acc.password
+	natsCtx.Token = acc.token
+
+	if len(spec.tls.RootCAs) > 0 {
+		natsCtx.TLSCAs = spec.tls.RootCAs
+	}
+
+	natsServers := strings.Join(append(spec.servers, acc.servers...), ",")
+	natsCtx.URL = natsServers
+	c.normalEvent(o, "Connecting", "Connecting to new nats-servers")
+	jsmc, err := jsm(natsCtx)
+	if err != nil {
+		return fmt.Errorf("failed to connect to nats-servers(%s): %w", natsServers, err)
+	}
+
+	defer jsmc.Close()
+
+	return op(jsmc)
 }
 
 func splitNamespaceName(item interface{}) (ns string, name string, err error) {

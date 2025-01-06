@@ -17,9 +17,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
 	"time"
 
 	jsm "github.com/nats-io/jsm.go"
@@ -63,71 +60,9 @@ func (c *Controller) processStreamObject(str *apis.Stream, jsm jsmClientFunc) (e
 	ns := str.Namespace
 	readOnly := c.opts.ReadOnly
 
-	var (
-		remoteClientCert string
-		remoteClientKey  string
-		remoteRootCA     string
-		accServers       []string
-		acc              *apis.Account
-		accUserCreds     string
-	)
-	if spec.Account != "" && c.opts.CRDConnect {
-		// Lookup the account using the REST client.
-		ctx, done := context.WithTimeout(context.Background(), 5*time.Second)
-		defer done()
-		acc, err = c.ji.Accounts(ns).Get(ctx, spec.Account, k8smeta.GetOptions{})
-		if err != nil {
-			return err
-		}
-
-		accServers = acc.Spec.Servers
-
-		// Lookup the TLS secrets
-		if acc.Spec.TLS != nil && acc.Spec.TLS.Secret != nil {
-			secretName := acc.Spec.TLS.Secret.Name
-			secret, err := c.ki.Secrets(ns).Get(c.ctx, secretName, k8smeta.GetOptions{})
-			if err != nil {
-				return err
-			}
-
-			// Write this to the cacheDir.
-			accDir := filepath.Join(c.cacheDir, ns, spec.Account)
-			if err := os.MkdirAll(accDir, 0o755); err != nil {
-				return err
-			}
-
-			remoteClientCert = filepath.Join(accDir, acc.Spec.TLS.ClientCert)
-			remoteClientKey = filepath.Join(accDir, acc.Spec.TLS.ClientKey)
-			remoteRootCA = filepath.Join(accDir, acc.Spec.TLS.RootCAs)
-
-			for k, v := range secret.Data {
-				if err := os.WriteFile(filepath.Join(accDir, k), v, 0o644); err != nil {
-					return err
-				}
-			}
-		}
-		// Lookup the UserCredentials.
-		if acc.Spec.Creds != nil {
-			secretName := acc.Spec.Creds.Secret.Name
-			secret, err := c.ki.Secrets(ns).Get(c.ctx, secretName, k8smeta.GetOptions{})
-			if err != nil {
-				return err
-			}
-
-			// Write the user credentials to the cache dir.
-			accDir := filepath.Join(c.cacheDir, ns, spec.Account)
-			if err := os.MkdirAll(accDir, 0o755); err != nil {
-				return err
-			}
-			for k, v := range secret.Data {
-				if k == acc.Spec.Creds.File {
-					accUserCreds = filepath.Join(c.cacheDir, ns, spec.Account, k)
-					if err := os.WriteFile(filepath.Join(accDir, k), v, 0o644); err != nil {
-						return err
-					}
-				}
-			}
-		}
+	acc, err := c.getAccountOverrides(spec.Account, ns)
+	if err != nil {
+		return err
 	}
 
 	defer func() {
@@ -143,57 +78,14 @@ func (c *Controller) processStreamObject(str *apis.Stream, jsm jsmClientFunc) (e
 	type operator func(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err error)
 
 	natsClientUtil := func(op operator) error {
-		servers := spec.Servers
-		if c.opts.CRDConnect {
-			// Create a new client
-			natsCtx := &natsContext{}
-			// Use JWT/NKEYS based credentials if present.
-			if spec.Creds != "" {
-				natsCtx.Credentials = spec.Creds
-			} else if spec.Nkey != "" {
-				natsCtx.Nkey = spec.Nkey
-			}
-			if spec.TLS.ClientCert != "" && spec.TLS.ClientKey != "" {
-				natsCtx.TLSCert = spec.TLS.ClientCert
-				natsCtx.TLSKey = spec.TLS.ClientKey
-			}
-
-			// Use fetched secrets for the account and server if defined.
-			if remoteClientCert != "" && remoteClientKey != "" {
-				natsCtx.TLSCert = remoteClientCert
-				natsCtx.TLSKey = remoteClientKey
-			}
-			if remoteRootCA != "" {
-				natsCtx.TLSCAs = []string{remoteRootCA}
-			}
-			if accUserCreds != "" {
-				natsCtx.Credentials = accUserCreds
-			}
-			if len(spec.TLS.RootCAs) > 0 {
-				natsCtx.TLSCAs = spec.TLS.RootCAs
-			}
-
-			natsServers := strings.Join(append(servers, accServers...), ",")
-			natsCtx.URL = natsServers
-			c.normalEvent(str, "Connecting", "Connecting to new nats-servers")
-			jsmc, err := jsm(natsCtx)
-			if err != nil {
-				return fmt.Errorf("failed to connect to nats-servers(%s): %w", natsServers, err)
-			}
-			defer jsmc.Close()
-			if err := op(c.ctx, jsmc, spec); err != nil {
-				return err
-			}
-		} else {
-			jsmc, err := jsm(&natsContext{})
-			if err != nil {
-				return err
-			}
-			if err := op(c.ctx, jsmc, spec); err != nil {
-				return err
-			}
-		}
-		return nil
+		return c.runWithJsmc(jsm, acc, &jsmcSpecOverrides{
+			servers: spec.Servers,
+			tls:     spec.TLS,
+			creds:   spec.Creds,
+			nkey:    spec.Nkey,
+		}, str, func(jsmc jsmClient) error {
+			return op(c.ctx, jsmc, spec)
+		})
 	}
 
 	deleteOK := str.GetDeletionTimestamp() != nil
