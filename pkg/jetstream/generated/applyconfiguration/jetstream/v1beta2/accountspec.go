@@ -18,9 +18,11 @@ package v1beta2
 // AccountSpecApplyConfiguration represents an declarative configuration of the AccountSpec type for use
 // with apply.
 type AccountSpecApplyConfiguration struct {
-	Servers []string                       `json:"servers,omitempty"`
-	TLS     *TLSSecretApplyConfiguration   `json:"tls,omitempty"`
-	Creds   *CredsSecretApplyConfiguration `json:"creds,omitempty"`
+	Servers          []string                            `json:"servers,omitempty"`
+	TLS              *TLSSecretApplyConfiguration        `json:"tls,omitempty"`
+	Creds            *CredsSecretApplyConfiguration      `json:"creds,omitempty"`
+	Token            *TokenSecretApplyConfiguration      `json:"token,omitempty"`
+	UserWithPassword *UserWithPasswordApplyConfiguration `json:"userWithPassword,omitempty"`
 }
 
 // AccountSpecApplyConfiguration constructs an declarative configuration of the AccountSpec type for use with
@@ -52,5 +54,21 @@ func (b *AccountSpecApplyConfiguration) WithTLS(value *TLSSecretApplyConfigurati
 // If called multiple times, the Creds field is set to the value of the last call.
 func (b *AccountSpecApplyConfiguration) WithCreds(value *CredsSecretApplyConfiguration) *AccountSpecApplyConfiguration {
 	b.Creds = value
+	return b
+}
+
+// WithToken sets the Token field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Token field is set to the value of the last call.
+func (b *AccountSpecApplyConfiguration) WithToken(value *TokenSecretApplyConfiguration) *AccountSpecApplyConfiguration {
+	b.Token = value
+	return b
+}
+
+// WithUserWithPassword sets the UserWithPassword field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the UserWithPassword field is set to the value of the last call.
+func (b *AccountSpecApplyConfiguration) WithUserWithPassword(value *UserWithPasswordApplyConfiguration) *AccountSpecApplyConfiguration {
+	b.UserWithPassword = value
 	return b
 }
