@@ -15,6 +15,10 @@ variable CI {
   default = false
 }
 
+variable PUSH {
+  default = false
+}
+
 ###################
 ### Functions
 ###################
@@ -26,12 +30,12 @@ function "get_tags" {
 
 function "get_platforms_multiarch" {
   params = []
-  result = CI ? ["linux/amd64", "linux/arm/v6", "linux/arm/v7", "linux/arm64"] : []
+  result = (CI || PUSH) ? ["linux/amd64", "linux/arm/v6", "linux/arm/v7", "linux/arm64"] : []
 }
 
 function "get_output" {
   params = []
-  result = CI ? ["type=registry"] : ["type=docker"]
+  result = (CI || PUSH) ? ["type=registry"] : ["type=docker"]
 }
 
 ###################
@@ -56,6 +60,7 @@ target "goreleaser" {
   }
   args = {
     CI = CI
+    PUSH = PUSH
     GITHUB_TOKEN = ""
   }
   dockerfile = "cicd/Dockerfile_goreleaser"
