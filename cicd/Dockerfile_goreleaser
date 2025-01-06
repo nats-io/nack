@@ -13,7 +13,10 @@ EOT
 FROM build
 
 ARG CI
+ARG PUSH
 ARG GITHUB_TOKEN
+ARG TAGS
+ARG VERSION
 
 COPY --from=src . /go/src
 
@@ -22,7 +25,8 @@ RUN <<EOT
   cd /go/src
   FLAGS="--clean"
   if [ -z ${GITHUB_TOKEN} ]; then
-    if [ ${CI} != "true" ]; then FLAGS="${FLAGS} --skip-validate --single-target"; fi
+    if [ ${CI} != "true" ]; then FLAGS="${FLAGS} --skip=validate"; fi
+    if [ ${PUSH} != "true" ]; then FLAGS="${FLAGS} --single-target"; fi
     goreleaser build ${FLAGS}
   else
     goreleaser release ${FLAGS}

@@ -56,9 +56,11 @@ jetstream-controller.docker: $(jetstreamSrc)
 .PHONY: jetstream-controller-docker
 jetstream-controller-docker:
 ifneq ($(ver),)
-	docker build --tag $(drepo)/jetstream-controller:$(ver) \
-		--build-arg VERSION=$(ver) \
-		--file docker/jetstream-controller/Dockerfile .
+	REGISTRY="$(drepo)" \
+	TAGS="$(ver)" \
+	docker buildx bake --load \
+		--set goreleaser.args.VERSION=$(ver) \
+		jetstream-controller
 else
 	# Missing version, try this.
 	# make jetstream-controller-docker ver=1.2.3
@@ -69,12 +71,12 @@ endif
 jetstream-controller-dockerx:
 ifneq ($(ver),)
 	# Ensure 'docker buildx ls' shows correct platforms.
-	docker buildx build \
-		--tag $(drepo)/jetstream-controller:$(ver) --tag $(drepo)/jetstream-controller:latest \
-		--build-arg VERSION=$(ver) \
-		--platform linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64/v8 \
-		--file docker/jetstream-controller/Dockerfile \
-		--push .
+	REGISTRY="$(drepo)" \
+	TAGS="$(ver)" \
+	PUSH=true \
+	docker buildx bake --push \
+		--set goreleaser.args.VERSION=$(ver) \
+		jetstream-controller
 else
 	# Missing version, try this.
 	# make jetstream-controller-dockerx ver=1.2.3
@@ -95,9 +97,11 @@ nats-server-config-reloader.docker: $(configReloaderSrc)
 .PHONY: nats-server-config-reloader-docker
 nats-server-config-reloader-docker:
 ifneq ($(ver),)
-	docker build --tag $(drepo)/nats-server-config-reloader:$(ver) \
-		--build-arg VERSION=$(ver) \
-		--file docker/nats-server-config-reloader/Dockerfile .
+	REGISTRY="$(drepo)" \
+	TAGS="$(ver)" \
+	docker buildx bake --load \
+		--set goreleaser.args.VERSION=$(ver) \
+		nats-server-config-reloader
 else
 	# Missing version, try this.
 	# make nats-server-config-reloader-docker ver=1.2.3
@@ -108,12 +112,12 @@ endif
 nats-server-config-reloader-dockerx:
 ifneq ($(ver),)
 	# Ensure 'docker buildx ls' shows correct platforms.
-	docker buildx build \
-		--tag $(drepo)/nats-server-config-reloader:$(ver) --tag $(drepo)/nats-server-config-reloader:latest \
-		--build-arg VERSION=$(ver) \
-		--platform linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64/v8 \
-		--file docker/nats-server-config-reloader/Dockerfile \
-		--push .
+	REGISTRY="$(drepo)" \
+	TAGS="$(ver)" \
+	PUSH=true \
+	docker buildx bake --push \
+		--set goreleaser.args.VERSION=$(ver) \
+		nats-server-config-reloader
 else
 	# Missing version, try this.
 	# make nats-server-config-reloader-dockerx ver=1.2.3
@@ -134,9 +138,11 @@ nats-boot-config.docker: $(bootConfigSrc)
 .PHONY: nats-boot-config-docker
 nats-boot-config-docker:
 ifneq ($(ver),)
-	docker build --tag $(drepo)/nats-boot-config:$(ver) \
-		--build-arg VERSION=$(ver) \
-		--file docker/nats-boot-config/Dockerfile .
+	REGISTRY="$(drepo)" \
+	TAGS="$(ver)" \
+	docker buildx bake --load \
+		--set goreleaser.args.VERSION=$(ver) \
+		nats-boot-config
 else
 	# Missing version, try this.
 	# make nats-boot-config-docker ver=1.2.3
@@ -147,12 +153,12 @@ endif
 nats-boot-config-dockerx:
 ifneq ($(ver),)
 	# Ensure 'docker buildx ls' shows correct platforms.
-	docker buildx build \
-		--tag $(drepo)/nats-boot-config:$(ver) --tag $(drepo)/nats-boot-config:latest \
-		--build-arg VERSION=$(ver) \
-		--platform linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64/v8 \
-		--file docker/nats-boot-config/Dockerfile \
-		--push .
+	REGISTRY="$(drepo)" \
+	TAGS="$(ver)" \
+	PUSH=true \
+	docker buildx bake --push \
+		--set goreleaser.args.VERSION=$(ver) \
+		nats-boot-config
 else
 	# Missing version, try this.
 	# make nats-boot-config-dockerx ver=1.2.3
