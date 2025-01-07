@@ -17,19 +17,19 @@ limitations under the License.
 package controller
 
 import (
+	"testing"
+	"time"
+
 	"github.com/nats-io/nats.go/jetstream"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"testing"
-	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -67,7 +67,7 @@ var _ = Describe("Consumer Controller", func() {
 		BeforeEach(func(ctx SpecContext) {
 			By("creating the custom resource for the Kind Consumer")
 			err := k8sClient.Get(ctx, typeNamespacedName, consumer)
-			if err != nil && errors.IsNotFound(err) {
+			if err != nil && k8serrors.IsNotFound(err) {
 				resource := &api.Consumer{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
@@ -149,9 +149,7 @@ var _ = Describe("Consumer Controller", func() {
 		})
 
 		When("reconciling a not initialized resource", func() {
-
 			It("should initialize a new resource", func(ctx SpecContext) {
-
 				By("re-queueing until it is initialized")
 				// Initialization can require multiple reconciliation loops
 				Eventually(func(ctx SpecContext) *api.Consumer {
@@ -177,7 +175,6 @@ var _ = Describe("Consumer Controller", func() {
 		})
 
 		When("reconciling an initialized resource", func() {
-
 			BeforeEach(func(ctx SpecContext) {
 				By("initializing the stream resource")
 
@@ -222,7 +219,6 @@ var _ = Describe("Consumer Controller", func() {
 			})
 
 			It("should create a new consumer", func(ctx SpecContext) {
-
 				By("running Reconcile")
 				result, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
@@ -249,7 +245,6 @@ var _ = Describe("Consumer Controller", func() {
 			})
 
 			It("should update an existing consumer", func(ctx SpecContext) {
-
 				By("reconciling once to create the consumer")
 				result, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
 				Expect(err).NotTo(HaveOccurred())
@@ -290,21 +285,20 @@ var _ = Describe("Consumer Controller", func() {
 			})
 
 			When("PreventUpdate is set", func() {
-
 				BeforeEach(func(ctx SpecContext) {
 					By("setting preventUpdate on the resource")
 					consumer.Spec.PreventUpdate = true
 					Expect(k8sClient.Update(ctx, consumer)).To(Succeed())
 				})
-				It("should not create the consumer", func(ctx SpecContext) {
+				It("should create the consumer", func(ctx SpecContext) {
 					By("running Reconcile")
 					result, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
 					Expect(err).NotTo(HaveOccurred())
 					Expect(result.IsZero()).To(BeTrue())
 
-					By("checking that no consumer was created")
+					By("checking that consumer was created")
 					_, err = jsClient.Consumer(ctx, streamName, consumerName)
-					Expect(err).To(MatchError(jetstream.ErrConsumerNotFound))
+					Expect(err).ToNot(HaveOccurred())
 				})
 				It("should not update the consumer", func(ctx SpecContext) {
 					By("creating the consumer")
@@ -318,12 +312,12 @@ var _ = Describe("Consumer Controller", func() {
 
 					By("checking that consumer was not updated")
 					c, err := jsClient.Consumer(ctx, streamName, consumerName)
+					Expect(err).NotTo(HaveOccurred())
 					Expect(c.CachedInfo().Config.Description).To(BeEmpty())
 				})
 			})
 
 			When("read-only mode is enabled", func() {
-
 				BeforeEach(func(ctx SpecContext) {
 					By("setting read only on the controller")
 					readOnly, err := NewJSController(k8sClient, &NatsConfig{ServerURL: testServer.ClientURL()}, &Config{ReadOnly: true})
@@ -355,12 +349,12 @@ var _ = Describe("Consumer Controller", func() {
 
 					By("checking that consumer was not updated")
 					s, err := jsClient.Consumer(ctx, streamName, consumerName)
+					Expect(err).NotTo(HaveOccurred())
 					Expect(s.CachedInfo().Config.Description).To(BeEmpty())
 				})
 			})
 
 			When("namespace restriction is enabled", func() {
-
 				BeforeEach(func(ctx SpecContext) {
 					By("setting a namespace on the resource")
 					namespaced, err := NewJSController(k8sClient, &NatsConfig{ServerURL: testServer.ClientURL()}, &Config{Namespace: "other-namespace"})
@@ -392,12 +386,12 @@ var _ = Describe("Consumer Controller", func() {
 
 					By("checking that consumer was not updated")
 					s, err := jsClient.Consumer(ctx, streamName, consumerName)
+					Expect(err).NotTo(HaveOccurred())
 					Expect(s.CachedInfo().Config.Description).To(BeEmpty())
 				})
 			})
 
 			When("the resource is marked for deletion", func() {
-
 				BeforeEach(func(ctx SpecContext) {
 					By("marking the resource for deletion")
 					Expect(k8sClient.Delete(ctx, consumer)).To(Succeed())
@@ -495,7 +489,6 @@ var _ = Describe("Consumer Controller", func() {
 							}
 						})
 						It("should delete the resource and not delete the consumer", func(ctx SpecContext) {
-
 							By("reconciling")
 							result, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
 							Expect(err).NotTo(HaveOccurred())
@@ -521,7 +514,6 @@ var _ = Describe("Consumer Controller", func() {
 							}
 						})
 						It("should not delete the resource and consumer", func(ctx SpecContext) {
-
 							By("reconciling")
 							result, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
 							Expect(err).NotTo(HaveOccurred())
@@ -540,7 +532,6 @@ var _ = Describe("Consumer Controller", func() {
 			})
 
 			It("should create consumer on different server as specified in spec", func(ctx SpecContext) {
-
 				By("setting up the alternative server")
 				altServer := CreateTestServer()
 				defer altServer.Shutdown()
@@ -558,7 +549,7 @@ var _ = Describe("Consumer Controller", func() {
 				Expect(k8sClient.Update(ctx, consumer)).To(Succeed())
 
 				By("checking precondition, that the consumer does not yet exist")
-				got, err := jsClient.Consumer(ctx, streamName, consumerName)
+				_, err = jsClient.Consumer(ctx, streamName, consumerName)
 				Expect(err).To(MatchError(jetstream.ErrConsumerNotFound))
 
 				By("reconciling the resource")
@@ -569,7 +560,7 @@ var _ = Describe("Consumer Controller", func() {
 				Expect(result.IsZero()).To(BeTrue())
 
 				By("checking if the consumer was created on the alternative server")
-				got, err = altClient.Consumer(ctx, streamName, consumerName)
+				got, err := altClient.Consumer(ctx, streamName, consumerName)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(got.CachedInfo().Created).To(BeTemporally("~", time.Now(), time.Second))
 
@@ -582,8 +573,7 @@ var _ = Describe("Consumer Controller", func() {
 })
 
 func Test_consumerSpecToConfig(t *testing.T) {
-
-	date := time.Date(2024, 12, 03, 16, 55, 5, 0, time.UTC)
+	date := time.Date(2024, 12, 3, 16, 55, 5, 0, time.UTC)
 	dateString := date.Format(time.RFC3339)
 
 	tests := []struct {

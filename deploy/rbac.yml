@@ -31,6 +31,8 @@ rules:
   resources:
   - streams
   - streams/status
+  - keyvalues
+  - keyvalues/status
   - consumers
   - consumers/status
   - streamtemplates
@@ -48,6 +50,7 @@ rules:
   - jetstream.nats.io
   resources:
   - streams/finalizers
+  - keyvalues/finalizers
   - consumers/finalizers
   - accounts/finalizers
   verbs:

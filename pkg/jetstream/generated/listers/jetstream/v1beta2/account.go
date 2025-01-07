@@ -1,4 +1,4 @@
-// Copyright 2024 The NATS Authors
+// Copyright 2025 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -16,10 +16,10 @@
 package v1beta2
 
 import (
-	v1beta2 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	jetstreamv1beta2 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // AccountLister helps list Accounts.
@@ -27,7 +27,7 @@ import (
 type AccountLister interface {
 	// List lists all Accounts in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1beta2.Account, err error)
+	List(selector labels.Selector) (ret []*jetstreamv1beta2.Account, err error)
 	// Accounts returns an object that can list and get Accounts.
 	Accounts(namespace string) AccountNamespaceLister
 	AccountListerExpansion
@@ -35,17 +35,17 @@ type AccountLister interface {
 
 // accountLister implements the AccountLister interface.
 type accountLister struct {
-	listers.ResourceIndexer[*v1beta2.Account]
+	listers.ResourceIndexer[*jetstreamv1beta2.Account]
 }
 
 // NewAccountLister returns a new AccountLister.
 func NewAccountLister(indexer cache.Indexer) AccountLister {
-	return &accountLister{listers.New[*v1beta2.Account](indexer, v1beta2.Resource("account"))}
+	return &accountLister{listers.New[*jetstreamv1beta2.Account](indexer, jetstreamv1beta2.Resource("account"))}
 }
 
 // Accounts returns an object that can list and get Accounts.
 func (s *accountLister) Accounts(namespace string) AccountNamespaceLister {
-	return accountNamespaceLister{listers.NewNamespaced[*v1beta2.Account](s.ResourceIndexer, namespace)}
+	return accountNamespaceLister{listers.NewNamespaced[*jetstreamv1beta2.Account](s.ResourceIndexer, namespace)}
 }
 
 // AccountNamespaceLister helps list and get Accounts.
@@ -53,15 +53,15 @@ func (s *accountLister) Accounts(namespace string) AccountNamespaceLister {
 type AccountNamespaceLister interface {
 	// List lists all Accounts in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1beta2.Account, err error)
+	List(selector labels.Selector) (ret []*jetstreamv1beta2.Account, err error)
 	// Get retrieves the Account from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1beta2.Account, error)
+	Get(name string) (*jetstreamv1beta2.Account, error)
 	AccountNamespaceListerExpansion
 }
 
 // accountNamespaceLister implements the AccountNamespaceLister
 // interface.
 type accountNamespaceLister struct {
-	listers.ResourceIndexer[*v1beta2.Account]
+	listers.ResourceIndexer[*jetstreamv1beta2.Account]
 }

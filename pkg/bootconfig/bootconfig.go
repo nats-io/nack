@@ -121,7 +121,7 @@ func (c *Controller) Run(ctx context.Context) error {
 
 	clientAdvertiseConfig := fmt.Sprintf("\nclient_advertise = \"%s\"\n\n", externalAddress)
 
-	err = os.WriteFile(c.opts.ClientAdvertiseFileName, []byte(clientAdvertiseConfig), 0644)
+	err = os.WriteFile(c.opts.ClientAdvertiseFileName, []byte(clientAdvertiseConfig), 0o644)
 	if err != nil {
 		return fmt.Errorf("Could not write client advertise config: %s", err)
 	}
@@ -129,7 +129,7 @@ func (c *Controller) Run(ctx context.Context) error {
 
 	gatewayAdvertiseConfig := fmt.Sprintf("\nadvertise = \"%s\"\n\n", externalAddress)
 
-	err = os.WriteFile(c.opts.GatewayAdvertiseFileName, []byte(gatewayAdvertiseConfig), 0644)
+	err = os.WriteFile(c.opts.GatewayAdvertiseFileName, []byte(gatewayAdvertiseConfig), 0o644)
 	if err != nil {
 		return fmt.Errorf("Could not write gateway advertise config: %s", err)
 	}

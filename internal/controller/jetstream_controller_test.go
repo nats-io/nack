@@ -1,15 +1,15 @@
 package controller
 
 import (
+	"testing"
+	"time"
+
 	api "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
-	"testing"
-	"time"
 )
 
 func Test_updateReadyCondition(t *testing.T) {
-
 	pastTransition := time.Now().UTC().Add(-time.Hour).Format(time.RFC3339Nano)
 	updatedTransition := "now"
 
