@@ -244,7 +244,7 @@ func consumerSpecToOpts(spec apis.ConsumerSpec) ([]jsm.ConsumerOption, error) {
 		opts = append(opts, jsm.AcknowledgeExplicit())
 	case "":
 	default:
-		return nil, fmt.Errorf("invalid value for 'ackPolicy': '%s'. Must be one of 'none', 'all', 'explicit'.", spec.AckPolicy)
+		return nil, fmt.Errorf("invalid value for 'ackPolicy': '%s'. Must be one of 'none', 'all', 'explicit'", spec.AckPolicy)
 	}
 
 	if spec.AckWait != "" {
@@ -262,7 +262,7 @@ func consumerSpecToOpts(spec apis.ConsumerSpec) ([]jsm.ConsumerOption, error) {
 		opts = append(opts, jsm.ReplayAsReceived())
 	case "":
 	default:
-		return nil, fmt.Errorf("invalid value for 'replayPolicy': '%s'. Must be one of 'instant', 'original'.", spec.ReplayPolicy)
+		return nil, fmt.Errorf("invalid value for 'replayPolicy': '%s'. Must be one of 'instant', 'original'", spec.ReplayPolicy)
 	}
 
 	if spec.SampleFreq != "" {

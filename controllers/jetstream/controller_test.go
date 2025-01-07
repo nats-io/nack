@@ -63,7 +63,7 @@ func TestGetStorageType(t *testing.T) {
 func TestEnqueueWork(t *testing.T) {
 	t.Parallel()
 
-	limiter := workqueue.DefaultControllerRateLimiter()
+	limiter := workqueue.DefaultTypedControllerRateLimiter[any]()
 	q := workqueue.NewNamedRateLimitingQueue(limiter, "StreamsTest")
 	defer q.ShutDown()
 
@@ -97,7 +97,7 @@ func TestProcessQueueNext(t *testing.T) {
 	t.Run("bad item key", func(t *testing.T) {
 		t.Parallel()
 
-		limiter := workqueue.DefaultControllerRateLimiter()
+		limiter := workqueue.DefaultTypedControllerRateLimiter[any]()
 		q := workqueue.NewNamedRateLimitingQueue(limiter, "StreamsTest")
 		defer q.ShutDown()
 
@@ -122,7 +122,7 @@ func TestProcessQueueNext(t *testing.T) {
 	t.Run("process error", func(t *testing.T) {
 		t.Parallel()
 
-		limiter := workqueue.DefaultControllerRateLimiter()
+		limiter := workqueue.DefaultTypedControllerRateLimiter[any]()
 		q := workqueue.NewNamedRateLimitingQueue(limiter, "StreamsTest")
 		defer q.ShutDown()
 
@@ -156,7 +156,7 @@ func TestProcessQueueNext(t *testing.T) {
 	t.Run("process ok", func(t *testing.T) {
 		t.Parallel()
 
-		limiter := workqueue.DefaultControllerRateLimiter()
+		limiter := workqueue.DefaultTypedControllerRateLimiter[any]()
 		q := workqueue.NewNamedRateLimitingQueue(limiter, "StreamsTest")
 		defer q.ShutDown()
 

@@ -1,15 +1,15 @@
 package controller
 
 import (
+	"os"
+	"time"
+
 	api "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 	"github.com/nats-io/nats-server/v2/server"
 	natsserver "github.com/nats-io/nats-server/v2/test"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
-
-	"os"
-	"time"
 )
 
 func assertReadyStateMatches(condition api.Condition, status v1.ConditionStatus, reason string, message string, transitionTime time.Time) {

@@ -20,6 +20,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/go-logr/logr"
 	api "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 	"github.com/nats-io/nats.go/jetstream"
@@ -29,7 +31,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	"time"
 )
 
 // StreamReconciler reconciles a Stream object
@@ -69,7 +70,7 @@ func (r *StreamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	log = log.WithValues("streamName", stream.Spec.Name)
 
 	// Update ready status to unknown when no status is set
-	if stream.Status.Conditions == nil || len(stream.Status.Conditions) == 0 {
+	if len(stream.Status.Conditions) == 0 {
 		log.Info("Setting initial ready condition to unknown.")
 		stream.Status.Conditions = updateReadyCondition(stream.Status.Conditions, v1.ConditionUnknown, "Reconciling", "Starting reconciliation")
 		err := r.Status().Update(ctx, stream)
@@ -115,7 +116,6 @@ func (r *StreamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 }
 
 func (r *StreamReconciler) deleteStream(ctx context.Context, log logr.Logger, stream *api.Stream) error {
-
 	// Set status to not false
 	stream.Status.Conditions = updateReadyCondition(stream.Status.Conditions, v1.ConditionFalse, "Finalizing", "Performing finalizer operations.")
 	if err := r.Status().Update(ctx, stream); err != nil {
@@ -151,11 +151,9 @@ func (r *StreamReconciler) deleteStream(ctx context.Context, log logr.Logger, st
 }
 
 func (r *StreamReconciler) createOrUpdate(ctx context.Context, log logr.Logger, stream *api.Stream) error {
-
 	// Create or Update the stream based on the spec
-	if stream.Spec.PreventUpdate || r.ReadOnly() {
+	if r.ReadOnly() {
 		log.Info("Skipping stream creation or update.",
-			"preventDelete", stream.Spec.PreventDelete,
 			"read-only", r.ReadOnly(),
 		)
 		return nil
@@ -170,9 +168,31 @@ func (r *StreamReconciler) createOrUpdate(ctx context.Context, log logr.Logger, 
 	// CreateOrUpdateStream is called on every reconciliation when the stream is not to be deleted.
 	// TODO(future-feature): Do we need to check if config differs?
 	err = r.WithJetStreamClient(streamConnOpts(stream.Spec), func(js jetstream.JetStream) error {
-		log.Info("Creating or updating stream.")
-		_, err = js.CreateOrUpdateStream(ctx, targetConfig)
-		return err
+		exists := false
+		_, err := js.Stream(ctx, targetConfig.Name)
+		if err == nil {
+			exists = true
+		} else if !errors.Is(err, jetstream.ErrStreamNotFound) {
+			return err
+		}
+
+		if !exists {
+			log.Info("Creating Stream.")
+			_, err := js.CreateStream(ctx, targetConfig)
+			return err
+		}
+
+		if !stream.Spec.PreventUpdate {
+			log.Info("Updating Stream.")
+			_, err := js.UpdateStream(ctx, targetConfig)
+			return err
+		} else {
+			log.Info("Skipping Stream update.",
+				"preventUpdate", stream.Spec.PreventUpdate,
+			)
+		}
+
+		return nil
 	})
 	if err != nil {
 		err = fmt.Errorf("create or update stream: %w", err)
@@ -212,7 +232,6 @@ func streamConnOpts(spec api.StreamSpec) *connectionOptions {
 
 // streamSpecToConfig creates a jetstream.StreamConfig matching the given stream resource spec
 func streamSpecToConfig(spec *api.StreamSpec) (jetstream.StreamConfig, error) {
-
 	// Set directly mapped fields
 	config := jetstream.StreamConfig{
 		Name:                 spec.Name,
@@ -293,7 +312,7 @@ func streamSpecToConfig(spec *api.StreamSpec) (jetstream.StreamConfig, error) {
 	if spec.Mirror != nil {
 		ss, err := mapStreamSource(spec.Mirror)
 		if err != nil {
-			return jetstream.StreamConfig{}, fmt.Errorf("map mirror stream soruce: %w", err)
+			return jetstream.StreamConfig{}, fmt.Errorf("map mirror stream source: %w", err)
 		}
 		config.Mirror = ss
 	}
@@ -304,7 +323,7 @@ func streamSpecToConfig(spec *api.StreamSpec) (jetstream.StreamConfig, error) {
 		for _, source := range spec.Sources {
 			s, err := mapStreamSource(source)
 			if err != nil {
-				return jetstream.StreamConfig{}, fmt.Errorf("map stream soruce: %w", err)
+				return jetstream.StreamConfig{}, fmt.Errorf("map stream source: %w", err)
 			}
 			config.Sources = append(config.Sources, s)
 		}
