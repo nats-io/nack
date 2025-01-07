@@ -245,15 +245,14 @@ func streamSpecToConfig(spec *api.StreamSpec) (jetstream.StreamConfig, error) {
 		MaxMsgSize:           int32(spec.MaxMsgSize),
 		Replicas:             spec.Replicas,
 		NoAck:                spec.NoAck,
+		Sealed:               spec.Sealed,
 		DenyDelete:           spec.DenyDelete,
 		DenyPurge:            spec.DenyPurge,
 		AllowRollup:          spec.AllowRollup,
 		FirstSeq:             spec.FirstSequence,
 		AllowDirect:          spec.AllowDirect,
-		// Explicitly set not (yet) mapped fields
-		Sealed:         false,
-		MirrorDirect:   false,
-		ConsumerLimits: jetstream.StreamConsumerLimits{},
+		MirrorDirect:         spec.MirrorDirect,
+		Metadata:             spec.Metadata,
 	}
 
 	// Set not directly mapped fields
@@ -354,9 +353,16 @@ func streamSpecToConfig(spec *api.StreamSpec) (jetstream.StreamConfig, error) {
 		}
 	}
 
-	// metadata
-	if spec.Metadata != nil {
-		config.Metadata = spec.Metadata
+	// consumerLimits
+	if spec.ConsumerLimits != nil {
+		inactiveThreshold, err := time.ParseDuration(spec.ConsumerLimits.InactiveThreshold)
+		if err != nil {
+			return jetstream.StreamConfig{}, fmt.Errorf("parse inactive threshold: %w", err)
+		}
+		config.ConsumerLimits = jetstream.StreamConsumerLimits{
+			InactiveThreshold: inactiveThreshold,
+			MaxAckPending:     spec.ConsumerLimits.MaxAckPending,
+		}
 	}
 
 	return config, nil

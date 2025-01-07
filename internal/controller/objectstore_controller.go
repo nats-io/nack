@@ -81,9 +81,9 @@ func (r *ObjectStoreReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	// Add finalizer
-	if !controllerutil.ContainsFinalizer(objectStore, objectFinalizer) {
+	if !controllerutil.ContainsFinalizer(objectStore, objectStoreFinalizer) {
 		log.Info("Adding ObjectStore finalizer.")
-		if ok := controllerutil.AddFinalizer(objectStore, objectFinalizer); !ok {
+		if ok := controllerutil.AddFinalizer(objectStore, objectStoreFinalizer); !ok {
 			return ctrl.Result{}, errors.New("failed to add finalizer to objectstore resource")
 		}
 
@@ -96,7 +96,7 @@ func (r *ObjectStoreReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	// Check Deletion
 	markedForDeletion := objectStore.GetDeletionTimestamp() != nil
 	if markedForDeletion {
-		if controllerutil.ContainsFinalizer(objectStore, objectFinalizer) {
+		if controllerutil.ContainsFinalizer(objectStore, objectStoreFinalizer) {
 			err := r.deleteObjectStore(ctx, log, objectStore)
 			if err != nil {
 				return ctrl.Result{}, fmt.Errorf("delete objectstore: %w", err)
@@ -127,7 +127,8 @@ func (r *ObjectStoreReconciler) deleteObjectStore(ctx context.Context, log logr.
 		err := r.WithJetStreamClient(objectStoreConnOpts(objectStore.Spec), func(js jetstream.JetStream) error {
 			return js.DeleteObjectStore(ctx, objectStore.Spec.Bucket)
 		})
-		if errors.Is(err, jetstream.ErrBucketNotFound) {
+		// FIX: ErrStreamNotFound -> ErrBucketNotFound once nats.go is corrected
+		if errors.Is(err, jetstream.ErrStreamNotFound) {
 			log.Info("ObjectStore does not exist, unable to delete.", "objectStoreName", objectStore.Spec.Bucket)
 		} else if err != nil {
 			return fmt.Errorf("delete objectstore during finalization: %w", err)
@@ -140,7 +141,7 @@ func (r *ObjectStoreReconciler) deleteObjectStore(ctx context.Context, log logr.
 	}
 
 	log.Info("Removing ObjectStore finalizer.")
-	if ok := controllerutil.RemoveFinalizer(objectStore, objectFinalizer); !ok {
+	if ok := controllerutil.RemoveFinalizer(objectStore, objectStoreFinalizer); !ok {
 		return errors.New("failed to remove objectstore finalizer")
 	}
 	if err := r.Update(ctx, objectStore); err != nil {
@@ -235,10 +236,11 @@ func objectStoreSpecToConfig(spec *api.ObjectStoreSpec) (jetstream.ObjectStoreCo
 	// Set directly mapped fields
 	config := jetstream.ObjectStoreConfig{
 		Bucket:      spec.Bucket,
-		Compression: spec.Compression,
 		Description: spec.Description,
 		MaxBytes:    int64(spec.MaxBytes),
 		Replicas:    spec.Replicas,
+		Compression: spec.Compression,
+		Metadata:    spec.Metadata,
 	}
 
 	// TTL

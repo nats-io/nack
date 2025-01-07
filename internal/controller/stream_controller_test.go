@@ -562,7 +562,7 @@ func Test_mapSpecToConfig(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:    "emtpy spec",
+			name:    "empty spec",
 			spec:    &api.StreamSpec{},
 			want:    jetstream.StreamConfig{},
 			wantErr: false,
