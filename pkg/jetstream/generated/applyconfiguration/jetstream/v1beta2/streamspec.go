@@ -22,41 +22,37 @@ import (
 // StreamSpecApplyConfiguration represents a declarative configuration of the StreamSpec type for use
 // with apply.
 type StreamSpecApplyConfiguration struct {
-	Account           *string                             `json:"account,omitempty"`
-	AllowDirect       *bool                               `json:"allowDirect,omitempty"`
-	AllowRollup       *bool                               `json:"allowRollup,omitempty"`
-	Creds             *string                             `json:"creds,omitempty"`
-	DenyDelete        *bool                               `json:"denyDelete,omitempty"`
-	DenyPurge         *bool                               `json:"denyPurge,omitempty"`
+	Name              *string                             `json:"name,omitempty"`
 	Description       *string                             `json:"description,omitempty"`
-	DiscardPerSubject *bool                               `json:"discardPerSubject,omitempty"`
-	PreventDelete     *bool                               `json:"preventDelete,omitempty"`
-	PreventUpdate     *bool                               `json:"preventUpdate,omitempty"`
-	Discard           *string                             `json:"discard,omitempty"`
-	DuplicateWindow   *string                             `json:"duplicateWindow,omitempty"`
-	MaxAge            *string                             `json:"maxAge,omitempty"`
-	MaxBytes          *int                                `json:"maxBytes,omitempty"`
+	Subjects          []string                            `json:"subjects,omitempty"`
+	Retention         *string                             `json:"retention,omitempty"`
 	MaxConsumers      *int                                `json:"maxConsumers,omitempty"`
 	MaxMsgs           *int                                `json:"maxMsgs,omitempty"`
-	MaxMsgSize        *int                                `json:"maxMsgSize,omitempty"`
+	MaxBytes          *int                                `json:"maxBytes,omitempty"`
+	Discard           *string                             `json:"discard,omitempty"`
+	DiscardPerSubject *bool                               `json:"discardPerSubject,omitempty"`
+	MaxAge            *string                             `json:"maxAge,omitempty"`
 	MaxMsgsPerSubject *int                                `json:"maxMsgsPerSubject,omitempty"`
-	Mirror            *StreamSourceApplyConfiguration     `json:"mirror,omitempty"`
-	Name              *string                             `json:"name,omitempty"`
-	Nkey              *string                             `json:"nkey,omitempty"`
-	NoAck             *bool                               `json:"noAck,omitempty"`
-	Placement         *StreamPlacementApplyConfiguration  `json:"placement,omitempty"`
-	Replicas          *int                                `json:"replicas,omitempty"`
-	Republish         *RePublishApplyConfiguration        `json:"republish,omitempty"`
-	SubjectTransform  *SubjectTransformApplyConfiguration `json:"subjectTransform,omitempty"`
-	FirstSequence     *uint64                             `json:"firstSequence,omitempty"`
-	Compression       *string                             `json:"compression,omitempty"`
-	Metadata          map[string]string                   `json:"metadata,omitempty"`
-	Retention         *string                             `json:"retention,omitempty"`
-	Servers           []string                            `json:"servers,omitempty"`
-	Sources           []*jetstreamv1beta2.StreamSource    `json:"sources,omitempty"`
+	MaxMsgSize        *int                                `json:"maxMsgSize,omitempty"`
 	Storage           *string                             `json:"storage,omitempty"`
-	Subjects          []string                            `json:"subjects,omitempty"`
-	TLS               *TLSApplyConfiguration              `json:"tls,omitempty"`
+	Replicas          *int                                `json:"replicas,omitempty"`
+	NoAck             *bool                               `json:"noAck,omitempty"`
+	DuplicateWindow   *string                             `json:"duplicateWindow,omitempty"`
+	Placement         *StreamPlacementApplyConfiguration  `json:"placement,omitempty"`
+	Mirror            *StreamSourceApplyConfiguration     `json:"mirror,omitempty"`
+	Sources           []*jetstreamv1beta2.StreamSource    `json:"sources,omitempty"`
+	Sealed            *bool                               `json:"sealed,omitempty"`
+	DenyDelete        *bool                               `json:"denyDelete,omitempty"`
+	DenyPurge         *bool                               `json:"denyPurge,omitempty"`
+	AllowRollup       *bool                               `json:"allowRollup,omitempty"`
+	Compression       *string                             `json:"compression,omitempty"`
+	FirstSequence     *uint64                             `json:"firstSequence,omitempty"`
+	SubjectTransform  *SubjectTransformApplyConfiguration `json:"subjectTransform,omitempty"`
+	RePublish         *RePublishApplyConfiguration        `json:"republish,omitempty"`
+	AllowDirect       *bool                               `json:"allowDirect,omitempty"`
+	MirrorDirect      *bool                               `json:"mirrorDirect,omitempty"`
+	ConsumerLimits    *ConsumerLimitsApplyConfiguration   `json:"consumerLimits,omitempty"`
+	Metadata          map[string]string                   `json:"metadata,omitempty"`
 }
 
 // StreamSpecApplyConfiguration constructs a declarative configuration of the StreamSpec type for use with
@@ -65,51 +61,11 @@ func StreamSpec() *StreamSpecApplyConfiguration {
 	return &StreamSpecApplyConfiguration{}
 }
 
-// WithAccount sets the Account field in the declarative configuration to the given value
+// WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Account field is set to the value of the last call.
-func (b *StreamSpecApplyConfiguration) WithAccount(value string) *StreamSpecApplyConfiguration {
-	b.Account = &value
-	return b
-}
-
-// WithAllowDirect sets the AllowDirect field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the AllowDirect field is set to the value of the last call.
-func (b *StreamSpecApplyConfiguration) WithAllowDirect(value bool) *StreamSpecApplyConfiguration {
-	b.AllowDirect = &value
-	return b
-}
-
-// WithAllowRollup sets the AllowRollup field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the AllowRollup field is set to the value of the last call.
-func (b *StreamSpecApplyConfiguration) WithAllowRollup(value bool) *StreamSpecApplyConfiguration {
-	b.AllowRollup = &value
-	return b
-}
-
-// WithCreds sets the Creds field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Creds field is set to the value of the last call.
-func (b *StreamSpecApplyConfiguration) WithCreds(value string) *StreamSpecApplyConfiguration {
-	b.Creds = &value
-	return b
-}
-
-// WithDenyDelete sets the DenyDelete field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the DenyDelete field is set to the value of the last call.
-func (b *StreamSpecApplyConfiguration) WithDenyDelete(value bool) *StreamSpecApplyConfiguration {
-	b.DenyDelete = &value
-	return b
-}
-
-// WithDenyPurge sets the DenyPurge field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the DenyPurge field is set to the value of the last call.
-func (b *StreamSpecApplyConfiguration) WithDenyPurge(value bool) *StreamSpecApplyConfiguration {
-	b.DenyPurge = &value
+// If called multiple times, the Name field is set to the value of the last call.
+func (b *StreamSpecApplyConfiguration) WithName(value string) *StreamSpecApplyConfiguration {
+	b.Name = &value
 	return b
 }
 
@@ -121,59 +77,21 @@ func (b *StreamSpecApplyConfiguration) WithDescription(value string) *StreamSpec
 	return b
 }
 
-// WithDiscardPerSubject sets the DiscardPerSubject field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the DiscardPerSubject field is set to the value of the last call.
-func (b *StreamSpecApplyConfiguration) WithDiscardPerSubject(value bool) *StreamSpecApplyConfiguration {
-	b.DiscardPerSubject = &value
+// WithSubjects adds the given value to the Subjects field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the Subjects field.
+func (b *StreamSpecApplyConfiguration) WithSubjects(values ...string) *StreamSpecApplyConfiguration {
+	for i := range values {
+		b.Subjects = append(b.Subjects, values[i])
+	}
 	return b
 }
 
-// WithPreventDelete sets the PreventDelete field in the declarative configuration to the given value
+// WithRetention sets the Retention field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the PreventDelete field is set to the value of the last call.
-func (b *StreamSpecApplyConfiguration) WithPreventDelete(value bool) *StreamSpecApplyConfiguration {
-	b.PreventDelete = &value
-	return b
-}
-
-// WithPreventUpdate sets the PreventUpdate field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the PreventUpdate field is set to the value of the last call.
-func (b *StreamSpecApplyConfiguration) WithPreventUpdate(value bool) *StreamSpecApplyConfiguration {
-	b.PreventUpdate = &value
-	return b
-}
-
-// WithDiscard sets the Discard field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Discard field is set to the value of the last call.
-func (b *StreamSpecApplyConfiguration) WithDiscard(value string) *StreamSpecApplyConfiguration {
-	b.Discard = &value
-	return b
-}
-
-// WithDuplicateWindow sets the DuplicateWindow field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the DuplicateWindow field is set to the value of the last call.
-func (b *StreamSpecApplyConfiguration) WithDuplicateWindow(value string) *StreamSpecApplyConfiguration {
-	b.DuplicateWindow = &value
-	return b
-}
-
-// WithMaxAge sets the MaxAge field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the MaxAge field is set to the value of the last call.
-func (b *StreamSpecApplyConfiguration) WithMaxAge(value string) *StreamSpecApplyConfiguration {
-	b.MaxAge = &value
-	return b
-}
-
-// WithMaxBytes sets the MaxBytes field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the MaxBytes field is set to the value of the last call.
-func (b *StreamSpecApplyConfiguration) WithMaxBytes(value int) *StreamSpecApplyConfiguration {
-	b.MaxBytes = &value
+// If called multiple times, the Retention field is set to the value of the last call.
+func (b *StreamSpecApplyConfiguration) WithRetention(value string) *StreamSpecApplyConfiguration {
+	b.Retention = &value
 	return b
 }
 
@@ -193,11 +111,35 @@ func (b *StreamSpecApplyConfiguration) WithMaxMsgs(value int) *StreamSpecApplyCo
 	return b
 }
 
-// WithMaxMsgSize sets the MaxMsgSize field in the declarative configuration to the given value
+// WithMaxBytes sets the MaxBytes field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the MaxMsgSize field is set to the value of the last call.
-func (b *StreamSpecApplyConfiguration) WithMaxMsgSize(value int) *StreamSpecApplyConfiguration {
-	b.MaxMsgSize = &value
+// If called multiple times, the MaxBytes field is set to the value of the last call.
+func (b *StreamSpecApplyConfiguration) WithMaxBytes(value int) *StreamSpecApplyConfiguration {
+	b.MaxBytes = &value
+	return b
+}
+
+// WithDiscard sets the Discard field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Discard field is set to the value of the last call.
+func (b *StreamSpecApplyConfiguration) WithDiscard(value string) *StreamSpecApplyConfiguration {
+	b.Discard = &value
+	return b
+}
+
+// WithDiscardPerSubject sets the DiscardPerSubject field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the DiscardPerSubject field is set to the value of the last call.
+func (b *StreamSpecApplyConfiguration) WithDiscardPerSubject(value bool) *StreamSpecApplyConfiguration {
+	b.DiscardPerSubject = &value
+	return b
+}
+
+// WithMaxAge sets the MaxAge field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the MaxAge field is set to the value of the last call.
+func (b *StreamSpecApplyConfiguration) WithMaxAge(value string) *StreamSpecApplyConfiguration {
+	b.MaxAge = &value
 	return b
 }
 
@@ -209,43 +151,19 @@ func (b *StreamSpecApplyConfiguration) WithMaxMsgsPerSubject(value int) *StreamS
 	return b
 }
 
-// WithMirror sets the Mirror field in the declarative configuration to the given value
+// WithMaxMsgSize sets the MaxMsgSize field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Mirror field is set to the value of the last call.
-func (b *StreamSpecApplyConfiguration) WithMirror(value *StreamSourceApplyConfiguration) *StreamSpecApplyConfiguration {
-	b.Mirror = value
+// If called multiple times, the MaxMsgSize field is set to the value of the last call.
+func (b *StreamSpecApplyConfiguration) WithMaxMsgSize(value int) *StreamSpecApplyConfiguration {
+	b.MaxMsgSize = &value
 	return b
 }
 
-// WithName sets the Name field in the declarative configuration to the given value
+// WithStorage sets the Storage field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Name field is set to the value of the last call.
-func (b *StreamSpecApplyConfiguration) WithName(value string) *StreamSpecApplyConfiguration {
-	b.Name = &value
-	return b
-}
-
-// WithNkey sets the Nkey field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Nkey field is set to the value of the last call.
-func (b *StreamSpecApplyConfiguration) WithNkey(value string) *StreamSpecApplyConfiguration {
-	b.Nkey = &value
-	return b
-}
-
-// WithNoAck sets the NoAck field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the NoAck field is set to the value of the last call.
-func (b *StreamSpecApplyConfiguration) WithNoAck(value bool) *StreamSpecApplyConfiguration {
-	b.NoAck = &value
-	return b
-}
-
-// WithPlacement sets the Placement field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Placement field is set to the value of the last call.
-func (b *StreamSpecApplyConfiguration) WithPlacement(value *StreamPlacementApplyConfiguration) *StreamSpecApplyConfiguration {
-	b.Placement = value
+// If called multiple times, the Storage field is set to the value of the last call.
+func (b *StreamSpecApplyConfiguration) WithStorage(value string) *StreamSpecApplyConfiguration {
+	b.Storage = &value
 	return b
 }
 
@@ -257,67 +175,35 @@ func (b *StreamSpecApplyConfiguration) WithReplicas(value int) *StreamSpecApplyC
 	return b
 }
 
-// WithRepublish sets the Republish field in the declarative configuration to the given value
+// WithNoAck sets the NoAck field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Republish field is set to the value of the last call.
-func (b *StreamSpecApplyConfiguration) WithRepublish(value *RePublishApplyConfiguration) *StreamSpecApplyConfiguration {
-	b.Republish = value
+// If called multiple times, the NoAck field is set to the value of the last call.
+func (b *StreamSpecApplyConfiguration) WithNoAck(value bool) *StreamSpecApplyConfiguration {
+	b.NoAck = &value
 	return b
 }
 
-// WithSubjectTransform sets the SubjectTransform field in the declarative configuration to the given value
+// WithDuplicateWindow sets the DuplicateWindow field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the SubjectTransform field is set to the value of the last call.
-func (b *StreamSpecApplyConfiguration) WithSubjectTransform(value *SubjectTransformApplyConfiguration) *StreamSpecApplyConfiguration {
-	b.SubjectTransform = value
+// If called multiple times, the DuplicateWindow field is set to the value of the last call.
+func (b *StreamSpecApplyConfiguration) WithDuplicateWindow(value string) *StreamSpecApplyConfiguration {
+	b.DuplicateWindow = &value
 	return b
 }
 
-// WithFirstSequence sets the FirstSequence field in the declarative configuration to the given value
+// WithPlacement sets the Placement field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the FirstSequence field is set to the value of the last call.
-func (b *StreamSpecApplyConfiguration) WithFirstSequence(value uint64) *StreamSpecApplyConfiguration {
-	b.FirstSequence = &value
+// If called multiple times, the Placement field is set to the value of the last call.
+func (b *StreamSpecApplyConfiguration) WithPlacement(value *StreamPlacementApplyConfiguration) *StreamSpecApplyConfiguration {
+	b.Placement = value
 	return b
 }
 
-// WithCompression sets the Compression field in the declarative configuration to the given value
+// WithMirror sets the Mirror field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Compression field is set to the value of the last call.
-func (b *StreamSpecApplyConfiguration) WithCompression(value string) *StreamSpecApplyConfiguration {
-	b.Compression = &value
-	return b
-}
-
-// WithMetadata puts the entries into the Metadata field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, the entries provided by each call will be put on the Metadata field,
-// overwriting an existing map entries in Metadata field with the same key.
-func (b *StreamSpecApplyConfiguration) WithMetadata(entries map[string]string) *StreamSpecApplyConfiguration {
-	if b.Metadata == nil && len(entries) > 0 {
-		b.Metadata = make(map[string]string, len(entries))
-	}
-	for k, v := range entries {
-		b.Metadata[k] = v
-	}
-	return b
-}
-
-// WithRetention sets the Retention field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Retention field is set to the value of the last call.
-func (b *StreamSpecApplyConfiguration) WithRetention(value string) *StreamSpecApplyConfiguration {
-	b.Retention = &value
-	return b
-}
-
-// WithServers adds the given value to the Servers field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the Servers field.
-func (b *StreamSpecApplyConfiguration) WithServers(values ...string) *StreamSpecApplyConfiguration {
-	for i := range values {
-		b.Servers = append(b.Servers, values[i])
-	}
+// If called multiple times, the Mirror field is set to the value of the last call.
+func (b *StreamSpecApplyConfiguration) WithMirror(value *StreamSourceApplyConfiguration) *StreamSpecApplyConfiguration {
+	b.Mirror = value
 	return b
 }
 
@@ -334,28 +220,104 @@ func (b *StreamSpecApplyConfiguration) WithSources(values ...**jetstreamv1beta2.
 	return b
 }
 
-// WithStorage sets the Storage field in the declarative configuration to the given value
+// WithSealed sets the Sealed field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Storage field is set to the value of the last call.
-func (b *StreamSpecApplyConfiguration) WithStorage(value string) *StreamSpecApplyConfiguration {
-	b.Storage = &value
+// If called multiple times, the Sealed field is set to the value of the last call.
+func (b *StreamSpecApplyConfiguration) WithSealed(value bool) *StreamSpecApplyConfiguration {
+	b.Sealed = &value
 	return b
 }
 
-// WithSubjects adds the given value to the Subjects field in the declarative configuration
+// WithDenyDelete sets the DenyDelete field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the DenyDelete field is set to the value of the last call.
+func (b *StreamSpecApplyConfiguration) WithDenyDelete(value bool) *StreamSpecApplyConfiguration {
+	b.DenyDelete = &value
+	return b
+}
+
+// WithDenyPurge sets the DenyPurge field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the DenyPurge field is set to the value of the last call.
+func (b *StreamSpecApplyConfiguration) WithDenyPurge(value bool) *StreamSpecApplyConfiguration {
+	b.DenyPurge = &value
+	return b
+}
+
+// WithAllowRollup sets the AllowRollup field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the AllowRollup field is set to the value of the last call.
+func (b *StreamSpecApplyConfiguration) WithAllowRollup(value bool) *StreamSpecApplyConfiguration {
+	b.AllowRollup = &value
+	return b
+}
+
+// WithCompression sets the Compression field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Compression field is set to the value of the last call.
+func (b *StreamSpecApplyConfiguration) WithCompression(value string) *StreamSpecApplyConfiguration {
+	b.Compression = &value
+	return b
+}
+
+// WithFirstSequence sets the FirstSequence field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the FirstSequence field is set to the value of the last call.
+func (b *StreamSpecApplyConfiguration) WithFirstSequence(value uint64) *StreamSpecApplyConfiguration {
+	b.FirstSequence = &value
+	return b
+}
+
+// WithSubjectTransform sets the SubjectTransform field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the SubjectTransform field is set to the value of the last call.
+func (b *StreamSpecApplyConfiguration) WithSubjectTransform(value *SubjectTransformApplyConfiguration) *StreamSpecApplyConfiguration {
+	b.SubjectTransform = value
+	return b
+}
+
+// WithRePublish sets the RePublish field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the RePublish field is set to the value of the last call.
+func (b *StreamSpecApplyConfiguration) WithRePublish(value *RePublishApplyConfiguration) *StreamSpecApplyConfiguration {
+	b.RePublish = value
+	return b
+}
+
+// WithAllowDirect sets the AllowDirect field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the AllowDirect field is set to the value of the last call.
+func (b *StreamSpecApplyConfiguration) WithAllowDirect(value bool) *StreamSpecApplyConfiguration {
+	b.AllowDirect = &value
+	return b
+}
+
+// WithMirrorDirect sets the MirrorDirect field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the MirrorDirect field is set to the value of the last call.
+func (b *StreamSpecApplyConfiguration) WithMirrorDirect(value bool) *StreamSpecApplyConfiguration {
+	b.MirrorDirect = &value
+	return b
+}
+
+// WithConsumerLimits sets the ConsumerLimits field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ConsumerLimits field is set to the value of the last call.
+func (b *StreamSpecApplyConfiguration) WithConsumerLimits(value *ConsumerLimitsApplyConfiguration) *StreamSpecApplyConfiguration {
+	b.ConsumerLimits = value
+	return b
+}
+
+// WithMetadata puts the entries into the Metadata field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the Subjects field.
-func (b *StreamSpecApplyConfiguration) WithSubjects(values ...string) *StreamSpecApplyConfiguration {
-	for i := range values {
-		b.Subjects = append(b.Subjects, values[i])
+// If called multiple times, the entries provided by each call will be put on the Metadata field,
+// overwriting an existing map entries in Metadata field with the same key.
+func (b *StreamSpecApplyConfiguration) WithMetadata(entries map[string]string) *StreamSpecApplyConfiguration {
+	if b.Metadata == nil && len(entries) > 0 {
+		b.Metadata = make(map[string]string, len(entries))
 	}
-	return b
-}
-
-// WithTLS sets the TLS field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the TLS field is set to the value of the last call.
-func (b *StreamSpecApplyConfiguration) WithTLS(value *TLSApplyConfiguration) *StreamSpecApplyConfiguration {
-	b.TLS = value
+	for k, v := range entries {
+		b.Metadata[k] = v
+	}
 	return b
 }

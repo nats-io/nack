@@ -67,7 +67,7 @@ func (r *KeyValueReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, fmt.Errorf("get keyvalue resource '%s': %w", req.NamespacedName.String(), err)
 	}
 
-	log = log.WithValues("keyValueName", keyValue.Spec.Name)
+	log = log.WithValues("keyValueName", keyValue.Spec.Bucket)
 
 	// Update ready status to unknown when no status is set
 	if len(keyValue.Status.Conditions) == 0 {
@@ -81,9 +81,9 @@ func (r *KeyValueReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	// Add finalizer
-	if !controllerutil.ContainsFinalizer(keyValue, keyValueFinalizer) {
+	if !controllerutil.ContainsFinalizer(keyValue, kvFinalizer) {
 		log.Info("Adding KeyValue finalizer.")
-		if ok := controllerutil.AddFinalizer(keyValue, keyValueFinalizer); !ok {
+		if ok := controllerutil.AddFinalizer(keyValue, kvFinalizer); !ok {
 			return ctrl.Result{}, errors.New("failed to add finalizer to keyvalue resource")
 		}
 
@@ -96,7 +96,7 @@ func (r *KeyValueReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	// Check Deletion
 	markedForDeletion := keyValue.GetDeletionTimestamp() != nil
 	if markedForDeletion {
-		if controllerutil.ContainsFinalizer(keyValue, keyValueFinalizer) {
+		if controllerutil.ContainsFinalizer(keyValue, kvFinalizer) {
 			err := r.deleteKeyValue(ctx, log, keyValue)
 			if err != nil {
 				return ctrl.Result{}, fmt.Errorf("delete keyvalue: %w", err)
@@ -116,7 +116,7 @@ func (r *KeyValueReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 }
 
 func (r *KeyValueReconciler) deleteKeyValue(ctx context.Context, log logr.Logger, keyValue *api.KeyValue) error {
-	// Set status to not false
+	// Set status to false
 	keyValue.Status.Conditions = updateReadyCondition(keyValue.Status.Conditions, v1.ConditionFalse, "Finalizing", "Performing finalizer operations.")
 	if err := r.Status().Update(ctx, keyValue); err != nil {
 		return fmt.Errorf("update ready condition: %w", err)
@@ -125,10 +125,10 @@ func (r *KeyValueReconciler) deleteKeyValue(ctx context.Context, log logr.Logger
 	if !keyValue.Spec.PreventDelete && !r.ReadOnly() {
 		log.Info("Deleting KeyValue.")
 		err := r.WithJetStreamClient(keyValueConnOpts(keyValue.Spec), func(js jetstream.JetStream) error {
-			return js.DeleteKeyValue(ctx, keyValue.Spec.Name)
+			return js.DeleteKeyValue(ctx, keyValue.Spec.Bucket)
 		})
 		if errors.Is(err, jetstream.ErrBucketNotFound) {
-			log.Info("KeyValue does not exist, unable to delete.", "keyValueName", keyValue.Spec.Name)
+			log.Info("KeyValue does not exist, unable to delete.", "keyValueName", keyValue.Spec.Bucket)
 		} else if err != nil {
 			return fmt.Errorf("delete keyvalue during finalization: %w", err)
 		}
@@ -140,7 +140,7 @@ func (r *KeyValueReconciler) deleteKeyValue(ctx context.Context, log logr.Logger
 	}
 
 	log.Info("Removing KeyValue finalizer.")
-	if ok := controllerutil.RemoveFinalizer(keyValue, keyValueFinalizer); !ok {
+	if ok := controllerutil.RemoveFinalizer(keyValue, kvFinalizer); !ok {
 		return errors.New("failed to remove keyvalue finalizer")
 	}
 	if err := r.Update(ctx, keyValue); err != nil {
@@ -234,7 +234,7 @@ func keyValueConnOpts(spec api.KeyValueSpec) *connectionOptions {
 func keyValueSpecToConfig(spec *api.KeyValueSpec) (jetstream.KeyValueConfig, error) {
 	// Set directly mapped fields
 	config := jetstream.KeyValueConfig{
-		Bucket:       spec.Name,
+		Bucket:       spec.Bucket,
 		Compression:  spec.Compression,
 		Description:  spec.Description,
 		History:      uint8(spec.History),
@@ -290,11 +290,11 @@ func keyValueSpecToConfig(spec *api.KeyValueSpec) (jetstream.KeyValueConfig, err
 	}
 
 	// RePublish
-	if spec.Republish != nil {
+	if spec.RePublish != nil {
 		config.RePublish = &jetstream.RePublish{
-			Source:      spec.Republish.Source,
-			Destination: spec.Republish.Destination,
-			HeadersOnly: spec.Republish.HeadersOnly,
+			Source:      spec.RePublish.Source,
+			Destination: spec.RePublish.Destination,
+			HeadersOnly: spec.RePublish.HeadersOnly,
 		}
 	}
 

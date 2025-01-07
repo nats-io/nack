@@ -27,6 +27,8 @@ type Interface interface {
 	Consumers() ConsumerInformer
 	// KeyValues returns a KeyValueInformer.
 	KeyValues() KeyValueInformer
+	// ObjectStores returns a ObjectStoreInformer.
+	ObjectStores() ObjectStoreInformer
 	// Streams returns a StreamInformer.
 	Streams() StreamInformer
 }
@@ -55,6 +57,11 @@ func (v *version) Consumers() ConsumerInformer {
 // KeyValues returns a KeyValueInformer.
 func (v *version) KeyValues() KeyValueInformer {
 	return &keyValueInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// ObjectStores returns a ObjectStoreInformer.
+func (v *version) ObjectStores() ObjectStoreInformer {
+	return &objectStoreInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // Streams returns a StreamInformer.

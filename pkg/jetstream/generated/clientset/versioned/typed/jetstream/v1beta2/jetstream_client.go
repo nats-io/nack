@@ -28,6 +28,7 @@ type JetstreamV1beta2Interface interface {
 	AccountsGetter
 	ConsumersGetter
 	KeyValuesGetter
+	ObjectStoresGetter
 	StreamsGetter
 }
 
@@ -46,6 +47,10 @@ func (c *JetstreamV1beta2Client) Consumers(namespace string) ConsumerInterface {
 
 func (c *JetstreamV1beta2Client) KeyValues(namespace string) KeyValueInterface {
 	return newKeyValues(c, namespace)
+}
+
+func (c *JetstreamV1beta2Client) ObjectStores(namespace string) ObjectStoreInterface {
+	return newObjectStores(c, namespace)
 }
 
 func (c *JetstreamV1beta2Client) Streams(namespace string) StreamInterface {

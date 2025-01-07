@@ -570,16 +570,12 @@ func Test_mapSpecToConfig(t *testing.T) {
 		{
 			name: "full spec",
 			spec: &api.StreamSpec{
-				Account:           "",
 				AllowDirect:       true,
 				AllowRollup:       true,
-				Creds:             "",
 				DenyDelete:        true,
 				DenyPurge:         true,
 				Description:       "stream description",
 				DiscardPerSubject: true,
-				PreventDelete:     false,
-				PreventUpdate:     false,
 				Discard:           "new",
 				DuplicateWindow:   "5s",
 				MaxAge:            "30s",
@@ -601,14 +597,13 @@ func Test_mapSpecToConfig(t *testing.T) {
 					}},
 				},
 				Name:  "stream-name",
-				Nkey:  "",
 				NoAck: true,
 				Placement: &api.StreamPlacement{
 					Cluster: "test-cluster",
 					Tags:    []string{"tag"},
 				},
 				Replicas: 3,
-				Republish: &api.RePublish{
+				RePublish: &api.RePublish{
 					Source:      "re-publish-source",
 					Destination: "re-publish-dest",
 					HeadersOnly: true,
@@ -623,7 +618,6 @@ func Test_mapSpecToConfig(t *testing.T) {
 					"meta": "data",
 				},
 				Retention: "interest",
-				Servers:   nil,
 				Sources: []*api.StreamSource{{
 					Name:                  "source",
 					OptStartSeq:           5,
@@ -638,7 +632,15 @@ func Test_mapSpecToConfig(t *testing.T) {
 				}},
 				Storage:  "file",
 				Subjects: []string{"orders.*"},
-				TLS:      api.TLS{},
+				BaseStreamConfig: api.BaseStreamConfig{
+					Account:       "",
+					Creds:         "",
+					Nkey:          "",
+					PreventDelete: false,
+					PreventUpdate: false,
+					Servers:       nil,
+					TLS:           api.TLS{},
+				},
 			},
 			want: jetstream.StreamConfig{
 				Name:                 "stream-name",

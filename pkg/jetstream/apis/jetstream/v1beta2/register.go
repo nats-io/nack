@@ -35,6 +35,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&StreamList{},
 		&KeyValue{},
 		&KeyValueList{},
+		&ObjectStore{},
+		&ObjectStoreList{},
 		&Consumer{},
 		&ConsumerList{},
 		&Account{},

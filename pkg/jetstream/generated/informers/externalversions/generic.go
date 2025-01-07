@@ -56,6 +56,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Jetstream().V1beta2().Consumers().Informer()}, nil
 	case v1beta2.SchemeGroupVersion.WithResource("keyvalues"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Jetstream().V1beta2().KeyValues().Informer()}, nil
+	case v1beta2.SchemeGroupVersion.WithResource("objectstores"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Jetstream().V1beta2().ObjectStores().Informer()}, nil
 	case v1beta2.SchemeGroupVersion.WithResource("streams"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Jetstream().V1beta2().Streams().Informer()}, nil
 

@@ -388,10 +388,10 @@ func createStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 		return nil
 	})
 
-	if spec.Republish != nil {
+	if spec.RePublish != nil {
 		opts = append(opts, jsm.Republish(&jsmapi.RePublish{
-			Source:      spec.Republish.Source,
-			Destination: spec.Republish.Destination,
+			Source:      spec.RePublish.Source,
+			Destination: spec.RePublish.Destination,
 		}))
 	}
 
@@ -495,11 +495,11 @@ func updateStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 		FirstSeq:         spec.FirstSequence,
 		SubjectTransform: subjectTransform,
 	}
-	if spec.Republish != nil {
+	if spec.RePublish != nil {
 		config.RePublish = &jsmapi.RePublish{
-			Source:      spec.Republish.Source,
-			Destination: spec.Republish.Destination,
-			HeadersOnly: spec.Republish.HeadersOnly,
+			Source:      spec.RePublish.Source,
+			Destination: spec.RePublish.Destination,
+			HeadersOnly: spec.RePublish.HeadersOnly,
 		}
 	}
 	if spec.Mirror != nil {

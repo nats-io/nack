@@ -66,7 +66,7 @@ var _ = Describe("KeyValue Controller", func() {
 					Namespace: "default",
 				},
 				Spec: api.KeyValueSpec{
-					Name:        keyValueName,
+					Bucket:      keyValueName,
 					Replicas:    1,
 					History:     10,
 					TTL:         "5m",
@@ -97,9 +97,9 @@ var _ = Describe("KeyValue Controller", func() {
 		if err != nil {
 			Expect(err).To(MatchError(k8serrors.IsNotFound, "Is not found"))
 		} else {
-			if controllerutil.ContainsFinalizer(resource, keyValueFinalizer) {
+			if controllerutil.ContainsFinalizer(resource, kvFinalizer) {
 				By("removing the finalizer")
-				controllerutil.RemoveFinalizer(resource, keyValueFinalizer)
+				controllerutil.RemoveFinalizer(resource, kvFinalizer)
 				Expect(k8sClient.Update(ctx, resource)).To(Succeed())
 			}
 
@@ -145,7 +145,7 @@ var _ = Describe("KeyValue Controller", func() {
 				return got
 			}).WithContext(ctx).
 				Should(SatisfyAll(
-					HaveField("Finalizers", HaveExactElements(keyValueFinalizer)),
+					HaveField("Finalizers", HaveExactElements(kvFinalizer)),
 					HaveField("Status.Conditions", Not(BeEmpty())),
 				))
 
@@ -163,7 +163,7 @@ var _ = Describe("KeyValue Controller", func() {
 			By("initializing the keyvalue resource")
 
 			By("setting the finalizer")
-			Expect(controllerutil.AddFinalizer(keyValue, keyValueFinalizer)).To(BeTrue())
+			Expect(controllerutil.AddFinalizer(keyValue, kvFinalizer)).To(BeTrue())
 			Expect(k8sClient.Update(ctx, keyValue)).To(Succeed())
 
 			By("setting an unknown ready state")
@@ -519,7 +519,7 @@ var _ = Describe("KeyValue Controller", func() {
 
 						By("checking that the finalizer is not removed")
 						Expect(k8sClient.Get(ctx, typeNamespacedName, keyValue)).To(Succeed())
-						Expect(keyValue.Finalizers).To(ContainElement(keyValueFinalizer))
+						Expect(keyValue.Finalizers).To(ContainElement(kvFinalizer))
 					})
 				})
 			})
@@ -580,15 +580,11 @@ func Test_mapKVSpecToConfig(t *testing.T) {
 		{
 			name: "full spec",
 			spec: &api.KeyValueSpec{
-				Account:       "",
-				Creds:         "",
-				Description:   "kv description",
-				PreventDelete: false,
-				PreventUpdate: false,
-				History:       20,
-				MaxValueSize:  1024,
-				MaxBytes:      1048576,
-				TTL:           "1h",
+				Description:  "kv description",
+				History:      20,
+				MaxValueSize: 1024,
+				MaxBytes:     1048576,
+				TTL:          "1h",
 				Mirror: &api.StreamSource{
 					Name:                  "mirror",
 					OptStartSeq:           5,
@@ -601,20 +597,18 @@ func Test_mapKVSpecToConfig(t *testing.T) {
 						Dest:   "transform-dest",
 					}},
 				},
-				Name: "kv-name",
-				Nkey: "",
+				Bucket: "kv-name",
 				Placement: &api.StreamPlacement{
 					Cluster: "test-cluster",
 					Tags:    []string{"tag"},
 				},
 				Replicas: 3,
-				Republish: &api.RePublish{
+				RePublish: &api.RePublish{
 					Source:      "re-publish-source",
 					Destination: "re-publish-dest",
 					HeadersOnly: true,
 				},
 				Compression: true,
-				Servers:     nil,
 				Sources: []*api.StreamSource{{
 					Name:                  "source",
 					OptStartSeq:           5,
@@ -628,7 +622,15 @@ func Test_mapKVSpecToConfig(t *testing.T) {
 					}},
 				}},
 				Storage: "memory",
-				TLS:     api.TLS{},
+				BaseStreamConfig: api.BaseStreamConfig{
+					Account:       "",
+					Creds:         "",
+					PreventDelete: false,
+					PreventUpdate: false,
+					Nkey:          "",
+					Servers:       nil,
+					TLS:           api.TLS{},
+				},
 			},
 			want: jetstream.KeyValueConfig{
 				Bucket:       "kv-name",

@@ -37,6 +37,10 @@ func (c *FakeJetstreamV1beta2) KeyValues(namespace string) v1beta2.KeyValueInter
 	return newFakeKeyValues(c, namespace)
 }
 
+func (c *FakeJetstreamV1beta2) ObjectStores(namespace string) v1beta2.ObjectStoreInterface {
+	return newFakeObjectStores(c, namespace)
+}
+
 func (c *FakeJetstreamV1beta2) Streams(namespace string) v1beta2.StreamInterface {
 	return newFakeStreams(c, namespace)
 }

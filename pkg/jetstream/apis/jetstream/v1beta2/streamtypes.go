@@ -22,41 +22,38 @@ func (s *Stream) GetSpec() interface{} {
 
 // StreamSpec is the spec for a Stream resource
 type StreamSpec struct {
-	Account           string            `json:"account"`
-	AllowDirect       bool              `json:"allowDirect"`
-	AllowRollup       bool              `json:"allowRollup"`
-	Creds             string            `json:"creds"`
-	DenyDelete        bool              `json:"denyDelete"`
-	DenyPurge         bool              `json:"denyPurge"`
+	Name              string            `json:"name"`
 	Description       string            `json:"description"`
-	DiscardPerSubject bool              `json:"discardPerSubject"`
-	PreventDelete     bool              `json:"preventDelete"`
-	PreventUpdate     bool              `json:"preventUpdate"`
-	Discard           string            `json:"discard"`
-	DuplicateWindow   string            `json:"duplicateWindow"`
-	MaxAge            string            `json:"maxAge"`
-	MaxBytes          int               `json:"maxBytes"`
+	Subjects          []string          `json:"subjects"`
+	Retention         string            `json:"retention"`
 	MaxConsumers      int               `json:"maxConsumers"`
 	MaxMsgs           int               `json:"maxMsgs"`
-	MaxMsgSize        int               `json:"maxMsgSize"`
+	MaxBytes          int               `json:"maxBytes"`
+	Discard           string            `json:"discard"`
+	DiscardPerSubject bool              `json:"discardPerSubject"` // Maps to DiscardNewPerSubject
+	MaxAge            string            `json:"maxAge"`
 	MaxMsgsPerSubject int               `json:"maxMsgsPerSubject"`
-	Mirror            *StreamSource     `json:"mirror"`
-	Name              string            `json:"name"`
-	Nkey              string            `json:"nkey"`
-	NoAck             bool              `json:"noAck"`
-	Placement         *StreamPlacement  `json:"placement"`
-	Replicas          int               `json:"replicas"`
-	Republish         *RePublish        `json:"republish"`
-	SubjectTransform  *SubjectTransform `json:"subjectTransform"`
-	FirstSequence     uint64            `json:"firstSequence"`
-	Compression       string            `json:"compression"`
-	Metadata          map[string]string `json:"metadata"`
-	Retention         string            `json:"retention"`
-	Servers           []string          `json:"servers"`
-	Sources           []*StreamSource   `json:"sources"`
+	MaxMsgSize        int               `json:"maxMsgSize"`
 	Storage           string            `json:"storage"`
-	Subjects          []string          `json:"subjects"`
-	TLS               TLS               `json:"tls"`
+	Replicas          int               `json:"replicas"`
+	NoAck             bool              `json:"noAck"`
+	DuplicateWindow   string            `json:"duplicateWindow"` // Maps to Duplicates
+	Placement         *StreamPlacement  `json:"placement"`
+	Mirror            *StreamSource     `json:"mirror"`
+	Sources           []*StreamSource   `json:"sources"`
+	Sealed            bool              `json:"sealed"`
+	DenyDelete        bool              `json:"denyDelete"`
+	DenyPurge         bool              `json:"denyPurge"`
+	AllowRollup       bool              `json:"allowRollup"`
+	Compression       string            `json:"compression"`
+	FirstSequence     uint64            `json:"firstSequence"` // Maps to FirstSeq
+	SubjectTransform  *SubjectTransform `json:"subjectTransform"`
+	RePublish         *RePublish        `json:"republish"`
+	AllowDirect       bool              `json:"allowDirect"`
+	MirrorDirect      bool              `json:"mirrorDirect"`
+	ConsumerLimits    *ConsumerLimits   `json:"consumerLimits"`
+	Metadata          map[string]string `json:"metadata"`
+	BaseStreamConfig
 }
 
 type SubjectTransform struct {

@@ -22,6 +22,21 @@ type Condition struct {
 	LastTransitionTime string                 `json:"lastTransitionTime"`
 }
 
+type BaseStreamConfig struct {
+	Account       string   `json:"account"`
+	Creds         string   `json:"creds"`
+	Nkey          string   `json:"nkey"`
+	PreventDelete bool     `json:"preventDelete"`
+	PreventUpdate bool     `json:"preventUpdate"`
+	Servers       []string `json:"servers"`
+	TLS           TLS      `json:"tls"`
+}
+
+type ConsumerLimits struct {
+	InactiveThreshold string `json:"inactiveThreshold"`
+	MaxAckPending     int    `json:"maxAckPending"`
+}
+
 type TLS struct {
 	ClientCert string   `json:"clientCert"`
 	ClientKey  string   `json:"clientKey"`
