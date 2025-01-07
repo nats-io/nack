@@ -205,6 +205,19 @@ var _ = Describe("Stream Controller", func() {
 			Expect(streamInfo.Created).To(BeTemporally("~", time.Now(), time.Second))
 		})
 
+		When("sealed is true", func() {
+			BeforeEach(func(ctx SpecContext) {
+				By("setting sealed to true")
+				stream.Spec.Name = "sealed"
+				stream.Spec.Sealed = true
+				Expect(k8sClient.Update(ctx, stream)).To(Succeed())
+			})
+			It("should not create the stream", func(ctx SpecContext) {
+				_, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
+				Expect(err.Error()).To(HaveSuffix("can not be sealed"))
+			})
+		})
+
 		When("PreventUpdate is set", func() {
 			BeforeEach(func(ctx SpecContext) {
 				By("setting preventDelete on the resource")
@@ -324,6 +337,7 @@ var _ = Describe("Stream Controller", func() {
 
 			By("updating the resource")
 			stream.Spec.Description = "new description"
+			stream.Spec.Sealed = true
 			Expect(k8sClient.Update(ctx, stream)).To(Succeed())
 
 			By("reconciling the updated resource")
@@ -348,6 +362,7 @@ var _ = Describe("Stream Controller", func() {
 			streamInfo, err := natsStream.Info(ctx)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(streamInfo.Config.Description).To(Equal("new description"))
+			Expect(streamInfo.Config.Sealed).To(BeTrue())
 			// Other fields unchanged
 			Expect(streamInfo.Config.Subjects).To(Equal([]string{"tests.*"}))
 		})
