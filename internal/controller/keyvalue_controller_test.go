@@ -97,9 +97,9 @@ var _ = Describe("KeyValue Controller", func() {
 		if err != nil {
 			Expect(err).To(MatchError(k8serrors.IsNotFound, "Is not found"))
 		} else {
-			if controllerutil.ContainsFinalizer(resource, kvFinalizer) {
+			if controllerutil.ContainsFinalizer(resource, keyValueFinalizer) {
 				By("removing the finalizer")
-				controllerutil.RemoveFinalizer(resource, kvFinalizer)
+				controllerutil.RemoveFinalizer(resource, keyValueFinalizer)
 				Expect(k8sClient.Update(ctx, resource)).To(Succeed())
 			}
 
@@ -145,7 +145,7 @@ var _ = Describe("KeyValue Controller", func() {
 				return got
 			}).WithContext(ctx).
 				Should(SatisfyAll(
-					HaveField("Finalizers", HaveExactElements(kvFinalizer)),
+					HaveField("Finalizers", HaveExactElements(keyValueFinalizer)),
 					HaveField("Status.Conditions", Not(BeEmpty())),
 				))
 
@@ -163,7 +163,7 @@ var _ = Describe("KeyValue Controller", func() {
 			By("initializing the keyvalue resource")
 
 			By("setting the finalizer")
-			Expect(controllerutil.AddFinalizer(keyValue, kvFinalizer)).To(BeTrue())
+			Expect(controllerutil.AddFinalizer(keyValue, keyValueFinalizer)).To(BeTrue())
 			Expect(k8sClient.Update(ctx, keyValue)).To(Succeed())
 
 			By("setting an unknown ready state")
@@ -519,7 +519,7 @@ var _ = Describe("KeyValue Controller", func() {
 
 						By("checking that the finalizer is not removed")
 						Expect(k8sClient.Get(ctx, typeNamespacedName, keyValue)).To(Succeed())
-						Expect(keyValue.Finalizers).To(ContainElement(kvFinalizer))
+						Expect(keyValue.Finalizers).To(ContainElement(keyValueFinalizer))
 					})
 				})
 			})
@@ -572,7 +572,7 @@ func Test_mapKVSpecToConfig(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:    "emtpy spec",
+			name:    "empty spec",
 			spec:    &api.KeyValueSpec{},
 			want:    jetstream.KeyValueConfig{},
 			wantErr: false,

@@ -1087,10 +1087,10 @@ spec:
             type: object
             properties:
               bucket:
-                description: A unique name for the KV Bucket.
+                description: A unique name for the KV Store.
                 type: string
               description:
-                description: The description of the KV Bucket.
+                description: The description of the KV Store.
                 type: string
               maxValueSize:
                 description: The maximum size of a value in bytes.
@@ -1102,21 +1102,21 @@ spec:
                 description: The time expiry for keys.
                 type: string
               maxBytes:
-                description: The maximum size of the KV Bucket in bytes.
+                description: The maximum size of the KV Store in bytes.
                 type: integer
               storage:
-                description: The storage backend to use for the KV Bucket.
+                description: The storage backend to use for the KV Store.
                 type: string
                 enum:
                 - file
                 - memory
               replicas:
-                description: The number of replicas to keep for the KV Bucket in clustered JetStream.
+                description: The number of replicas to keep for the KV Store in clustered JetStream.
                 type: integer
                 minimum: 1
                 maximum: 5
               placement:
-                description: The KV Bucket placement via tags or cluster name.
+                description: The KV Store placement via tags or cluster name.
                 type: object
                 properties:
                   cluster:
@@ -1126,7 +1126,7 @@ spec:
                     items:
                       type: string
               republish:
-                description: Republish configuration for the KV Bucket.
+                description: Republish configuration for the KV Store.
                 type: object
                 properties:
                   destination:
@@ -1136,7 +1136,7 @@ spec:
                     type: string
                     description: Messages will be published from this subject to the destination subject.
               mirror:
-                description: A KV Bucket mirror.
+                description: A KV Store mirror.
                 type: object
                 properties:
                   name:
@@ -1166,10 +1166,10 @@ spec:
                           description: Destination subject.
                           type: string
               compression:
-                description: KV Bucket compression.
+                description: KV Store compression.
                 type: boolean
               sources:
-                description: A KV Bucket's sources.
+                description: A KV Store's sources.
                 type: array
                 items:
                   type: object
@@ -1200,12 +1200,10 @@ spec:
                           dest:
                             description: Destination subject.
                             type: string
-              servers:
-                description: A list of servers for creating stream
-                type: array
-                items:
-                  type: string
-                default: []
+              account:
+                description: Name of the account to which the Stream belongs.
+                type: string
+                pattern: '^[^.*>]*$'
               creds:
                 description: NATS user credentials for connecting to servers. Please make sure your controller has mounted the cerds on its path.
                 type: string
@@ -1214,6 +1212,20 @@ spec:
                 description: NATS user NKey for connecting to servers.
                 type: string
                 default: ''
+              preventDelete:
+                description: When true, the managed KV Store will not be deleted when the resource is deleted
+                type: boolean
+                default: false
+              preventUpdate:
+                description: When true, the managed KV Store will not be updated when the resource is updated
+                type: boolean
+                default: false
+              servers:
+                description: A list of servers for creating the KV Store
+                type: array
+                items:
+                  type: string
+                default: []
               tls:
                 description: A client's TLS certs and keys.
                 type: object
@@ -1229,18 +1241,6 @@ spec:
                     type: array
                     items:
                       type: string
-              account:
-                description: Name of the account to which the Stream belongs.
-                type: string
-                pattern: '^[^.*>]*$'
-              preventDelete:
-                description: When true, the managed Stream will not be deleted when the resource is deleted
-                type: boolean
-                default: false
-              preventUpdate:
-                description: When true, the managed Stream will not be updated when the resource is updated
-                type: boolean
-                default: false
           status:
             type: object
             properties:
@@ -1264,9 +1264,145 @@ spec:
     additionalPrinterColumns:
     - name: State
       type: string
-      description: The current state of the KV Bucket.
+      description: The current state of the KV Store.
       jsonPath: .status.conditions[?(@.type == 'Ready')].reason
-    - name: KV Bucket Name
+    - name: KV Store Name
       type: string
-      description: The name of the KV Bucket.
+      description: The name of the KV Store.
+      jsonPath: .spec.name
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: objectstores.jetstream.nats.io
+spec:
+  group: jetstream.nats.io
+  scope: Namespaced
+  names:
+    kind: ObjectStore
+    singular: objectstore
+    plural: objectstores
+  versions:
+  - name: v1beta2
+    served: true
+    storage: true
+    subresources:
+      status: {}
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              bucket:
+                description: A unique name for the Object Store.
+                type: string
+              description:
+                description: The description of the Object Store.
+                type: string
+              ttl:
+                description: The time expiry for keys.
+                type: string
+              maxBytes:
+                description: The maximum size of the Store in bytes.
+                type: integer
+              storage:
+                description: The storage backend to use for the Object Store.
+                type: string
+                enum:
+                - file
+                - memory
+              replicas:
+                description: The number of replicas to keep for the Object Store in clustered JetStream.
+                type: integer
+                minimum: 1
+                maximum: 5
+              placement:
+                description: The Object Store placement via tags or cluster name.
+                type: object
+                properties:
+                  cluster:
+                    type: string
+                  tags:
+                    type: array
+                    items:
+                      type: string
+              compression:
+                description: Object Store compression.
+                type: boolean
+              metadata:
+                description: Additional Object Store metadata.
+                type: object
+                additionalProperties:
+                  type: string
+              account:
+                description: Name of the account to which the Object Store belongs.
+                type: string
+                pattern: '^[^.*>]*$'
+              creds:
+                description: NATS user credentials for connecting to servers. Please make sure your controller has mounted the cerds on its path.
+                type: string
+                default: ''
+              nkey:
+                description: NATS user NKey for connecting to servers.
+                type: string
+                default: ''
+              preventDelete:
+                description: When true, the managed Object Store will not be deleted when the resource is deleted
+                type: boolean
+                default: false
+              preventUpdate:
+                description: When true, the managed Object Store will not be updated when the resource is updated
+                type: boolean
+                default: false
+              servers:
+                description: A list of servers for creating the Object Store
+                type: array
+                items:
+                  type: string
+                default: []
+              tls:
+                description: A client's TLS certs and keys.
+                type: object
+                properties:
+                  clientCert:
+                    description: A client's cert filepath. Should be mounted.
+                    type: string
+                  clientKey:
+                    description: A client's key filepath. Should be mounted.
+                    type: string
+                  rootCas:
+                    description: A list of filepaths to CAs. Should be mounted.
+                    type: array
+                    items:
+                      type: string
+          status:
+            type: object
+            properties:
+              observedGeneration:
+                type: integer
+              conditions:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                    status:
+                      type: string
+                    lastTransitionTime:
+                      type: string
+                    reason:
+                      type: string
+                    message:
+                      type: string
+    additionalPrinterColumns:
+    - name: State
+      type: string
+      description: The current state of the Object Store.
+      jsonPath: .status.conditions[?(@.type == 'Ready')].reason
+    - name: Object Store Name
+      type: string
+      description: The name of the Object Store.
       jsonPath: .spec.name

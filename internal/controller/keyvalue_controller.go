@@ -81,9 +81,9 @@ func (r *KeyValueReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	// Add finalizer
-	if !controllerutil.ContainsFinalizer(keyValue, kvFinalizer) {
+	if !controllerutil.ContainsFinalizer(keyValue, keyValueFinalizer) {
 		log.Info("Adding KeyValue finalizer.")
-		if ok := controllerutil.AddFinalizer(keyValue, kvFinalizer); !ok {
+		if ok := controllerutil.AddFinalizer(keyValue, keyValueFinalizer); !ok {
 			return ctrl.Result{}, errors.New("failed to add finalizer to keyvalue resource")
 		}
 
@@ -96,7 +96,7 @@ func (r *KeyValueReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	// Check Deletion
 	markedForDeletion := keyValue.GetDeletionTimestamp() != nil
 	if markedForDeletion {
-		if controllerutil.ContainsFinalizer(keyValue, kvFinalizer) {
+		if controllerutil.ContainsFinalizer(keyValue, keyValueFinalizer) {
 			err := r.deleteKeyValue(ctx, log, keyValue)
 			if err != nil {
 				return ctrl.Result{}, fmt.Errorf("delete keyvalue: %w", err)
@@ -140,7 +140,7 @@ func (r *KeyValueReconciler) deleteKeyValue(ctx context.Context, log logr.Logger
 	}
 
 	log.Info("Removing KeyValue finalizer.")
-	if ok := controllerutil.RemoveFinalizer(keyValue, kvFinalizer); !ok {
+	if ok := controllerutil.RemoveFinalizer(keyValue, keyValueFinalizer); !ok {
 		return errors.New("failed to remove keyvalue finalizer")
 	}
 	if err := r.Update(ctx, keyValue); err != nil {
