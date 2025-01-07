@@ -116,7 +116,7 @@ func (r *StreamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 }
 
 func (r *StreamReconciler) deleteStream(ctx context.Context, log logr.Logger, stream *api.Stream) error {
-	// Set status to not false
+	// Set status to false
 	stream.Status.Conditions = updateReadyCondition(stream.Status.Conditions, v1.ConditionFalse, "Finalizing", "Performing finalizer operations.")
 	if err := r.Status().Update(ctx, stream); err != nil {
 		return fmt.Errorf("update ready condition: %w", err)
@@ -346,11 +346,11 @@ func streamSpecToConfig(spec *api.StreamSpec) (jetstream.StreamConfig, error) {
 	}
 
 	// rePublish
-	if spec.Republish != nil {
+	if spec.RePublish != nil {
 		config.RePublish = &jetstream.RePublish{
-			Source:      spec.Republish.Source,
-			Destination: spec.Republish.Destination,
-			HeadersOnly: spec.Republish.HeadersOnly,
+			Source:      spec.RePublish.Source,
+			Destination: spec.RePublish.Destination,
+			HeadersOnly: spec.RePublish.HeadersOnly,
 		}
 	}
 

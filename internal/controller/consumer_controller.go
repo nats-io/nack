@@ -114,7 +114,7 @@ func (r *ConsumerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 }
 
 func (r *ConsumerReconciler) deleteConsumer(ctx context.Context, log logr.Logger, consumer *api.Consumer) error {
-	// Set status to not false
+	// Set status to false
 	consumer.Status.Conditions = updateReadyCondition(consumer.Status.Conditions, v1.ConditionFalse, "Finalizing", "Performing finalizer operations.")
 	if err := r.Status().Update(ctx, consumer); err != nil {
 		return fmt.Errorf("update ready condition: %w", err)

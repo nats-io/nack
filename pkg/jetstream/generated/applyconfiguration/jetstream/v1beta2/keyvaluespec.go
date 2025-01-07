@@ -22,26 +22,19 @@ import (
 // KeyValueSpecApplyConfiguration represents a declarative configuration of the KeyValueSpec type for use
 // with apply.
 type KeyValueSpecApplyConfiguration struct {
-	Account       *string                            `json:"account,omitempty"`
-	Compression   *bool                              `json:"compression,omitempty"`
-	Creds         *string                            `json:"creds,omitempty"`
-	Description   *string                            `json:"description,omitempty"`
-	History       *int                               `json:"history,omitempty"`
-	MaxBytes      *int                               `json:"maxBytes,omitempty"`
-	MaxValueSize  *int                               `json:"maxValueSize,omitempty"`
-	Mirror        *StreamSourceApplyConfiguration    `json:"mirror,omitempty"`
-	Name          *string                            `json:"name,omitempty"`
-	Nkey          *string                            `json:"nkey,omitempty"`
-	Placement     *StreamPlacementApplyConfiguration `json:"placement,omitempty"`
-	PreventDelete *bool                              `json:"preventDelete,omitempty"`
-	PreventUpdate *bool                              `json:"preventUpdate,omitempty"`
-	Replicas      *int                               `json:"replicas,omitempty"`
-	Republish     *RePublishApplyConfiguration       `json:"republish,omitempty"`
-	Servers       []string                           `json:"servers,omitempty"`
-	Sources       []*jetstreamv1beta2.StreamSource   `json:"sources,omitempty"`
-	Storage       *string                            `json:"storage,omitempty"`
-	TLS           *TLSApplyConfiguration             `json:"tls,omitempty"`
-	TTL           *string                            `json:"ttl,omitempty"`
+	Bucket       *string                            `json:"bucket,omitempty"`
+	Description  *string                            `json:"description,omitempty"`
+	MaxValueSize *int                               `json:"maxValueSize,omitempty"`
+	History      *int                               `json:"history,omitempty"`
+	TTL          *string                            `json:"ttl,omitempty"`
+	MaxBytes     *int                               `json:"maxBytes,omitempty"`
+	Storage      *string                            `json:"storage,omitempty"`
+	Replicas     *int                               `json:"replicas,omitempty"`
+	Placement    *StreamPlacementApplyConfiguration `json:"placement,omitempty"`
+	RePublish    *RePublishApplyConfiguration       `json:"republish,omitempty"`
+	Mirror       *StreamSourceApplyConfiguration    `json:"mirror,omitempty"`
+	Sources      []*jetstreamv1beta2.StreamSource   `json:"sources,omitempty"`
+	Compression  *bool                              `json:"compression,omitempty"`
 }
 
 // KeyValueSpecApplyConfiguration constructs a declarative configuration of the KeyValueSpec type for use with
@@ -50,27 +43,11 @@ func KeyValueSpec() *KeyValueSpecApplyConfiguration {
 	return &KeyValueSpecApplyConfiguration{}
 }
 
-// WithAccount sets the Account field in the declarative configuration to the given value
+// WithBucket sets the Bucket field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Account field is set to the value of the last call.
-func (b *KeyValueSpecApplyConfiguration) WithAccount(value string) *KeyValueSpecApplyConfiguration {
-	b.Account = &value
-	return b
-}
-
-// WithCompression sets the Compression field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Compression field is set to the value of the last call.
-func (b *KeyValueSpecApplyConfiguration) WithCompression(value bool) *KeyValueSpecApplyConfiguration {
-	b.Compression = &value
-	return b
-}
-
-// WithCreds sets the Creds field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Creds field is set to the value of the last call.
-func (b *KeyValueSpecApplyConfiguration) WithCreds(value string) *KeyValueSpecApplyConfiguration {
-	b.Creds = &value
+// If called multiple times, the Bucket field is set to the value of the last call.
+func (b *KeyValueSpecApplyConfiguration) WithBucket(value string) *KeyValueSpecApplyConfiguration {
+	b.Bucket = &value
 	return b
 }
 
@@ -82,11 +59,27 @@ func (b *KeyValueSpecApplyConfiguration) WithDescription(value string) *KeyValue
 	return b
 }
 
+// WithMaxValueSize sets the MaxValueSize field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the MaxValueSize field is set to the value of the last call.
+func (b *KeyValueSpecApplyConfiguration) WithMaxValueSize(value int) *KeyValueSpecApplyConfiguration {
+	b.MaxValueSize = &value
+	return b
+}
+
 // WithHistory sets the History field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the History field is set to the value of the last call.
 func (b *KeyValueSpecApplyConfiguration) WithHistory(value int) *KeyValueSpecApplyConfiguration {
 	b.History = &value
+	return b
+}
+
+// WithTTL sets the TTL field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the TTL field is set to the value of the last call.
+func (b *KeyValueSpecApplyConfiguration) WithTTL(value string) *KeyValueSpecApplyConfiguration {
+	b.TTL = &value
 	return b
 }
 
@@ -98,59 +91,11 @@ func (b *KeyValueSpecApplyConfiguration) WithMaxBytes(value int) *KeyValueSpecAp
 	return b
 }
 
-// WithMaxValueSize sets the MaxValueSize field in the declarative configuration to the given value
+// WithStorage sets the Storage field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the MaxValueSize field is set to the value of the last call.
-func (b *KeyValueSpecApplyConfiguration) WithMaxValueSize(value int) *KeyValueSpecApplyConfiguration {
-	b.MaxValueSize = &value
-	return b
-}
-
-// WithMirror sets the Mirror field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Mirror field is set to the value of the last call.
-func (b *KeyValueSpecApplyConfiguration) WithMirror(value *StreamSourceApplyConfiguration) *KeyValueSpecApplyConfiguration {
-	b.Mirror = value
-	return b
-}
-
-// WithName sets the Name field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Name field is set to the value of the last call.
-func (b *KeyValueSpecApplyConfiguration) WithName(value string) *KeyValueSpecApplyConfiguration {
-	b.Name = &value
-	return b
-}
-
-// WithNkey sets the Nkey field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Nkey field is set to the value of the last call.
-func (b *KeyValueSpecApplyConfiguration) WithNkey(value string) *KeyValueSpecApplyConfiguration {
-	b.Nkey = &value
-	return b
-}
-
-// WithPlacement sets the Placement field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Placement field is set to the value of the last call.
-func (b *KeyValueSpecApplyConfiguration) WithPlacement(value *StreamPlacementApplyConfiguration) *KeyValueSpecApplyConfiguration {
-	b.Placement = value
-	return b
-}
-
-// WithPreventDelete sets the PreventDelete field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the PreventDelete field is set to the value of the last call.
-func (b *KeyValueSpecApplyConfiguration) WithPreventDelete(value bool) *KeyValueSpecApplyConfiguration {
-	b.PreventDelete = &value
-	return b
-}
-
-// WithPreventUpdate sets the PreventUpdate field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the PreventUpdate field is set to the value of the last call.
-func (b *KeyValueSpecApplyConfiguration) WithPreventUpdate(value bool) *KeyValueSpecApplyConfiguration {
-	b.PreventUpdate = &value
+// If called multiple times, the Storage field is set to the value of the last call.
+func (b *KeyValueSpecApplyConfiguration) WithStorage(value string) *KeyValueSpecApplyConfiguration {
+	b.Storage = &value
 	return b
 }
 
@@ -162,21 +107,27 @@ func (b *KeyValueSpecApplyConfiguration) WithReplicas(value int) *KeyValueSpecAp
 	return b
 }
 
-// WithRepublish sets the Republish field in the declarative configuration to the given value
+// WithPlacement sets the Placement field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Republish field is set to the value of the last call.
-func (b *KeyValueSpecApplyConfiguration) WithRepublish(value *RePublishApplyConfiguration) *KeyValueSpecApplyConfiguration {
-	b.Republish = value
+// If called multiple times, the Placement field is set to the value of the last call.
+func (b *KeyValueSpecApplyConfiguration) WithPlacement(value *StreamPlacementApplyConfiguration) *KeyValueSpecApplyConfiguration {
+	b.Placement = value
 	return b
 }
 
-// WithServers adds the given value to the Servers field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the Servers field.
-func (b *KeyValueSpecApplyConfiguration) WithServers(values ...string) *KeyValueSpecApplyConfiguration {
-	for i := range values {
-		b.Servers = append(b.Servers, values[i])
-	}
+// WithRePublish sets the RePublish field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the RePublish field is set to the value of the last call.
+func (b *KeyValueSpecApplyConfiguration) WithRePublish(value *RePublishApplyConfiguration) *KeyValueSpecApplyConfiguration {
+	b.RePublish = value
+	return b
+}
+
+// WithMirror sets the Mirror field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Mirror field is set to the value of the last call.
+func (b *KeyValueSpecApplyConfiguration) WithMirror(value *StreamSourceApplyConfiguration) *KeyValueSpecApplyConfiguration {
+	b.Mirror = value
 	return b
 }
 
@@ -193,26 +144,10 @@ func (b *KeyValueSpecApplyConfiguration) WithSources(values ...**jetstreamv1beta
 	return b
 }
 
-// WithStorage sets the Storage field in the declarative configuration to the given value
+// WithCompression sets the Compression field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Storage field is set to the value of the last call.
-func (b *KeyValueSpecApplyConfiguration) WithStorage(value string) *KeyValueSpecApplyConfiguration {
-	b.Storage = &value
-	return b
-}
-
-// WithTLS sets the TLS field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the TLS field is set to the value of the last call.
-func (b *KeyValueSpecApplyConfiguration) WithTLS(value *TLSApplyConfiguration) *KeyValueSpecApplyConfiguration {
-	b.TLS = value
-	return b
-}
-
-// WithTTL sets the TTL field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the TTL field is set to the value of the last call.
-func (b *KeyValueSpecApplyConfiguration) WithTTL(value string) *KeyValueSpecApplyConfiguration {
-	b.TTL = &value
+// If called multiple times, the Compression field is set to the value of the last call.
+func (b *KeyValueSpecApplyConfiguration) WithCompression(value bool) *KeyValueSpecApplyConfiguration {
+	b.Compression = &value
 	return b
 }

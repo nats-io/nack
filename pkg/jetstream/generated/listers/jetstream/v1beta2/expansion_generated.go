@@ -39,6 +39,14 @@ type KeyValueListerExpansion interface{}
 // KeyValueNamespaceLister.
 type KeyValueNamespaceListerExpansion interface{}
 
+// ObjectStoreListerExpansion allows custom methods to be added to
+// ObjectStoreLister.
+type ObjectStoreListerExpansion interface{}
+
+// ObjectStoreNamespaceListerExpansion allows custom methods to be added to
+// ObjectStoreNamespaceLister.
+type ObjectStoreNamespaceListerExpansion interface{}
+
 // StreamListerExpansion allows custom methods to be added to
 // StreamLister.
 type StreamListerExpansion interface{}

@@ -33,10 +33,14 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &jetstreamv1beta2.AccountApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("AccountSpec"):
 		return &jetstreamv1beta2.AccountSpecApplyConfiguration{}
+	case v1beta2.SchemeGroupVersion.WithKind("BaseStreamConfig"):
+		return &jetstreamv1beta2.BaseStreamConfigApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("Condition"):
 		return &jetstreamv1beta2.ConditionApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("Consumer"):
 		return &jetstreamv1beta2.ConsumerApplyConfiguration{}
+	case v1beta2.SchemeGroupVersion.WithKind("ConsumerLimits"):
+		return &jetstreamv1beta2.ConsumerLimitsApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("ConsumerSpec"):
 		return &jetstreamv1beta2.ConsumerSpecApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("CredsSecret"):
@@ -45,6 +49,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &jetstreamv1beta2.KeyValueApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("KeyValueSpec"):
 		return &jetstreamv1beta2.KeyValueSpecApplyConfiguration{}
+	case v1beta2.SchemeGroupVersion.WithKind("ObjectStore"):
+		return &jetstreamv1beta2.ObjectStoreApplyConfiguration{}
+	case v1beta2.SchemeGroupVersion.WithKind("ObjectStoreSpec"):
+		return &jetstreamv1beta2.ObjectStoreSpecApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("RePublish"):
 		return &jetstreamv1beta2.RePublishApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("SecretRef"):

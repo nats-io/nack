@@ -21,4 +21,6 @@ type ConsumerExpansion interface{}
 
 type KeyValueExpansion interface{}
 
+type ObjectStoreExpansion interface{}
+
 type StreamExpansion interface{}
