@@ -25,7 +25,7 @@ import (
 
 	"github.com/nats-io/nack/controllers/jetstream"
 	"github.com/nats-io/nack/internal/controller"
-	jetstreamnatsiov1beta2 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
+	v1beta2 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 	clientset "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -160,7 +160,7 @@ func runControlLoop(config *rest.Config, natsCfg *controller.NatsConfig, control
 	// Setup scheme
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(jetstreamnatsiov1beta2.AddToScheme(scheme))
+	utilruntime.Must(v1beta2.AddToScheme(scheme))
 
 	mgr, err := ctrl.NewManager(config, ctrl.Options{
 		Scheme: scheme,

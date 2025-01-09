@@ -88,7 +88,8 @@ var _ = Describe("Stream Controller", func() {
 
 		By("setting up the tested controller")
 		controller = &StreamReconciler{
-			baseController,
+			Scheme:              k8sClient.Scheme(),
+			JetStreamController: baseController,
 		}
 	})
 
@@ -257,6 +258,7 @@ var _ = Describe("Stream Controller", func() {
 				readOnly, err := NewJSController(k8sClient, &NatsConfig{ServerURL: testServer.ClientURL()}, &Config{ReadOnly: true})
 				Expect(err).NotTo(HaveOccurred())
 				controller = &StreamReconciler{
+					Scheme:              k8sClient.Scheme(),
 					JetStreamController: readOnly,
 				}
 			})
@@ -294,6 +296,7 @@ var _ = Describe("Stream Controller", func() {
 				namespaced, err := NewJSController(k8sClient, &NatsConfig{ServerURL: testServer.ClientURL()}, &Config{Namespace: "other-namespace"})
 				Expect(err).NotTo(HaveOccurred())
 				controller = &StreamReconciler{
+					Scheme:              k8sClient.Scheme(),
 					JetStreamController: namespaced,
 				}
 			})
@@ -372,12 +375,13 @@ var _ = Describe("Stream Controller", func() {
 			// Setup client for not running server
 			// Use actual test server to ensure port not used by other service on test instance
 			sv := CreateTestServer()
-			base, err := NewJSController(k8sClient, &NatsConfig{ServerURL: sv.ClientURL()}, &Config{})
+			disconnectedController, err := NewJSController(k8sClient, &NatsConfig{ServerURL: sv.ClientURL()}, &Config{})
 			Expect(err).NotTo(HaveOccurred())
 			sv.Shutdown()
 
 			controller := &StreamReconciler{
-				base,
+				Scheme:              k8sClient.Scheme(),
+				JetStreamController: disconnectedController,
 			}
 
 			By("reconciling resource")
@@ -483,6 +487,7 @@ var _ = Describe("Stream Controller", func() {
 						readOnly, err := NewJSController(k8sClient, &NatsConfig{ServerURL: testServer.ClientURL()}, &Config{ReadOnly: true})
 						Expect(err).NotTo(HaveOccurred())
 						controller = &StreamReconciler{
+							Scheme:              k8sClient.Scheme(),
 							JetStreamController: readOnly,
 						}
 					})
@@ -508,6 +513,7 @@ var _ = Describe("Stream Controller", func() {
 						namespaced, err := NewJSController(k8sClient, &NatsConfig{ServerURL: testServer.ClientURL()}, &Config{Namespace: "other-namespace"})
 						Expect(err).NotTo(HaveOccurred())
 						controller = &StreamReconciler{
+							Scheme:              k8sClient.Scheme(),
 							JetStreamController: namespaced,
 						}
 					})

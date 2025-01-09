@@ -27,6 +27,7 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -35,6 +36,8 @@ import (
 
 // ObjectStoreReconciler reconciles a ObjectStore object
 type ObjectStoreReconciler struct {
+	Scheme *runtime.Scheme
+
 	JetStreamController
 }
 

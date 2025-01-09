@@ -26,6 +26,7 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -36,6 +37,8 @@ import (
 
 // ConsumerReconciler reconciles a Consumer object
 type ConsumerReconciler struct {
+	Scheme *runtime.Scheme
+
 	JetStreamController
 }
 

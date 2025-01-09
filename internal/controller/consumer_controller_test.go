@@ -93,7 +93,8 @@ var _ = Describe("Consumer Controller", func() {
 
 			By("setting up the tested controller")
 			controller = &ConsumerReconciler{
-				baseController,
+				Scheme:              k8sClient.Scheme(),
+				JetStreamController: baseController,
 			}
 		})
 
@@ -323,6 +324,7 @@ var _ = Describe("Consumer Controller", func() {
 					readOnly, err := NewJSController(k8sClient, &NatsConfig{ServerURL: testServer.ClientURL()}, &Config{ReadOnly: true})
 					Expect(err).NotTo(HaveOccurred())
 					controller = &ConsumerReconciler{
+						Scheme:              k8sClient.Scheme(),
 						JetStreamController: readOnly,
 					}
 				})
@@ -360,6 +362,7 @@ var _ = Describe("Consumer Controller", func() {
 					namespaced, err := NewJSController(k8sClient, &NatsConfig{ServerURL: testServer.ClientURL()}, &Config{Namespace: "other-namespace"})
 					Expect(err).NotTo(HaveOccurred())
 					controller = &ConsumerReconciler{
+						Scheme:              k8sClient.Scheme(),
 						JetStreamController: namespaced,
 					}
 				})
@@ -485,6 +488,7 @@ var _ = Describe("Consumer Controller", func() {
 							readOnly, err := NewJSController(k8sClient, &NatsConfig{ServerURL: testServer.ClientURL()}, &Config{ReadOnly: true})
 							Expect(err).NotTo(HaveOccurred())
 							controller = &ConsumerReconciler{
+								Scheme:              k8sClient.Scheme(),
 								JetStreamController: readOnly,
 							}
 						})
@@ -510,6 +514,7 @@ var _ = Describe("Consumer Controller", func() {
 							namespaced, err := NewJSController(k8sClient, &NatsConfig{ServerURL: testServer.ClientURL()}, &Config{Namespace: "other-namespace"})
 							Expect(err).NotTo(HaveOccurred())
 							controller = &ConsumerReconciler{
+								Scheme:              k8sClient.Scheme(),
 								JetStreamController: namespaced,
 							}
 						})
