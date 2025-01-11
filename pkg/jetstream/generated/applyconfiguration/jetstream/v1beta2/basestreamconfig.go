@@ -18,43 +18,14 @@ package v1beta2
 // BaseStreamConfigApplyConfiguration represents a declarative configuration of the BaseStreamConfig type for use
 // with apply.
 type BaseStreamConfigApplyConfiguration struct {
-	Account       *string                `json:"account,omitempty"`
-	Creds         *string                `json:"creds,omitempty"`
-	Nkey          *string                `json:"nkey,omitempty"`
-	PreventDelete *bool                  `json:"preventDelete,omitempty"`
-	PreventUpdate *bool                  `json:"preventUpdate,omitempty"`
-	Servers       []string               `json:"servers,omitempty"`
-	TLS           *TLSApplyConfiguration `json:"tls,omitempty"`
+	PreventDelete *bool `json:"preventDelete,omitempty"`
+	PreventUpdate *bool `json:"preventUpdate,omitempty"`
 }
 
 // BaseStreamConfigApplyConfiguration constructs a declarative configuration of the BaseStreamConfig type for use with
 // apply.
 func BaseStreamConfig() *BaseStreamConfigApplyConfiguration {
 	return &BaseStreamConfigApplyConfiguration{}
-}
-
-// WithAccount sets the Account field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Account field is set to the value of the last call.
-func (b *BaseStreamConfigApplyConfiguration) WithAccount(value string) *BaseStreamConfigApplyConfiguration {
-	b.Account = &value
-	return b
-}
-
-// WithCreds sets the Creds field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Creds field is set to the value of the last call.
-func (b *BaseStreamConfigApplyConfiguration) WithCreds(value string) *BaseStreamConfigApplyConfiguration {
-	b.Creds = &value
-	return b
-}
-
-// WithNkey sets the Nkey field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Nkey field is set to the value of the last call.
-func (b *BaseStreamConfigApplyConfiguration) WithNkey(value string) *BaseStreamConfigApplyConfiguration {
-	b.Nkey = &value
-	return b
 }
 
 // WithPreventDelete sets the PreventDelete field in the declarative configuration to the given value
@@ -70,23 +41,5 @@ func (b *BaseStreamConfigApplyConfiguration) WithPreventDelete(value bool) *Base
 // If called multiple times, the PreventUpdate field is set to the value of the last call.
 func (b *BaseStreamConfigApplyConfiguration) WithPreventUpdate(value bool) *BaseStreamConfigApplyConfiguration {
 	b.PreventUpdate = &value
-	return b
-}
-
-// WithServers adds the given value to the Servers field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the Servers field.
-func (b *BaseStreamConfigApplyConfiguration) WithServers(values ...string) *BaseStreamConfigApplyConfiguration {
-	for i := range values {
-		b.Servers = append(b.Servers, values[i])
-	}
-	return b
-}
-
-// WithTLS sets the TLS field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the TLS field is set to the value of the last call.
-func (b *BaseStreamConfigApplyConfiguration) WithTLS(value *TLSApplyConfiguration) *BaseStreamConfigApplyConfiguration {
-	b.TLS = value
 	return b
 }

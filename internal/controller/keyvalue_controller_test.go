@@ -629,13 +629,15 @@ func Test_mapKVSpecToConfig(t *testing.T) {
 				}},
 				Storage: "memory",
 				BaseStreamConfig: api.BaseStreamConfig{
-					Account:       "",
-					Creds:         "",
 					PreventDelete: false,
 					PreventUpdate: false,
-					Nkey:          "",
-					Servers:       nil,
-					TLS:           api.TLS{},
+					ConnectionOpts: api.ConnectionOpts{
+						Account: "",
+						Creds:   "",
+						Nkey:    "",
+						Servers: nil,
+						TLS:     api.TLS{},
+					},
 				},
 			},
 			want: jetstream.KeyValueConfig{

@@ -127,7 +127,7 @@ func (r *StreamReconciler) deleteStream(ctx context.Context, log logr.Logger, st
 
 	if !stream.Spec.PreventDelete && !r.ReadOnly() {
 		log.Info("Deleting stream.")
-		err := r.WithJetStreamClient(streamConnOpts(stream.Spec), func(js jetstream.JetStream) error {
+		err := r.WithJetStreamClient(stream.Spec.ConnectionOpts, func(js jetstream.JetStream) error {
 			return js.DeleteStream(ctx, stream.Spec.Name)
 		})
 		if errors.Is(err, jetstream.ErrStreamNotFound) {
@@ -170,7 +170,7 @@ func (r *StreamReconciler) createOrUpdate(ctx context.Context, log logr.Logger, 
 
 	// CreateOrUpdateStream is called on every reconciliation when the stream is not to be deleted.
 	// TODO(future-feature): Do we need to check if config differs?
-	err = r.WithJetStreamClient(streamConnOpts(stream.Spec), func(js jetstream.JetStream) error {
+	err = r.WithJetStreamClient(stream.Spec.ConnectionOpts, func(js jetstream.JetStream) error {
 		exists := false
 		_, err := js.Stream(ctx, targetConfig.Name)
 		if err == nil {
@@ -220,17 +220,6 @@ func (r *StreamReconciler) createOrUpdate(ctx context.Context, log logr.Logger, 
 	}
 
 	return nil
-}
-
-// streamConnOpts extracts nats connection relevant fields from the given stream spec as connectionOptions.
-func streamConnOpts(spec api.StreamSpec) *connectionOptions {
-	return &connectionOptions{
-		Account: spec.Account,
-		Creds:   spec.Creds,
-		Nkey:    spec.Nkey,
-		Servers: spec.Servers,
-		TLS:     spec.TLS,
-	}
 }
 
 // streamSpecToConfig creates a jetstream.StreamConfig matching the given stream resource spec

@@ -124,7 +124,7 @@ func (r *ConsumerReconciler) deleteConsumer(ctx context.Context, log logr.Logger
 	}
 
 	if !consumer.Spec.PreventDelete && !r.ReadOnly() {
-		err := r.WithJetStreamClient(consumerConnOpts(consumer.Spec), func(js jetstream.JetStream) error {
+		err := r.WithJetStreamClient(consumer.Spec.ConnectionOpts, func(js jetstream.JetStream) error {
 			return js.DeleteConsumer(ctx, consumer.Spec.StreamName, consumerName(consumer.Spec))
 		})
 		switch {
@@ -171,7 +171,7 @@ func (r *ConsumerReconciler) createOrUpdate(ctx context.Context, log klog.Logger
 		return fmt.Errorf("map consumer spec to target config: %w", err)
 	}
 
-	err = r.WithJetStreamClient(consumerConnOpts(consumer.Spec), func(js jetstream.JetStream) error {
+	err = r.WithJetStreamClient(consumer.Spec.ConnectionOpts, func(js jetstream.JetStream) error {
 		consumerName := targetConfig.Name
 		if consumerName == "" {
 			consumerName = targetConfig.Durable
@@ -226,16 +226,6 @@ func (r *ConsumerReconciler) createOrUpdate(ctx context.Context, log klog.Logger
 	}
 
 	return nil
-}
-
-func consumerConnOpts(spec api.ConsumerSpec) *connectionOptions {
-	return &connectionOptions{
-		Account: spec.Account,
-		Creds:   spec.Creds,
-		Nkey:    spec.Nkey,
-		Servers: spec.Servers,
-		TLS:     spec.TLS,
-	}
 }
 
 func consumerSpecToConfig(spec *api.ConsumerSpec) (*jetstream.ConsumerConfig, error) {

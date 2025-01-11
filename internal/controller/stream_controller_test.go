@@ -654,13 +654,15 @@ func Test_mapSpecToConfig(t *testing.T) {
 				Storage:  "file",
 				Subjects: []string{"orders.*"},
 				BaseStreamConfig: api.BaseStreamConfig{
-					Account:       "",
-					Creds:         "",
-					Nkey:          "",
 					PreventDelete: false,
 					PreventUpdate: false,
-					Servers:       nil,
-					TLS:           api.TLS{},
+					ConnectionOpts: api.ConnectionOpts{
+						Account: "",
+						Creds:   "",
+						Nkey:    "",
+						Servers: nil,
+						TLS:     api.TLS{},
+					},
 				},
 			},
 			want: jetstream.StreamConfig{

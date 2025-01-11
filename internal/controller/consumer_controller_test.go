@@ -61,7 +61,7 @@ var _ = Describe("Consumer Controller", func() {
 			Name: consumerName,
 		}
 
-		// Tested coontroller
+		// Tested controller
 		var controller *ConsumerReconciler
 
 		BeforeEach(func(ctx SpecContext) {
@@ -599,7 +599,6 @@ func Test_consumerSpecToConfig(t *testing.T) {
 				AckPolicy:          "explicit",
 				AckWait:            "10ns",
 				BackOff:            []string{"1s", "5m"},
-				Creds:              "",
 				DeliverGroup:       "",
 				DeliverPolicy:      "new",
 				DeliverSubject:     "",
@@ -619,19 +618,24 @@ func Test_consumerSpecToConfig(t *testing.T) {
 				MaxRequestMaxBytes: 1024,
 				MaxWaiting:         5,
 				MemStorage:         true,
-				Nkey:               "",
 				OptStartSeq:        17,
 				OptStartTime:       dateString,
 				RateLimitBps:       512,
 				ReplayPolicy:       "instant",
 				Replicas:           9,
 				SampleFreq:         "25%",
-				Servers:            nil,
 				StreamName:         "",
-				TLS:                api.TLS{},
-				Account:            "",
 				Metadata: map[string]string{
 					"meta": "data",
+				},
+				BaseStreamConfig: api.BaseStreamConfig{
+					ConnectionOpts: api.ConnectionOpts{
+						Account: "",
+						Creds:   "",
+						Nkey:    "",
+						TLS:     api.TLS{},
+						Servers: nil,
+					},
 				},
 			},
 			want: &jetstream.ConsumerConfig{

@@ -14,6 +14,7 @@ import (
 type Config struct {
 	ReadOnly  bool
 	Namespace string
+	CacheDir  string
 }
 
 // RegisterAll registers all available jetStream controllers to the manager.
@@ -26,6 +27,13 @@ func RegisterAll(mgr ctrl.Manager, clientConfig *NatsConfig, config *Config) err
 	baseController, err := NewJSController(mgr.GetClient(), clientConfig, config)
 	if err != nil {
 		return fmt.Errorf("create base jetstream controller: %w", err)
+	}
+
+	if err := (&AccountReconciler{
+		Scheme:              scheme,
+		JetStreamController: baseController,
+	}).SetupWithManager(mgr); err != nil {
+		return fmt.Errorf("unable to create account controller: %w", err)
 	}
 
 	if err := (&ConsumerReconciler{

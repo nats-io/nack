@@ -127,7 +127,7 @@ func (r *ObjectStoreReconciler) deleteObjectStore(ctx context.Context, log logr.
 
 	if !objectStore.Spec.PreventDelete && !r.ReadOnly() {
 		log.Info("Deleting ObjectStore.")
-		err := r.WithJetStreamClient(objectStoreConnOpts(objectStore.Spec), func(js jetstream.JetStream) error {
+		err := r.WithJetStreamClient(objectStore.Spec.ConnectionOpts, func(js jetstream.JetStream) error {
 			return js.DeleteObjectStore(ctx, objectStore.Spec.Bucket)
 		})
 		// FIX: ErrStreamNotFound -> ErrBucketNotFound once nats.go is corrected
@@ -171,7 +171,7 @@ func (r *ObjectStoreReconciler) createOrUpdate(ctx context.Context, log logr.Log
 
 	// UpdateObjectStore is called on every reconciliation when the stream is not to be deleted.
 	// TODO(future-feature): Do we need to check if config differs?
-	err = r.WithJetStreamClient(objectStoreConnOpts(objectStore.Spec), func(js jetstream.JetStream) error {
+	err = r.WithJetStreamClient(objectStore.Spec.ConnectionOpts, func(js jetstream.JetStream) error {
 		exists := false
 		_, err := js.ObjectStore(ctx, targetConfig.Bucket)
 		if err == nil {
@@ -221,17 +221,6 @@ func (r *ObjectStoreReconciler) createOrUpdate(ctx context.Context, log logr.Log
 	}
 
 	return nil
-}
-
-// objectStoreConnOpts extracts nats connection relevant fields from the given ObjectStore spec as connectionOptions.
-func objectStoreConnOpts(spec api.ObjectStoreSpec) *connectionOptions {
-	return &connectionOptions{
-		Account: spec.Account,
-		Creds:   spec.Creds,
-		Nkey:    spec.Nkey,
-		Servers: spec.Servers,
-		TLS:     spec.TLS,
-	}
 }
 
 // objectStoreSpecToConfig creates a jetstream.ObjectStoreConfig matching the given ObjectStore resource spec

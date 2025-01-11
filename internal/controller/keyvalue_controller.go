@@ -126,7 +126,7 @@ func (r *KeyValueReconciler) deleteKeyValue(ctx context.Context, log logr.Logger
 
 	if !keyValue.Spec.PreventDelete && !r.ReadOnly() {
 		log.Info("Deleting KeyValue.")
-		err := r.WithJetStreamClient(keyValueConnOpts(keyValue.Spec), func(js jetstream.JetStream) error {
+		err := r.WithJetStreamClient(keyValue.Spec.ConnectionOpts, func(js jetstream.JetStream) error {
 			return js.DeleteKeyValue(ctx, keyValue.Spec.Bucket)
 		})
 		if errors.Is(err, jetstream.ErrBucketNotFound) {
@@ -169,7 +169,7 @@ func (r *KeyValueReconciler) createOrUpdate(ctx context.Context, log logr.Logger
 
 	// UpdateKeyValue is called on every reconciliation when the stream is not to be deleted.
 	// TODO(future-feature): Do we need to check if config differs?
-	err = r.WithJetStreamClient(keyValueConnOpts(keyValue.Spec), func(js jetstream.JetStream) error {
+	err = r.WithJetStreamClient(keyValue.Spec.ConnectionOpts, func(js jetstream.JetStream) error {
 		exists := false
 		_, err := js.KeyValue(ctx, targetConfig.Bucket)
 		if err == nil {
@@ -219,17 +219,6 @@ func (r *KeyValueReconciler) createOrUpdate(ctx context.Context, log logr.Logger
 	}
 
 	return nil
-}
-
-// keyValueConnOpts extracts nats connection relevant fields from the given KeyValue spec as connectionOptions.
-func keyValueConnOpts(spec api.KeyValueSpec) *connectionOptions {
-	return &connectionOptions{
-		Account: spec.Account,
-		Creds:   spec.Creds,
-		Nkey:    spec.Nkey,
-		Servers: spec.Servers,
-		TLS:     spec.TLS,
-	}
 }
 
 // keyValueSpecToConfig creates a jetstream.KeyValueConfig matching the given KeyValue resource spec

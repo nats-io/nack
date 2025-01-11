@@ -590,13 +590,15 @@ func Test_mapobjectstoreSpecToConfig(t *testing.T) {
 					"foo": "bar",
 				},
 				BaseStreamConfig: api.BaseStreamConfig{
-					Account:       "",
-					Creds:         "",
 					PreventDelete: false,
 					PreventUpdate: false,
-					Nkey:          "",
-					Servers:       nil,
-					TLS:           api.TLS{},
+					ConnectionOpts: api.ConnectionOpts{
+						Account: "",
+						Creds:   "",
+						Nkey:    "",
+						Servers: nil,
+						TLS:     api.TLS{},
+					},
 				},
 			},
 			want: jetstream.ObjectStoreConfig{

@@ -171,6 +171,13 @@ func runControlLoop(config *rest.Config, natsCfg *controller.NatsConfig, control
 		return fmt.Errorf("unable to start manager: %w", err)
 	}
 
+	cacheDir, err := os.MkdirTemp(".", "nack")
+	if err != nil {
+		return fmt.Errorf("create cache dir: %w", err)
+	}
+	defer os.RemoveAll(cacheDir)
+	controllerCfg.CacheDir = cacheDir
+
 	err = controller.RegisterAll(mgr, natsCfg, controllerCfg)
 	if err != nil {
 		return fmt.Errorf("register jetstream controllers: %w", err)

@@ -18,42 +18,37 @@ package v1beta2
 // ConsumerSpecApplyConfiguration represents a declarative configuration of the ConsumerSpec type for use
 // with apply.
 type ConsumerSpecApplyConfiguration struct {
-	AckPolicy          *string                `json:"ackPolicy,omitempty"`
-	AckWait            *string                `json:"ackWait,omitempty"`
-	BackOff            []string               `json:"backoff,omitempty"`
-	Creds              *string                `json:"creds,omitempty"`
-	DeliverGroup       *string                `json:"deliverGroup,omitempty"`
-	DeliverPolicy      *string                `json:"deliverPolicy,omitempty"`
-	DeliverSubject     *string                `json:"deliverSubject,omitempty"`
-	Description        *string                `json:"description,omitempty"`
-	PreventDelete      *bool                  `json:"preventDelete,omitempty"`
-	PreventUpdate      *bool                  `json:"preventUpdate,omitempty"`
-	DurableName        *string                `json:"durableName,omitempty"`
-	FilterSubject      *string                `json:"filterSubject,omitempty"`
-	FilterSubjects     []string               `json:"filterSubjects,omitempty"`
-	FlowControl        *bool                  `json:"flowControl,omitempty"`
-	HeadersOnly        *bool                  `json:"headersOnly,omitempty"`
-	HeartbeatInterval  *string                `json:"heartbeatInterval,omitempty"`
-	MaxAckPending      *int                   `json:"maxAckPending,omitempty"`
-	MaxDeliver         *int                   `json:"maxDeliver,omitempty"`
-	MaxRequestBatch    *int                   `json:"maxRequestBatch,omitempty"`
-	MaxRequestExpires  *string                `json:"maxRequestExpires,omitempty"`
-	MaxRequestMaxBytes *int                   `json:"maxRequestMaxBytes,omitempty"`
-	MaxWaiting         *int                   `json:"maxWaiting,omitempty"`
-	MemStorage         *bool                  `json:"memStorage,omitempty"`
-	Name               *string                `json:"name,omitempty"`
-	Nkey               *string                `json:"nkey,omitempty"`
-	OptStartSeq        *int                   `json:"optStartSeq,omitempty"`
-	OptStartTime       *string                `json:"optStartTime,omitempty"`
-	RateLimitBps       *int                   `json:"rateLimitBps,omitempty"`
-	ReplayPolicy       *string                `json:"replayPolicy,omitempty"`
-	Replicas           *int                   `json:"replicas,omitempty"`
-	SampleFreq         *string                `json:"sampleFreq,omitempty"`
-	Servers            []string               `json:"servers,omitempty"`
-	StreamName         *string                `json:"streamName,omitempty"`
-	TLS                *TLSApplyConfiguration `json:"tls,omitempty"`
-	Account            *string                `json:"account,omitempty"`
-	Metadata           map[string]string      `json:"metadata,omitempty"`
+	AckPolicy          *string           `json:"ackPolicy,omitempty"`
+	AckWait            *string           `json:"ackWait,omitempty"`
+	BackOff            []string          `json:"backoff,omitempty"`
+	DeliverGroup       *string           `json:"deliverGroup,omitempty"`
+	DeliverPolicy      *string           `json:"deliverPolicy,omitempty"`
+	DeliverSubject     *string           `json:"deliverSubject,omitempty"`
+	Description        *string           `json:"description,omitempty"`
+	PreventDelete      *bool             `json:"preventDelete,omitempty"`
+	PreventUpdate      *bool             `json:"preventUpdate,omitempty"`
+	DurableName        *string           `json:"durableName,omitempty"`
+	FilterSubject      *string           `json:"filterSubject,omitempty"`
+	FilterSubjects     []string          `json:"filterSubjects,omitempty"`
+	FlowControl        *bool             `json:"flowControl,omitempty"`
+	HeadersOnly        *bool             `json:"headersOnly,omitempty"`
+	HeartbeatInterval  *string           `json:"heartbeatInterval,omitempty"`
+	MaxAckPending      *int              `json:"maxAckPending,omitempty"`
+	MaxDeliver         *int              `json:"maxDeliver,omitempty"`
+	MaxRequestBatch    *int              `json:"maxRequestBatch,omitempty"`
+	MaxRequestExpires  *string           `json:"maxRequestExpires,omitempty"`
+	MaxRequestMaxBytes *int              `json:"maxRequestMaxBytes,omitempty"`
+	MaxWaiting         *int              `json:"maxWaiting,omitempty"`
+	MemStorage         *bool             `json:"memStorage,omitempty"`
+	Name               *string           `json:"name,omitempty"`
+	OptStartSeq        *int              `json:"optStartSeq,omitempty"`
+	OptStartTime       *string           `json:"optStartTime,omitempty"`
+	RateLimitBps       *int              `json:"rateLimitBps,omitempty"`
+	ReplayPolicy       *string           `json:"replayPolicy,omitempty"`
+	Replicas           *int              `json:"replicas,omitempty"`
+	SampleFreq         *string           `json:"sampleFreq,omitempty"`
+	StreamName         *string           `json:"streamName,omitempty"`
+	Metadata           map[string]string `json:"metadata,omitempty"`
 }
 
 // ConsumerSpecApplyConfiguration constructs a declarative configuration of the ConsumerSpec type for use with
@@ -85,14 +80,6 @@ func (b *ConsumerSpecApplyConfiguration) WithBackOff(values ...string) *Consumer
 	for i := range values {
 		b.BackOff = append(b.BackOff, values[i])
 	}
-	return b
-}
-
-// WithCreds sets the Creds field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Creds field is set to the value of the last call.
-func (b *ConsumerSpecApplyConfiguration) WithCreds(value string) *ConsumerSpecApplyConfiguration {
-	b.Creds = &value
 	return b
 }
 
@@ -258,14 +245,6 @@ func (b *ConsumerSpecApplyConfiguration) WithName(value string) *ConsumerSpecApp
 	return b
 }
 
-// WithNkey sets the Nkey field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Nkey field is set to the value of the last call.
-func (b *ConsumerSpecApplyConfiguration) WithNkey(value string) *ConsumerSpecApplyConfiguration {
-	b.Nkey = &value
-	return b
-}
-
 // WithOptStartSeq sets the OptStartSeq field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the OptStartSeq field is set to the value of the last call.
@@ -314,37 +293,11 @@ func (b *ConsumerSpecApplyConfiguration) WithSampleFreq(value string) *ConsumerS
 	return b
 }
 
-// WithServers adds the given value to the Servers field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the Servers field.
-func (b *ConsumerSpecApplyConfiguration) WithServers(values ...string) *ConsumerSpecApplyConfiguration {
-	for i := range values {
-		b.Servers = append(b.Servers, values[i])
-	}
-	return b
-}
-
 // WithStreamName sets the StreamName field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the StreamName field is set to the value of the last call.
 func (b *ConsumerSpecApplyConfiguration) WithStreamName(value string) *ConsumerSpecApplyConfiguration {
 	b.StreamName = &value
-	return b
-}
-
-// WithTLS sets the TLS field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the TLS field is set to the value of the last call.
-func (b *ConsumerSpecApplyConfiguration) WithTLS(value *TLSApplyConfiguration) *ConsumerSpecApplyConfiguration {
-	b.TLS = value
-	return b
-}
-
-// WithAccount sets the Account field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Account field is set to the value of the last call.
-func (b *ConsumerSpecApplyConfiguration) WithAccount(value string) *ConsumerSpecApplyConfiguration {
-	b.Account = &value
 	return b
 }
 

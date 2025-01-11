@@ -23,13 +23,18 @@ type Condition struct {
 }
 
 type BaseStreamConfig struct {
-	Account       string   `json:"account"`
-	Creds         string   `json:"creds"`
-	Nkey          string   `json:"nkey"`
-	PreventDelete bool     `json:"preventDelete"`
-	PreventUpdate bool     `json:"preventUpdate"`
-	Servers       []string `json:"servers"`
-	TLS           TLS      `json:"tls"`
+	PreventDelete bool `json:"preventDelete"`
+	PreventUpdate bool `json:"preventUpdate"`
+	ConnectionOpts
+}
+
+type ConnectionOpts struct {
+	Account  string   `json:"account"`
+	Creds    string   `json:"creds"`
+	Nkey     string   `json:"nkey"`
+	Servers  []string `json:"servers"`
+	TLS      TLS      `json:"tls"`
+	TLSFirst string   `json:"tlsFirst"`
 }
 
 type ConsumerLimits struct {
@@ -51,8 +56,8 @@ type TLSSecret struct {
 }
 
 type CredsSecret struct {
-	File   string    `json:"file"`
-	Secret SecretRef `json:"secret"`
+	File   string     `json:"file"`
+	Secret *SecretRef `json:"secret"`
 }
 
 type SecretRef struct {
