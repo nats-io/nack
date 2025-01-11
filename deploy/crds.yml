@@ -513,6 +513,11 @@ spec:
           spec:
             type: object
             properties:
+              name:
+                description: The name of the Consumer.
+                type: string
+                pattern: '^[^.*>]+$'
+                minLength: 1
               streamName:
                 description: The name of the Stream to create the Consumer in.
                 type: string
@@ -533,11 +538,6 @@ spec:
               optStartTime:
                 description: Time format must be RFC3339.
                 type: string
-              durableName:
-                description: The name of the Consumer.
-                type: string
-                pattern: '^[^.*>]+$'
-                minLength: 1
               deliverSubject:
                 description: The subject to deliver observed messages, when not set, a pull-based Consumer is created.
                 type: string

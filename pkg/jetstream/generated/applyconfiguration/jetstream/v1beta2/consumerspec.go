@@ -41,6 +41,7 @@ type ConsumerSpecApplyConfiguration struct {
 	MaxRequestMaxBytes *int                   `json:"maxRequestMaxBytes,omitempty"`
 	MaxWaiting         *int                   `json:"maxWaiting,omitempty"`
 	MemStorage         *bool                  `json:"memStorage,omitempty"`
+	Name               *string                `json:"name,omitempty"`
 	Nkey               *string                `json:"nkey,omitempty"`
 	OptStartSeq        *int                   `json:"optStartSeq,omitempty"`
 	OptStartTime       *string                `json:"optStartTime,omitempty"`
@@ -246,6 +247,14 @@ func (b *ConsumerSpecApplyConfiguration) WithMaxWaiting(value int) *ConsumerSpec
 // If called multiple times, the MemStorage field is set to the value of the last call.
 func (b *ConsumerSpecApplyConfiguration) WithMemStorage(value bool) *ConsumerSpecApplyConfiguration {
 	b.MemStorage = &value
+	return b
+}
+
+// WithName sets the Name field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Name field is set to the value of the last call.
+func (b *ConsumerSpecApplyConfiguration) WithName(value string) *ConsumerSpecApplyConfiguration {
+	b.Name = &value
 	return b
 }
 

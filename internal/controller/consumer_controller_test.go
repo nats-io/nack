@@ -58,7 +58,7 @@ var _ = Describe("Consumer Controller", func() {
 		}
 
 		emptyConsumerConfig := jetstream.ConsumerConfig{
-			Durable: consumerName,
+			Name: consumerName,
 		}
 
 		// Tested coontroller
@@ -76,7 +76,7 @@ var _ = Describe("Consumer Controller", func() {
 					Spec: api.ConsumerSpec{
 						AckPolicy:     "explicit",
 						DeliverPolicy: "all",
-						DurableName:   consumerName,
+						Name:          consumerName,
 						Description:   "test consumer",
 						StreamName:    streamName,
 						ReplayPolicy:  "instant",
@@ -606,7 +606,7 @@ func Test_consumerSpecToConfig(t *testing.T) {
 				Description:        "test consumer",
 				PreventDelete:      false,
 				PreventUpdate:      false,
-				DurableName:        "test-consumer",
+				Name:               "test-consumer",
 				FilterSubject:      "time.us.>",
 				FilterSubjects:     []string{"time.us.east", "time.us.west"},
 				FlowControl:        false,
@@ -635,8 +635,7 @@ func Test_consumerSpecToConfig(t *testing.T) {
 				},
 			},
 			want: &jetstream.ConsumerConfig{
-				Name:               "", // Optional, not mapped
-				Durable:            "test-consumer",
+				Name:               "test-consumer",
 				Description:        "test consumer",
 				DeliverPolicy:      jetstream.DeliverNewPolicy,
 				OptStartSeq:        17,

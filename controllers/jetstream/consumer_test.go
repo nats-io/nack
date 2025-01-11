@@ -55,7 +55,7 @@ func TestProcessConsumer(t *testing.T) {
 				Generation: 1,
 			},
 			Spec: apis.ConsumerSpec{
-				DurableName:       name,
+				Name:              name,
 				DeliverPolicy:     "byStartTime",
 				OptStartTime:      time.Now().Format(time.RFC3339),
 				AckPolicy:         "explicit",
@@ -124,7 +124,7 @@ func TestProcessConsumer(t *testing.T) {
 				Generation: 1,
 			},
 			Spec: apis.ConsumerSpec{
-				DurableName:   name,
+				Name:          name,
 				DeliverPolicy: "invalid",
 			},
 		})
@@ -179,7 +179,7 @@ func TestProcessConsumer(t *testing.T) {
 				Generation: 2,
 			},
 			Spec: apis.ConsumerSpec{
-				DurableName: name,
+				Name: name,
 			},
 			Status: apis.Status{
 				ObservedGeneration: 1,
@@ -237,7 +237,7 @@ func TestProcessConsumer(t *testing.T) {
 				DeletionTimestamp: &ts,
 			},
 			Spec: apis.ConsumerSpec{
-				DurableName: name,
+				Name: name,
 			},
 		})
 		if err != nil {
@@ -289,7 +289,7 @@ func TestProcessConsumer(t *testing.T) {
 				Generation: 1,
 			},
 			Spec: apis.ConsumerSpec{
-				DurableName: name,
+				Name: name,
 			},
 		})
 		if err != nil {
@@ -339,7 +339,7 @@ func TestConsumerSpecToOpts(t *testing.T) {
 	}{
 		"valid consumer spec": {
 			given: apis.ConsumerSpec{
-				DurableName:       "my-consumer",
+				Name:              "my-consumer",
 				DeliverPolicy:     "byStartSequence",
 				OptStartSeq:       10,
 				AckPolicy:         "explicit",
@@ -356,7 +356,7 @@ func TestConsumerSpecToOpts(t *testing.T) {
 				AckPolicy:         jsmapi.AckExplicit,
 				AckWait:           1 * time.Minute,
 				DeliverPolicy:     jsmapi.DeliverByStartSequence,
-				Durable:           "my-consumer",
+				Name:              "my-consumer",
 				Heartbeat:         30 * time.Second,
 				BackOff:           []time.Duration{500 * time.Millisecond, 1 * time.Second},
 				OptStartSeq:       10,
@@ -369,15 +369,15 @@ func TestConsumerSpecToOpts(t *testing.T) {
 		},
 		"valid consumer spec, defaults only": {
 			given: apis.ConsumerSpec{
-				DurableName: "my-consumer",
+				Name: "my-consumer",
 			},
 			expected: jsmapi.ConsumerConfig{
-				Durable: "my-consumer",
+				Name: "my-consumer",
 			},
 		},
 		"invalid deliver policy value": {
 			given: apis.ConsumerSpec{
-				DurableName:   "my-consumer",
+				Name:          "my-consumer",
 				DeliverPolicy: "invalid",
 			},
 			errCheck: func(t *testing.T, err error) {
@@ -387,7 +387,7 @@ func TestConsumerSpecToOpts(t *testing.T) {
 		},
 		"missing start time for deliver policy byStartTime": {
 			given: apis.ConsumerSpec{
-				DurableName:   "my-consumer",
+				Name:          "my-consumer",
 				DeliverPolicy: "byStartTime",
 			},
 			errCheck: func(t *testing.T, err error) {
@@ -397,8 +397,8 @@ func TestConsumerSpecToOpts(t *testing.T) {
 		},
 		"invalid ack policy": {
 			given: apis.ConsumerSpec{
-				DurableName: "my-consumer",
-				AckPolicy:   "invalid",
+				Name:      "my-consumer",
+				AckPolicy: "invalid",
 			},
 			errCheck: func(t *testing.T, err error) {
 				require.Error(t, err)
@@ -407,7 +407,7 @@ func TestConsumerSpecToOpts(t *testing.T) {
 		},
 		"invalid replay policy": {
 			given: apis.ConsumerSpec{
-				DurableName:  "my-consumer",
+				Name:         "my-consumer",
 				ReplayPolicy: "invalid",
 			},
 			errCheck: func(t *testing.T, err error) {

@@ -2,6 +2,7 @@ package controller
 
 const (
 	readyCondType        = "Ready"
+	accountFinalizer     = "account.nats.io/finalizer"
 	streamFinalizer      = "stream.nats.io/finalizer"
 	keyValueFinalizer    = "kv.nats.io/finalizer"
 	objectStoreFinalizer = "objectstore.nats.io/finalizer"

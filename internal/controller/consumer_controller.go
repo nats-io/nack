@@ -66,8 +66,8 @@ func (r *ConsumerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	log = log.WithValues(
-		"streamName", consumer.Spec.StreamName,
-		"consumerName", consumer.Spec.DurableName,
+		"streamName", consumerName(consumer.Spec),
+		"consumerName", consumerName,
 	)
 
 	// Update ready status to unknown when no status is set
@@ -125,7 +125,7 @@ func (r *ConsumerReconciler) deleteConsumer(ctx context.Context, log logr.Logger
 
 	if !consumer.Spec.PreventDelete && !r.ReadOnly() {
 		err := r.WithJetStreamClient(consumerConnOpts(consumer.Spec), func(js jetstream.JetStream) error {
-			return js.DeleteConsumer(ctx, consumer.Spec.StreamName, consumer.Spec.DurableName)
+			return js.DeleteConsumer(ctx, consumer.Spec.StreamName, consumerName(consumer.Spec))
 		})
 		switch {
 		case errors.Is(err, jetstream.ErrConsumerNotFound):
@@ -139,7 +139,7 @@ func (r *ConsumerReconciler) deleteConsumer(ctx context.Context, log logr.Logger
 		}
 	} else {
 		log.Info("Skipping consumer deletion.",
-			"consumerName", consumer.Spec.DurableName,
+			"consumerName", consumerName(consumer.Spec),
 			"preventDelete", consumer.Spec.PreventDelete,
 			"read-only", r.ReadOnly(),
 		)
@@ -240,7 +240,7 @@ func consumerConnOpts(spec api.ConsumerSpec) *connectionOptions {
 
 func consumerSpecToConfig(spec *api.ConsumerSpec) (*jetstream.ConsumerConfig, error) {
 	config := &jetstream.ConsumerConfig{
-		Durable:            spec.DurableName,
+		Name:               spec.Name,
 		Description:        spec.Description,
 		OptStartSeq:        uint64(spec.OptStartSeq),
 		MaxDeliver:         spec.MaxDeliver,
@@ -258,8 +258,15 @@ func consumerSpecToConfig(spec *api.ConsumerSpec) (*jetstream.ConsumerConfig, er
 		Metadata:           spec.Metadata,
 
 		// Explicitly set not (yet) mapped fields
-		Name:              "",
 		InactiveThreshold: 0,
+	}
+
+	// Support deprecated option
+	if spec.DurableName != "" {
+		if spec.Name != "" && spec.DurableName != spec.Name {
+			return nil, fmt.Errorf("durable name and name must be the same")
+		}
+		config.Durable = spec.DurableName
 	}
 
 	// DeliverPolicy
@@ -332,4 +339,13 @@ func (r *ConsumerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&api.Consumer{}).
 		WithEventFilter(predicate.GenerationChangedPredicate{}).
 		Complete(r)
+}
+
+// Durable is a deprecated field with all consumers having names.
+func consumerName(spec api.ConsumerSpec) string {
+	if spec.Name != "" {
+		return spec.Name
+	}
+
+	return spec.DurableName
 }

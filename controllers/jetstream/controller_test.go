@@ -311,7 +311,7 @@ func TestShouldEnqueue(t *testing.T) {
 					Name:      "obj-name",
 				},
 				Spec: apis.ConsumerSpec{
-					DurableName: "foo",
+					Name: "foo",
 				},
 			},
 			next: &apis.Consumer{
@@ -320,7 +320,7 @@ func TestShouldEnqueue(t *testing.T) {
 					Name:      "obj-name",
 				},
 				Spec: apis.ConsumerSpec{
-					DurableName: "bar",
+					Name: "bar",
 				},
 			},
 			want: true,
