@@ -29,12 +29,13 @@ type BaseStreamConfig struct {
 }
 
 type ConnectionOpts struct {
-	Account  string   `json:"account"`
-	Creds    string   `json:"creds"`
-	Nkey     string   `json:"nkey"`
-	Servers  []string `json:"servers"`
-	TLS      TLS      `json:"tls"`
-	TLSFirst bool     `json:"tlsFirst"`
+	Account   string   `json:"account"`
+	Creds     string   `json:"creds"`
+	Namespace string   `json:"namespace"`
+	Nkey      string   `json:"nkey"`
+	Servers   []string `json:"servers"`
+	TLS       TLS      `json:"tls"`
+	TLSFirst  bool     `json:"tlsFirst"`
 }
 
 type ConsumerLimits struct {

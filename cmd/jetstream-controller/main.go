@@ -111,6 +111,7 @@ func run() error {
 			ReadOnly:  *readOnly,
 			Namespace: *namespace,
 		}
+
 		return runControlLoop(config, natsCfg, controllerCfg)
 	}
 

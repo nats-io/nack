@@ -92,7 +92,7 @@ func (c *jsController) natsConfigFromOpts(opts api.ConnectionOpts) (*NatsConfig,
 	err := c.Get(ctx,
 		types.NamespacedName{
 			Name:      opts.Account,
-			Namespace: c.controllerConfig.Namespace,
+			Namespace: opts.Namespace,
 		},
 		account,
 	)
@@ -100,14 +100,16 @@ func (c *jsController) natsConfigFromOpts(opts api.ConnectionOpts) (*NatsConfig,
 		return nil, err
 	}
 
-	natsConfig.ServerURL = strings.Join(account.Spec.Servers, ",")
+	if len(account.Spec.Servers) > 0 {
+		natsConfig.ServerURL = strings.Join(account.Spec.Servers, ",")
+	}
 
 	if account.Spec.TLS != nil && account.Spec.TLS.Secret != nil {
 		tlsSecret := &v1.Secret{}
 		err := c.Get(ctx,
 			types.NamespacedName{
 				Name:      account.Spec.TLS.Secret.Name,
-				Namespace: c.controllerConfig.Namespace,
+				Namespace: opts.Namespace,
 			},
 			tlsSecret,
 		)
@@ -150,7 +152,7 @@ func (c *jsController) natsConfigFromOpts(opts api.ConnectionOpts) (*NatsConfig,
 		err := c.Get(ctx,
 			types.NamespacedName{
 				Name:      account.Spec.Creds.Secret.Name,
-				Namespace: c.controllerConfig.Namespace,
+				Namespace: opts.Namespace,
 			},
 			credsSecret,
 		)

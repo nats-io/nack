@@ -69,6 +69,10 @@ func (r *KeyValueReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, fmt.Errorf("get keyvalue resource '%s': %w", req.NamespacedName.String(), err)
 	}
 
+	if keyValue.Spec.Namespace == "" {
+		keyValue.Spec.Namespace = keyValue.Namespace
+	}
+
 	log = log.WithValues("keyValueName", keyValue.Spec.Bucket)
 
 	// Update ready status to unknown when no status is set
@@ -127,6 +131,13 @@ func (r *KeyValueReconciler) deleteKeyValue(ctx context.Context, log logr.Logger
 	if !keyValue.Spec.PreventDelete && !r.ReadOnly() {
 		log.Info("Deleting KeyValue.")
 		err := r.WithJetStreamClient(keyValue.Spec.ConnectionOpts, func(js jetstream.JetStream) error {
+			_, err := js.KeyValue(ctx, keyValue.Spec.Bucket)
+			if err != nil {
+				if errors.Is(err, jetstream.ErrBucketNotFound) || errors.Is(err, jetstream.ErrJetStreamNotEnabled) || errors.Is(err, jetstream.ErrJetStreamNotEnabledForAccount) {
+					return nil
+				}
+				return err
+			}
 			return js.DeleteKeyValue(ctx, keyValue.Spec.Bucket)
 		})
 		if errors.Is(err, jetstream.ErrBucketNotFound) {

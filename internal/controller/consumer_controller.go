@@ -65,9 +65,22 @@ func (r *ConsumerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, fmt.Errorf("get consumer resource '%s': %w", req.NamespacedName.String(), err)
 	}
 
+	// Set both Name values
+	if consumer.Spec.Name == "" {
+		consumer.Spec.Name = consumer.Spec.DurableName
+	}
+
+	if consumer.Spec.DurableName == "" {
+		consumer.Spec.DurableName = consumer.Spec.Name
+	}
+
+	if consumer.Spec.Namespace == "" {
+		consumer.Spec.Namespace = consumer.Namespace
+	}
+
 	log = log.WithValues(
-		"streamName", consumerName(consumer.Spec),
-		"consumerName", consumerName,
+		"streamName", consumer.Spec.StreamName,
+		"consumerName", consumer.Spec.Name,
 	)
 
 	// Update ready status to unknown when no status is set
@@ -125,7 +138,14 @@ func (r *ConsumerReconciler) deleteConsumer(ctx context.Context, log logr.Logger
 
 	if !consumer.Spec.PreventDelete && !r.ReadOnly() {
 		err := r.WithJetStreamClient(consumer.Spec.ConnectionOpts, func(js jetstream.JetStream) error {
-			return js.DeleteConsumer(ctx, consumer.Spec.StreamName, consumerName(consumer.Spec))
+			_, err := js.Consumer(ctx, consumer.Spec.StreamName, consumer.Spec.Name)
+			if err != nil {
+				if errors.Is(err, jetstream.ErrConsumerNotFound) || errors.Is(err, jetstream.ErrJetStreamNotEnabled) || errors.Is(err, jetstream.ErrJetStreamNotEnabledForAccount) {
+					return nil
+				}
+				return err
+			}
+			return js.DeleteConsumer(ctx, consumer.Spec.StreamName, consumer.Spec.Name)
 		})
 		switch {
 		case errors.Is(err, jetstream.ErrConsumerNotFound):
@@ -139,7 +159,7 @@ func (r *ConsumerReconciler) deleteConsumer(ctx context.Context, log logr.Logger
 		}
 	} else {
 		log.Info("Skipping consumer deletion.",
-			"consumerName", consumerName(consumer.Spec),
+			"consumerName", consumer.Spec.Name,
 			"preventDelete", consumer.Spec.PreventDelete,
 			"read-only", r.ReadOnly(),
 		)
@@ -172,13 +192,8 @@ func (r *ConsumerReconciler) createOrUpdate(ctx context.Context, log klog.Logger
 	}
 
 	err = r.WithJetStreamClient(consumer.Spec.ConnectionOpts, func(js jetstream.JetStream) error {
-		consumerName := targetConfig.Name
-		if consumerName == "" {
-			consumerName = targetConfig.Durable
-		}
-
 		exists := false
-		_, err := js.Consumer(ctx, consumer.Spec.StreamName, consumerName)
+		_, err := js.Consumer(ctx, consumer.Spec.StreamName, consumer.Spec.Name)
 		if err == nil {
 			exists = true
 		} else if !errors.Is(err, jetstream.ErrConsumerNotFound) {
@@ -251,7 +266,6 @@ func consumerSpecToConfig(spec *api.ConsumerSpec) (*jetstream.ConsumerConfig, er
 		InactiveThreshold: 0,
 	}
 
-	// Support deprecated option
 	if spec.DurableName != "" {
 		if spec.Name != "" && spec.DurableName != spec.Name {
 			return nil, fmt.Errorf("durable name and name must be the same")
@@ -329,13 +343,4 @@ func (r *ConsumerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&api.Consumer{}).
 		WithEventFilter(predicate.GenerationChangedPredicate{}).
 		Complete(r)
-}
-
-// Durable is a deprecated field with all consumers having names.
-func consumerName(spec api.ConsumerSpec) string {
-	if spec.Name != "" {
-		return spec.Name
-	}
-
-	return spec.DurableName
 }
