@@ -64,7 +64,7 @@ func (r *StreamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	stream := &api.Stream{}
 	if err := r.Get(ctx, req.NamespacedName, stream); err != nil {
 		if apierrors.IsNotFound(err) {
-			log.Info("Stream resource not found. Ignoring since object must be deleted.")
+			log.Info("Stream deleted.", "streamName", req.NamespacedName.String())
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, fmt.Errorf("get stream resource '%s': %w", req.NamespacedName.String(), err)

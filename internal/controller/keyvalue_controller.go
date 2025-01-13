@@ -63,7 +63,7 @@ func (r *KeyValueReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	keyValue := &api.KeyValue{}
 	if err := r.Get(ctx, req.NamespacedName, keyValue); err != nil {
 		if apierrors.IsNotFound(err) {
-			log.Info("KeyValue resource not found. Ignoring since object must be deleted.")
+			log.Info("KeyValue deleted.", "keyValueName", req.NamespacedName.String())
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, fmt.Errorf("get keyvalue resource '%s': %w", req.NamespacedName.String(), err)

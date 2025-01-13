@@ -64,7 +64,7 @@ func (r *ObjectStoreReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	objectStore := &api.ObjectStore{}
 	if err := r.Get(ctx, req.NamespacedName, objectStore); err != nil {
 		if apierrors.IsNotFound(err) {
-			log.Info("ObjectStore resource not found. Ignoring since object must be deleted.")
+			log.Info("ObjectStore deleted.", "objectStoreName", req.NamespacedName.String())
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, fmt.Errorf("get objectstore resource '%s': %w", req.NamespacedName.String(), err)

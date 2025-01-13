@@ -69,7 +69,7 @@ func (r *AccountReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	account := &api.Account{}
 	if err := r.Get(ctx, req.NamespacedName, account); err != nil {
 		if apierrors.IsNotFound(err) {
-			log.Info("Account resource not found. Ignoring since object must be deleted.")
+			log.Info("Account deleted.", "accountName", req.NamespacedName.String())
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, fmt.Errorf("get account resource '%s': %w", req.NamespacedName.String(), err)
@@ -88,7 +88,7 @@ func (r *AccountReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	log.Info("Add Finalizer", "Account", account.Name)
+	log.Info("Add Finalizer", "accountName", account.Name)
 
 	// Add finalizer
 	if !controllerutil.ContainsFinalizer(account, accountFinalizer) {
