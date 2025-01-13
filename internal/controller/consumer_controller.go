@@ -253,9 +253,6 @@ func consumerSpecToConfig(spec *api.ConsumerSpec) (*jetstream.ConsumerConfig, er
 		MemoryStorage:      spec.MemStorage,
 		FilterSubjects:     spec.FilterSubjects,
 		Metadata:           spec.Metadata,
-
-		// Explicitly set not (yet) mapped fields
-		InactiveThreshold: 0,
 	}
 
 	// DeliverPolicy
@@ -317,6 +314,14 @@ func consumerSpecToConfig(spec *api.ConsumerSpec) (*jetstream.ConsumerConfig, er
 			return nil, fmt.Errorf("invalid opt start time: %w", err)
 		}
 		config.MaxRequestExpires = d
+	}
+
+	if spec.InactiveThreshold != "" {
+		d, err := time.ParseDuration(spec.InactiveThreshold)
+		if err != nil {
+			return nil, fmt.Errorf("invalid inactive threshold: %w", err)
+		}
+		config.InactiveThreshold = d
 	}
 
 	return config, nil
