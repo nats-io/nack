@@ -32,7 +32,7 @@ type JetStreamController interface {
 	// The given opts values take precedence over the controllers base configuration.
 	//
 	// Returns the error of the operation or errors during client setup.
-	WithJetStreamClient(opts api.ConnectionOpts, op func(js jetstream.JetStream) error) error
+	WithJetStreamClient(opts api.ConnectionOpts, ns string, op func(js jetstream.JetStream) error) error
 }
 
 func NewJSController(k8sClient client.Client, natsConfig *NatsConfig, controllerConfig *Config) (JetStreamController, error) {
@@ -60,10 +60,10 @@ func (c *jsController) ValidNamespace(namespace string) bool {
 	return ns == "" || ns == namespace
 }
 
-func (c *jsController) WithJetStreamClient(opts api.ConnectionOpts, op func(js jetstream.JetStream) error) error {
+func (c *jsController) WithJetStreamClient(opts api.ConnectionOpts, ns string, op func(js jetstream.JetStream) error) error {
 	// Build single use client
 	// TODO(future-feature): Use client-pool instead of single use client
-	cfg, err := c.natsConfigFromOpts(opts)
+	cfg, err := c.natsConfigFromOpts(opts, ns)
 	if err != nil {
 		return err
 	}
@@ -78,7 +78,7 @@ func (c *jsController) WithJetStreamClient(opts api.ConnectionOpts, op func(js j
 }
 
 // Setup default options, override from account resource if configured
-func (c *jsController) natsConfigFromOpts(opts api.ConnectionOpts) (*NatsConfig, error) {
+func (c *jsController) natsConfigFromOpts(opts api.ConnectionOpts, ns string) (*NatsConfig, error) {
 	ctx, done := context.WithTimeout(context.Background(), 5*time.Second)
 	defer done()
 
@@ -92,7 +92,7 @@ func (c *jsController) natsConfigFromOpts(opts api.ConnectionOpts) (*NatsConfig,
 	err := c.Get(ctx,
 		types.NamespacedName{
 			Name:      opts.Account,
-			Namespace: opts.Namespace,
+			Namespace: ns,
 		},
 		account,
 	)
@@ -109,7 +109,7 @@ func (c *jsController) natsConfigFromOpts(opts api.ConnectionOpts) (*NatsConfig,
 		err := c.Get(ctx,
 			types.NamespacedName{
 				Name:      account.Spec.TLS.Secret.Name,
-				Namespace: opts.Namespace,
+				Namespace: ns,
 			},
 			tlsSecret,
 		)
@@ -152,7 +152,7 @@ func (c *jsController) natsConfigFromOpts(opts api.ConnectionOpts) (*NatsConfig,
 		err := c.Get(ctx,
 			types.NamespacedName{
 				Name:      account.Spec.Creds.Secret.Name,
-				Namespace: opts.Namespace,
+				Namespace: ns,
 			},
 			credsSecret,
 		)

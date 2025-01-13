@@ -69,10 +69,6 @@ func (r *KeyValueReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, fmt.Errorf("get keyvalue resource '%s': %w", req.NamespacedName.String(), err)
 	}
 
-	if keyValue.Spec.Namespace == "" {
-		keyValue.Spec.Namespace = keyValue.Namespace
-	}
-
 	log = log.WithValues("keyValueName", keyValue.Spec.Bucket)
 
 	// Update ready status to unknown when no status is set
@@ -130,7 +126,7 @@ func (r *KeyValueReconciler) deleteKeyValue(ctx context.Context, log logr.Logger
 
 	if !keyValue.Spec.PreventDelete && !r.ReadOnly() {
 		log.Info("Deleting KeyValue.")
-		err := r.WithJetStreamClient(keyValue.Spec.ConnectionOpts, func(js jetstream.JetStream) error {
+		err := r.WithJetStreamClient(keyValue.Spec.ConnectionOpts, keyValue.Namespace, func(js jetstream.JetStream) error {
 			_, err := js.KeyValue(ctx, keyValue.Spec.Bucket)
 			if err != nil {
 				if errors.Is(err, jetstream.ErrBucketNotFound) || errors.Is(err, jetstream.ErrJetStreamNotEnabled) || errors.Is(err, jetstream.ErrJetStreamNotEnabledForAccount) {
@@ -180,7 +176,7 @@ func (r *KeyValueReconciler) createOrUpdate(ctx context.Context, log logr.Logger
 
 	// UpdateKeyValue is called on every reconciliation when the stream is not to be deleted.
 	// TODO(future-feature): Do we need to check if config differs?
-	err = r.WithJetStreamClient(keyValue.Spec.ConnectionOpts, func(js jetstream.JetStream) error {
+	err = r.WithJetStreamClient(keyValue.Spec.ConnectionOpts, keyValue.Namespace, func(js jetstream.JetStream) error {
 		exists := false
 		_, err := js.KeyValue(ctx, targetConfig.Bucket)
 		if err == nil {

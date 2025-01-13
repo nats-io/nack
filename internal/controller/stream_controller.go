@@ -70,10 +70,6 @@ func (r *StreamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, fmt.Errorf("get stream resource '%s': %w", req.NamespacedName.String(), err)
 	}
 
-	if stream.Spec.Namespace == "" {
-		stream.Spec.Namespace = stream.Namespace
-	}
-
 	log = log.WithValues("streamName", stream.Spec.Name)
 
 	// Update ready status to unknown when no status is set
@@ -131,7 +127,7 @@ func (r *StreamReconciler) deleteStream(ctx context.Context, log logr.Logger, st
 
 	if !stream.Spec.PreventDelete && !r.ReadOnly() {
 		log.Info("Deleting stream.")
-		err := r.WithJetStreamClient(stream.Spec.ConnectionOpts, func(js jetstream.JetStream) error {
+		err := r.WithJetStreamClient(stream.Spec.ConnectionOpts, stream.Namespace, func(js jetstream.JetStream) error {
 			_, err := js.Stream(ctx, stream.Spec.Name)
 			if err != nil {
 				if errors.Is(err, jetstream.ErrStreamNotFound) || errors.Is(err, jetstream.ErrJetStreamNotEnabled) || errors.Is(err, jetstream.ErrJetStreamNotEnabledForAccount) {
@@ -182,7 +178,7 @@ func (r *StreamReconciler) createOrUpdate(ctx context.Context, log logr.Logger, 
 
 	// CreateOrUpdateStream is called on every reconciliation when the stream is not to be deleted.
 	// TODO(future-feature): Do we need to check if config differs?
-	err = r.WithJetStreamClient(stream.Spec.ConnectionOpts, func(js jetstream.JetStream) error {
+	err = r.WithJetStreamClient(stream.Spec.ConnectionOpts, stream.Namespace, func(js jetstream.JetStream) error {
 		exists := false
 		_, err := js.Stream(ctx, targetConfig.Name)
 		if err == nil {

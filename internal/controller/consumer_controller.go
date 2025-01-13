@@ -74,10 +74,6 @@ func (r *ConsumerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		consumer.Spec.DurableName = consumer.Spec.Name
 	}
 
-	if consumer.Spec.Namespace == "" {
-		consumer.Spec.Namespace = consumer.Namespace
-	}
-
 	log = log.WithValues(
 		"streamName", consumer.Spec.StreamName,
 		"consumerName", consumer.Spec.Name,
@@ -137,7 +133,7 @@ func (r *ConsumerReconciler) deleteConsumer(ctx context.Context, log logr.Logger
 	}
 
 	if !consumer.Spec.PreventDelete && !r.ReadOnly() {
-		err := r.WithJetStreamClient(consumer.Spec.ConnectionOpts, func(js jetstream.JetStream) error {
+		err := r.WithJetStreamClient(consumer.Spec.ConnectionOpts, consumer.Namespace, func(js jetstream.JetStream) error {
 			_, err := js.Consumer(ctx, consumer.Spec.StreamName, consumer.Spec.Name)
 			if err != nil {
 				if errors.Is(err, jetstream.ErrConsumerNotFound) || errors.Is(err, jetstream.ErrJetStreamNotEnabled) || errors.Is(err, jetstream.ErrJetStreamNotEnabledForAccount) {
@@ -191,7 +187,7 @@ func (r *ConsumerReconciler) createOrUpdate(ctx context.Context, log klog.Logger
 		return fmt.Errorf("map consumer spec to target config: %w", err)
 	}
 
-	err = r.WithJetStreamClient(consumer.Spec.ConnectionOpts, func(js jetstream.JetStream) error {
+	err = r.WithJetStreamClient(consumer.Spec.ConnectionOpts, consumer.Namespace, func(js jetstream.JetStream) error {
 		exists := false
 		_, err := js.Consumer(ctx, consumer.Spec.StreamName, consumer.Spec.Name)
 		if err == nil {
