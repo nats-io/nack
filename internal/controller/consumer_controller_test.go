@@ -76,7 +76,7 @@ var _ = Describe("Consumer Controller", func() {
 					Spec: api.ConsumerSpec{
 						AckPolicy:     "explicit",
 						DeliverPolicy: "all",
-						Name:          consumerName,
+						DurableName:   consumerName,
 						Description:   "test consumer",
 						StreamName:    streamName,
 						ReplayPolicy:  "instant",
@@ -603,7 +603,7 @@ func Test_consumerSpecToConfig(t *testing.T) {
 				DeliverPolicy:      "new",
 				DeliverSubject:     "",
 				Description:        "test consumer",
-				Name:               "test-consumer",
+				DurableName:        "test-consumer",
 				FilterSubject:      "time.us.>",
 				FilterSubjects:     []string{"time.us.east", "time.us.west"},
 				FlowControl:        false,

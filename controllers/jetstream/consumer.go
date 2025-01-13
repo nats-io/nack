@@ -198,7 +198,7 @@ func (c *Controller) processConsumerObject(cns *apis.Consumer, jsm jsmClientFunc
 	switch {
 	case createOK:
 		c.normalEvent(cns, "Creating",
-			fmt.Sprintf("Creating consumer %q on stream %q", consumerName(spec), spec.StreamName))
+			fmt.Sprintf("Creating consumer %q on stream %q", spec.DurableName, spec.StreamName))
 		if err := natsClientUtil(createConsumer); err != nil {
 			return err
 		}
@@ -207,16 +207,16 @@ func (c *Controller) processConsumerObject(cns *apis.Consumer, jsm jsmClientFunc
 			return err
 		}
 		c.normalEvent(cns, "Created",
-			fmt.Sprintf("Created consumer %q on stream %q", consumerName(spec), spec.StreamName))
+			fmt.Sprintf("Created consumer %q on stream %q", spec.DurableName, spec.StreamName))
 	case updateOK:
 		if cns.Spec.PreventUpdate {
-			c.normalEvent(cns, "SkipUpdate", fmt.Sprintf("Skip updating consumer %q on stream %q", consumerName(spec), spec.StreamName))
+			c.normalEvent(cns, "SkipUpdate", fmt.Sprintf("Skip updating consumer %q on stream %q", spec.DurableName, spec.StreamName))
 			if _, err := setConsumerOK(c.ctx, cns, ifc); err != nil {
 				return err
 			}
 			return nil
 		}
-		c.normalEvent(cns, "Updating", fmt.Sprintf("Updating consumer %q on stream %q", consumerName(spec), spec.StreamName))
+		c.normalEvent(cns, "Updating", fmt.Sprintf("Updating consumer %q on stream %q", spec.DurableName, spec.StreamName))
 		if err := natsClientUtil(updateConsumer); err != nil {
 			return err
 		}
@@ -224,22 +224,22 @@ func (c *Controller) processConsumerObject(cns *apis.Consumer, jsm jsmClientFunc
 		if _, err := setConsumerOK(c.ctx, cns, ifc); err != nil {
 			return err
 		}
-		c.normalEvent(cns, "Updated", fmt.Sprintf("Updated consumer %q on stream %q", consumerName(spec), spec.StreamName))
+		c.normalEvent(cns, "Updated", fmt.Sprintf("Updated consumer %q on stream %q", spec.DurableName, spec.StreamName))
 	case deleteOK:
 		if cns.Spec.PreventDelete {
-			c.normalEvent(cns, "SkipDelete", fmt.Sprintf("Skip deleting consumer %q on stream %q", consumerName(spec), spec.StreamName))
+			c.normalEvent(cns, "SkipDelete", fmt.Sprintf("Skip deleting consumer %q on stream %q", spec.DurableName, spec.StreamName))
 			if _, err := setConsumerOK(c.ctx, cns, ifc); err != nil {
 				return err
 			}
 			return nil
 		}
-		c.normalEvent(cns, "Deleting", fmt.Sprintf("Deleting consumer %q on stream %q", consumerName(spec), spec.StreamName))
+		c.normalEvent(cns, "Deleting", fmt.Sprintf("Deleting consumer %q on stream %q", spec.DurableName, spec.StreamName))
 		if err := natsClientUtil(deleteConsumer); err != nil {
 			return err
 		}
 	default:
 		c.normalEvent(cns, "Noop", fmt.Sprintf("Nothing done for consumer %q (prevent-delete=%v, prevent-update=%v)",
-			consumerName(spec), spec.PreventDelete, spec.PreventUpdate,
+			spec.DurableName, spec.PreventDelete, spec.PreventUpdate,
 		))
 		if _, err := setConsumerOK(c.ctx, cns, ifc); err != nil {
 			return err
@@ -256,14 +256,14 @@ func consumerExists(ctx context.Context, c jsmClient, spec apis.ConsumerSpec) (e
 		}
 	}()
 
-	_, err = c.LoadConsumer(ctx, spec.StreamName, consumerName(spec))
+	_, err = c.LoadConsumer(ctx, spec.StreamName, spec.DurableName)
 	return err
 }
 
 func createConsumer(ctx context.Context, c jsmClient, spec apis.ConsumerSpec) (err error) {
 	defer func() {
 		if err != nil {
-			err = fmt.Errorf("failed to create consumer %q on stream %q: %w", consumerName(spec), spec.StreamName, err)
+			err = fmt.Errorf("failed to create consumer %q on stream %q: %w", spec.DurableName, spec.StreamName, err)
 		}
 	}()
 
@@ -278,11 +278,11 @@ func createConsumer(ctx context.Context, c jsmClient, spec apis.ConsumerSpec) (e
 func updateConsumer(ctx context.Context, c jsmClient, spec apis.ConsumerSpec) (err error) {
 	defer func() {
 		if err != nil {
-			err = fmt.Errorf("failed to update consumer %q on stream %q: %w", consumerName(spec), spec.StreamName, err)
+			err = fmt.Errorf("failed to update consumer %q on stream %q: %w", spec.DurableName, spec.StreamName, err)
 		}
 	}()
 
-	js, err := c.LoadConsumer(ctx, spec.StreamName, consumerName(spec))
+	js, err := c.LoadConsumer(ctx, spec.StreamName, spec.DurableName)
 	if err != nil {
 		return
 	}
@@ -298,7 +298,7 @@ func updateConsumer(ctx context.Context, c jsmClient, spec apis.ConsumerSpec) (e
 
 func consumerSpecToOpts(spec apis.ConsumerSpec) ([]jsm.ConsumerOption, error) {
 	opts := []jsm.ConsumerOption{
-		jsm.ConsumerName(spec.Name),
+		jsm.DurableName(spec.DurableName),
 		jsm.DeliverySubject(spec.DeliverSubject),
 		jsm.RateLimitBitsPerSecond(uint64(spec.RateLimitBps)),
 		jsm.MaxAckPending(uint(spec.MaxAckPending)),
@@ -308,15 +308,6 @@ func consumerSpecToOpts(spec apis.ConsumerSpec) ([]jsm.ConsumerOption, error) {
 		jsm.MaxRequestBatch(uint(spec.MaxRequestBatch)),
 		jsm.MaxRequestMaxBytes(spec.MaxRequestMaxBytes),
 		jsm.ConsumerOverrideReplicas(spec.Replicas),
-	}
-
-	// Support deprecated option
-	if spec.DurableName != "" {
-		if spec.Name != "" && spec.Name != spec.DurableName {
-			return nil, fmt.Errorf("durable name and name must be the same")
-		}
-
-		opts = append(opts, jsm.DurableName(spec.DurableName))
 	}
 
 	if spec.FilterSubject != "" && len(spec.FilterSubjects) > 0 {
@@ -444,7 +435,7 @@ func consumerSpecToOpts(spec apis.ConsumerSpec) ([]jsm.ConsumerOption, error) {
 }
 
 func deleteConsumer(ctx context.Context, c jsmClient, spec apis.ConsumerSpec) (err error) {
-	stream, consumer := spec.StreamName, consumerName(spec)
+	stream, consumer := spec.StreamName, spec.DurableName
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("failed to delete consumer %q on stream %q: %w", consumer, stream, err)
@@ -486,7 +477,7 @@ func setConsumerOK(ctx context.Context, s *apis.Consumer, i typed.ConsumerInterf
 		defer cancel()
 		res, err = i.UpdateStatus(ctx, sc, k8smeta.UpdateOptions{})
 		if err != nil {
-			return fmt.Errorf("failed to set consumer %q status: %w", consumerName(s.Spec), err)
+			return fmt.Errorf("failed to set consumer %q status: %w", s.Spec.DurableName, err)
 		}
 		return nil
 	})
@@ -519,13 +510,4 @@ func setConsumerErrored(ctx context.Context, s *apis.Consumer, sif typed.Consume
 		return nil
 	})
 	return res, err
-}
-
-// Durable is a deprecated field with all consumers having names.
-func consumerName(spec apis.ConsumerSpec) string {
-	if spec.Name != "" {
-		return spec.Name
-	}
-
-	return spec.DurableName
 }

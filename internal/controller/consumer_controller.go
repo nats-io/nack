@@ -65,18 +65,9 @@ func (r *ConsumerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, fmt.Errorf("get consumer resource '%s': %w", req.NamespacedName.String(), err)
 	}
 
-	// Set both Name values
-	if consumer.Spec.Name == "" {
-		consumer.Spec.Name = consumer.Spec.DurableName
-	}
-
-	if consumer.Spec.DurableName == "" {
-		consumer.Spec.DurableName = consumer.Spec.Name
-	}
-
 	log = log.WithValues(
 		"streamName", consumer.Spec.StreamName,
-		"consumerName", consumer.Spec.Name,
+		"consumerName", consumer.Spec.DurableName,
 	)
 
 	// Update ready status to unknown when no status is set
@@ -139,14 +130,14 @@ func (r *ConsumerReconciler) deleteConsumer(ctx context.Context, log logr.Logger
 
 	if !consumer.Spec.PreventDelete && !r.ReadOnly() {
 		err := r.WithJetStreamClient(consumer.Spec.ConnectionOpts, consumer.Namespace, func(js jetstream.JetStream) error {
-			_, err := js.Consumer(ctx, consumer.Spec.StreamName, consumer.Spec.Name)
+			_, err := js.Consumer(ctx, consumer.Spec.StreamName, consumer.Spec.DurableName)
 			if err != nil {
 				if errors.Is(err, jetstream.ErrConsumerNotFound) || errors.Is(err, jetstream.ErrJetStreamNotEnabled) || errors.Is(err, jetstream.ErrJetStreamNotEnabledForAccount) {
 					return nil
 				}
 				return err
 			}
-			return js.DeleteConsumer(ctx, consumer.Spec.StreamName, consumer.Spec.Name)
+			return js.DeleteConsumer(ctx, consumer.Spec.StreamName, consumer.Spec.DurableName)
 		})
 		switch {
 		case errors.Is(err, jetstream.ErrConsumerNotFound):
@@ -160,7 +151,7 @@ func (r *ConsumerReconciler) deleteConsumer(ctx context.Context, log logr.Logger
 		}
 	} else {
 		log.Info("Skipping consumer deletion.",
-			"consumerName", consumer.Spec.Name,
+			"consumerName", consumer.Spec.DurableName,
 			"preventDelete", consumer.Spec.PreventDelete,
 			"read-only", r.ReadOnly(),
 		)
@@ -194,7 +185,7 @@ func (r *ConsumerReconciler) createOrUpdate(ctx context.Context, log klog.Logger
 
 	err = r.WithJetStreamClient(consumer.Spec.ConnectionOpts, consumer.Namespace, func(js jetstream.JetStream) error {
 		exists := false
-		_, err := js.Consumer(ctx, consumer.Spec.StreamName, consumer.Spec.Name)
+		_, err := js.Consumer(ctx, consumer.Spec.StreamName, consumer.Spec.DurableName)
 		if err == nil {
 			exists = true
 		} else if !errors.Is(err, jetstream.ErrConsumerNotFound) {
@@ -246,7 +237,7 @@ func (r *ConsumerReconciler) createOrUpdate(ctx context.Context, log klog.Logger
 
 func consumerSpecToConfig(spec *api.ConsumerSpec) (*jetstream.ConsumerConfig, error) {
 	config := &jetstream.ConsumerConfig{
-		Name:               spec.Name,
+		Durable:            spec.DurableName,
 		Description:        spec.Description,
 		OptStartSeq:        uint64(spec.OptStartSeq),
 		MaxDeliver:         spec.MaxDeliver,
@@ -265,13 +256,6 @@ func consumerSpecToConfig(spec *api.ConsumerSpec) (*jetstream.ConsumerConfig, er
 
 		// Explicitly set not (yet) mapped fields
 		InactiveThreshold: 0,
-	}
-
-	if spec.DurableName != "" {
-		if spec.Name != "" && spec.DurableName != spec.Name {
-			return nil, fmt.Errorf("durable name and name must be the same")
-		}
-		config.Durable = spec.DurableName
 	}
 
 	// DeliverPolicy

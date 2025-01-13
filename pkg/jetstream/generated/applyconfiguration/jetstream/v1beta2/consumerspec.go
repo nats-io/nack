@@ -18,7 +18,6 @@ package v1beta2
 // ConsumerSpecApplyConfiguration represents a declarative configuration of the ConsumerSpec type for use
 // with apply.
 type ConsumerSpecApplyConfiguration struct {
-	Name               *string           `json:"name,omitempty"`
 	DurableName        *string           `json:"durableName,omitempty"`
 	Description        *string           `json:"description,omitempty"`
 	DeliverPolicy      *string           `json:"deliverPolicy,omitempty"`
@@ -54,14 +53,6 @@ type ConsumerSpecApplyConfiguration struct {
 // apply.
 func ConsumerSpec() *ConsumerSpecApplyConfiguration {
 	return &ConsumerSpecApplyConfiguration{}
-}
-
-// WithName sets the Name field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Name field is set to the value of the last call.
-func (b *ConsumerSpecApplyConfiguration) WithName(value string) *ConsumerSpecApplyConfiguration {
-	b.Name = &value
-	return b
 }
 
 // WithDurableName sets the DurableName field in the declarative configuration to the given value

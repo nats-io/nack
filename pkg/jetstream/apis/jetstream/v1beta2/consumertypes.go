@@ -22,7 +22,6 @@ func (c *Consumer) GetSpec() interface{} {
 
 // ConsumerSpec is the spec for a Consumer resource
 type ConsumerSpec struct {
-	Name               string            `json:"name"`
 	DurableName        string            `json:"durableName"` // Maps to Durable
 	Description        string            `json:"description"`
 	DeliverPolicy      string            `json:"deliverPolicy"`
