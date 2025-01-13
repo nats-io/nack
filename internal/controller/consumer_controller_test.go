@@ -58,7 +58,7 @@ var _ = Describe("Consumer Controller", func() {
 		}
 
 		emptyConsumerConfig := jetstream.ConsumerConfig{
-			Name: consumerName,
+			Durable: consumerName,
 		}
 
 		// Tested controller
@@ -639,7 +639,7 @@ func Test_consumerSpecToConfig(t *testing.T) {
 				},
 			},
 			want: &jetstream.ConsumerConfig{
-				Name:               "test-consumer",
+				Durable:            "test-consumer",
 				Description:        "test consumer",
 				DeliverPolicy:      jetstream.DeliverNewPolicy,
 				OptStartSeq:        17,
