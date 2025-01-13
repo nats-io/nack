@@ -252,7 +252,7 @@ func streamSpecToConfig(spec *api.StreamSpec) (jetstream.StreamConfig, error) {
 	// retention
 	if spec.Retention != "" {
 		// Wrap string in " to be properly unmarshalled as json string
-		err := config.Retention.UnmarshalJSON(asJsonString(spec.Retention))
+		err := config.Retention.UnmarshalJSON(jsonString(spec.Retention))
 		if err != nil {
 			return jetstream.StreamConfig{}, fmt.Errorf("invalid retention policy: %w", err)
 		}
@@ -260,7 +260,7 @@ func streamSpecToConfig(spec *api.StreamSpec) (jetstream.StreamConfig, error) {
 
 	// discard
 	if spec.Discard != "" {
-		err := config.Discard.UnmarshalJSON(asJsonString(spec.Discard))
+		err := config.Discard.UnmarshalJSON(jsonString(spec.Discard))
 		if err != nil {
 			return jetstream.StreamConfig{}, fmt.Errorf("invalid retention policy: %w", err)
 		}
@@ -276,7 +276,7 @@ func streamSpecToConfig(spec *api.StreamSpec) (jetstream.StreamConfig, error) {
 	}
 	// storage
 	if spec.Storage != "" {
-		err := config.Storage.UnmarshalJSON(asJsonString(spec.Storage))
+		err := config.Storage.UnmarshalJSON(jsonString(spec.Storage))
 		if err != nil {
 			return jetstream.StreamConfig{}, fmt.Errorf("invalid storage: %w", err)
 		}
@@ -322,7 +322,7 @@ func streamSpecToConfig(spec *api.StreamSpec) (jetstream.StreamConfig, error) {
 
 	// compression
 	if spec.Compression != "" {
-		err := config.Compression.UnmarshalJSON(asJsonString(spec.Compression))
+		err := config.Compression.UnmarshalJSON(jsonString(spec.Compression))
 		if err != nil {
 			return jetstream.StreamConfig{}, fmt.Errorf("invalid compression: %w", err)
 		}

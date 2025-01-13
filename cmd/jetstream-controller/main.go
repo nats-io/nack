@@ -67,7 +67,7 @@ func run() error {
 	ca := flag.String("tlsca", "", "NATS TLS certificate authority chain")
 	tlsfirst := flag.Bool("tlsfirst", false, "If enabled, forces explicit TLS without waiting for Server INFO")
 	server := flag.String("s", "", "NATS Server URL")
-	crdConnect := flag.Bool("crd-connect", false, "If true, then NATS connections will be made from CRD config, not global config")
+	crdConnect := flag.Bool("crd-connect", false, "If true, then NATS connections will be made from CRD config, not global config. Ignored if running with control loop, CRD options will always override global config")
 	cleanupPeriod := flag.Duration("cleanup-period", 30*time.Second, "Period to run object cleanup")
 	readOnly := flag.Bool("read-only", false, "Starts the controller without causing changes to the NATS resources")
 	controlLoop := flag.Bool("control-loop", false, "Experimental: Run controller with a full reconciliation control loop.")
@@ -165,7 +165,6 @@ func runControlLoop(config *rest.Config, natsCfg *controller.NatsConfig, control
 	mgr, err := ctrl.NewManager(config, ctrl.Options{
 		Scheme: scheme,
 		Logger: klog.NewKlogr().WithName("controller-runtime"),
-		// TODO Add full configuration
 	})
 	if err != nil {
 		return fmt.Errorf("unable to start manager: %w", err)

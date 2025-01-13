@@ -603,8 +603,6 @@ func Test_consumerSpecToConfig(t *testing.T) {
 				DeliverPolicy:      "new",
 				DeliverSubject:     "",
 				Description:        "test consumer",
-				PreventDelete:      false,
-				PreventUpdate:      false,
 				Name:               "test-consumer",
 				FilterSubject:      "time.us.>",
 				FilterSubjects:     []string{"time.us.east", "time.us.west"},
@@ -629,6 +627,8 @@ func Test_consumerSpecToConfig(t *testing.T) {
 					"meta": "data",
 				},
 				BaseStreamConfig: api.BaseStreamConfig{
+					PreventDelete: false,
+					PreventUpdate: false,
 					ConnectionOpts: api.ConnectionOpts{
 						Account: "",
 						Creds:   "",

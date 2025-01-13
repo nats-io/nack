@@ -261,7 +261,7 @@ func consumerSpecToConfig(spec *api.ConsumerSpec) (*jetstream.ConsumerConfig, er
 
 	// DeliverPolicy
 	if spec.DeliverPolicy != "" {
-		err := config.DeliverPolicy.UnmarshalJSON(asJsonString(spec.DeliverPolicy))
+		err := config.DeliverPolicy.UnmarshalJSON(jsonString(spec.DeliverPolicy))
 		if err != nil {
 			return nil, fmt.Errorf("invalid delivery policy: %w", err)
 		}
@@ -278,7 +278,7 @@ func consumerSpecToConfig(spec *api.ConsumerSpec) (*jetstream.ConsumerConfig, er
 
 	//	AckPolicy
 	if spec.AckPolicy != "" {
-		err := config.AckPolicy.UnmarshalJSON(asJsonString(spec.AckPolicy))
+		err := config.AckPolicy.UnmarshalJSON(jsonString(spec.AckPolicy))
 		if err != nil {
 			return nil, fmt.Errorf("invalid ack policy: %w", err)
 		}
@@ -305,7 +305,7 @@ func consumerSpecToConfig(spec *api.ConsumerSpec) (*jetstream.ConsumerConfig, er
 
 	//	ReplayPolicy
 	if spec.ReplayPolicy != "" {
-		err := config.ReplayPolicy.UnmarshalJSON(asJsonString(spec.ReplayPolicy))
+		err := config.ReplayPolicy.UnmarshalJSON(jsonString(spec.ReplayPolicy))
 		if err != nil {
 			return nil, fmt.Errorf("invalid replay policy: %w", err)
 		}

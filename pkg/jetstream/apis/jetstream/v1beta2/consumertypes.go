@@ -22,37 +22,41 @@ func (c *Consumer) GetSpec() interface{} {
 
 // ConsumerSpec is the spec for a Consumer resource
 type ConsumerSpec struct {
+	Name               string            `json:"name"`
+	DurableName        string            `json:"durableName"` // Maps to Durable
+	Description        string            `json:"description"`
+	DeliverPolicy      string            `json:"deliverPolicy"`
+	OptStartSeq        int               `json:"optStartSeq"`
+	OptStartTime       string            `json:"optStartTime"`
 	AckPolicy          string            `json:"ackPolicy"`
 	AckWait            string            `json:"ackWait"`
-	BackOff            []string          `json:"backoff"`
-	DeliverGroup       string            `json:"deliverGroup"`
-	DeliverPolicy      string            `json:"deliverPolicy"`
-	DeliverSubject     string            `json:"deliverSubject"`
-	Description        string            `json:"description"`
-	PreventDelete      bool              `json:"preventDelete"`
-	PreventUpdate      bool              `json:"preventUpdate"`
-	DurableName        string            `json:"durableName"`
-	FilterSubject      string            `json:"filterSubject"`
-	FilterSubjects     []string          `json:"filterSubjects"`
-	FlowControl        bool              `json:"flowControl"`
-	HeadersOnly        bool              `json:"headersOnly"`
-	HeartbeatInterval  string            `json:"heartbeatInterval"`
-	MaxAckPending      int               `json:"maxAckPending"`
 	MaxDeliver         int               `json:"maxDeliver"`
+	BackOff            []string          `json:"backoff"`
+	FilterSubject      string            `json:"filterSubject"`
+	ReplayPolicy       string            `json:"replayPolicy"`
+	RateLimitBps       int               `json:"rateLimitBps"` // Maps to RateLimit
+	SampleFreq         string            `json:"sampleFreq"`   // Maps to SampleFrequency
+	MaxWaiting         int               `json:"maxWaiting"`
+	MaxAckPending      int               `json:"maxAckPending"`
+	HeadersOnly        bool              `json:"headersOnly"`
 	MaxRequestBatch    int               `json:"maxRequestBatch"`
 	MaxRequestExpires  string            `json:"maxRequestExpires"`
 	MaxRequestMaxBytes int               `json:"maxRequestMaxBytes"`
-	MaxWaiting         int               `json:"maxWaiting"`
-	MemStorage         bool              `json:"memStorage"`
-	Name               string            `json:"name"`
-	OptStartSeq        int               `json:"optStartSeq"`
-	OptStartTime       string            `json:"optStartTime"`
-	RateLimitBps       int               `json:"rateLimitBps"`
-	ReplayPolicy       string            `json:"replayPolicy"`
+	InactiveThreshold  string            `json:"inactiveThreshold"`
 	Replicas           int               `json:"replicas"`
-	SampleFreq         string            `json:"sampleFreq"`
-	StreamName         string            `json:"streamName"`
+	MemStorage         bool              `json:"memStorage"` // Maps to MemoryStorage
+	FilterSubjects     []string          `json:"filterSubjects"`
 	Metadata           map[string]string `json:"metadata"`
+
+	// Legacy API options for Push Consumers.
+	// controller-runtime implementation moves to modern JetStream API over legacy
+	// which does not support Push Consumers
+	FlowControl       bool   `json:"flowControl"`
+	DeliverSubject    string `json:"deliverSubject"`
+	DeliverGroup      string `json:"deliverGroup"`
+	HeartbeatInterval string `json:"heartbeatInterval"`
+
+	StreamName string `json:"streamName"`
 	BaseStreamConfig
 }
 

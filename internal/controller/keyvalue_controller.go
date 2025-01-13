@@ -245,7 +245,7 @@ func keyValueSpecToConfig(spec *api.KeyValueSpec) (jetstream.KeyValueConfig, err
 
 	// storage
 	if spec.Storage != "" {
-		err := config.Storage.UnmarshalJSON(asJsonString(spec.Storage))
+		err := config.Storage.UnmarshalJSON(jsonString(spec.Storage))
 		if err != nil {
 			return jetstream.KeyValueConfig{}, fmt.Errorf("invalid storage: %w", err)
 		}

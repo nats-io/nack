@@ -75,8 +75,6 @@ func (r *AccountReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, fmt.Errorf("get account resource '%s': %w", req.NamespacedName.String(), err)
 	}
 
-	log.Info("Reconcile", "Account", account.Name)
-
 	// Update ready status to unknown when no status is set
 	if len(account.Status.Conditions) == 0 {
 		log.Info("Setting initial ready condition to unknown.")
@@ -200,7 +198,6 @@ func (r *AccountReconciler) findDependentResources(ctx context.Context, log logr
 	}
 	for _, i := range streamList.Items {
 		if i.Spec.Account == obj.GetName() {
-			log.Info("Dependent Stream", "Stream", i.Spec.Name)
 			resourceList = append(resourceList, &i)
 		}
 	}

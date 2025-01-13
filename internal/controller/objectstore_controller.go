@@ -246,7 +246,7 @@ func objectStoreSpecToConfig(spec *api.ObjectStoreSpec) (jetstream.ObjectStoreCo
 
 	// storage
 	if spec.Storage != "" {
-		err := config.Storage.UnmarshalJSON(asJsonString(spec.Storage))
+		err := config.Storage.UnmarshalJSON(jsonString(spec.Storage))
 		if err != nil {
 			return jetstream.ObjectStoreConfig{}, fmt.Errorf("invalid storage: %w", err)
 		}

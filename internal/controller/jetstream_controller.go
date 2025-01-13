@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -191,12 +190,11 @@ func (c *jsController) setupNatsConfig(opts api.ConnectionOpts) *NatsConfig {
 		servers = strings.Join(opts.Servers, ",")
 	}
 
+	// Currently, if the global TLSFirst is set, a false value in the CRD will not override
+	// due to that being the bool zero value. A true value in the CRD can override a global false.
 	tlsFirst := c.config.TLSFirst
-	if opts.TLSFirst != "" {
-		crdTlsFirst, err := strconv.ParseBool(opts.TLSFirst)
-		if err == nil {
-			tlsFirst = crdTlsFirst
-		}
+	if opts.TLSFirst {
+		tlsFirst = opts.TLSFirst
 	}
 
 	creds := c.config.Credentials
@@ -264,8 +262,8 @@ func updateReadyCondition(conditions []api.Condition, status v1.ConditionStatus,
 	}
 }
 
-// asJsonString returns the given string wrapped in " and converted to []byte.
+// jsonString returns the given string wrapped in " and converted to []byte.
 // Helper for mapping spec config to jetStream config using UnmarshalJSON.
-func asJsonString(v string) []byte {
+func jsonString(v string) []byte {
 	return []byte("\"" + v + "\"")
 }

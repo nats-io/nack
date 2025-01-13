@@ -23,7 +23,7 @@ type ConnectionOptsApplyConfiguration struct {
 	Nkey     *string                `json:"nkey,omitempty"`
 	Servers  []string               `json:"servers,omitempty"`
 	TLS      *TLSApplyConfiguration `json:"tls,omitempty"`
-	TLSFirst *string                `json:"tlsFirst,omitempty"`
+	TLSFirst *bool                  `json:"tlsFirst,omitempty"`
 }
 
 // ConnectionOptsApplyConfiguration constructs a declarative configuration of the ConnectionOpts type for use with
@@ -77,7 +77,7 @@ func (b *ConnectionOptsApplyConfiguration) WithTLS(value *TLSApplyConfiguration)
 // WithTLSFirst sets the TLSFirst field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the TLSFirst field is set to the value of the last call.
-func (b *ConnectionOptsApplyConfiguration) WithTLSFirst(value string) *ConnectionOptsApplyConfiguration {
+func (b *ConnectionOptsApplyConfiguration) WithTLSFirst(value bool) *ConnectionOptsApplyConfiguration {
 	b.TLSFirst = &value
 	return b
 }

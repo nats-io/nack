@@ -34,7 +34,7 @@ type ConnectionOpts struct {
 	Nkey     string   `json:"nkey"`
 	Servers  []string `json:"servers"`
 	TLS      TLS      `json:"tls"`
-	TLSFirst string   `json:"tlsFirst"`
+	TLSFirst bool     `json:"tlsFirst"`
 }
 
 type ConsumerLimits struct {
