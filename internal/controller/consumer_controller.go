@@ -118,6 +118,11 @@ func (r *ConsumerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, nil
 	}
 
+	if consumer.Spec.FlowControl || consumer.Spec.DeliverSubject != "" || consumer.Spec.DeliverGroup != "" || consumer.Spec.HeartbeatInterval != "" {
+		log.Info("FlowControl, DeliverSubject, DeliverGroup, and HeartbeatInterval are Push Consumer options, which are no longer supported. Skipping consumer creation or update.")
+		return ctrl.Result{}, nil
+	}
+
 	// Create or update stream
 	if err := r.createOrUpdate(ctx, log, consumer); err != nil {
 		return ctrl.Result{}, fmt.Errorf("create or update: %s", err)
