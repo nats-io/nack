@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -27,12 +28,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 
 	api "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -76,7 +74,7 @@ func (r *ConsumerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	// Update ready status to unknown when no status is set
 	if len(consumer.Status.Conditions) == 0 {
 		log.Info("Setting initial ready condition to unknown.")
-		consumer.Status.Conditions = updateReadyCondition(consumer.Status.Conditions, v1.ConditionUnknown, "Reconciling", "Starting reconciliation")
+		consumer.Status.Conditions = updateReadyCondition(consumer.Status.Conditions, v1.ConditionUnknown, stateReconciling, "Starting reconciliation")
 		err := r.Status().Update(ctx, consumer)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("set condition unknown: %w", err)
@@ -126,7 +124,7 @@ func (r *ConsumerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 func (r *ConsumerReconciler) deleteConsumer(ctx context.Context, log logr.Logger, consumer *api.Consumer) error {
 	// Set status to false
-	consumer.Status.Conditions = updateReadyCondition(consumer.Status.Conditions, v1.ConditionFalse, "Finalizing", "Performing finalizer operations.")
+	consumer.Status.Conditions = updateReadyCondition(consumer.Status.Conditions, v1.ConditionFalse, stateFinalizing, "Performing finalizer operations.")
 	if err := r.Status().Update(ctx, consumer); err != nil {
 		return fmt.Errorf("update ready condition: %w", err)
 	}
@@ -173,13 +171,6 @@ func (r *ConsumerReconciler) deleteConsumer(ctx context.Context, log logr.Logger
 
 func (r *ConsumerReconciler) createOrUpdate(ctx context.Context, log klog.Logger, consumer *api.Consumer) error {
 	// Create or Update the stream based on the spec
-	if r.ReadOnly() {
-		log.Info("Skipping consumer creation or update.",
-			"read-only", r.ReadOnly(),
-		)
-		return nil
-	}
-
 	// Map spec to consumer target config
 	targetConfig, err := consumerSpecToConfig(&consumer.Spec)
 	if err != nil {
@@ -188,34 +179,84 @@ func (r *ConsumerReconciler) createOrUpdate(ctx context.Context, log klog.Logger
 
 	err = r.WithJetStreamClient(consumer.Spec.ConnectionOpts, consumer.Namespace, func(js jetstream.JetStream) error {
 		exists := false
-		_, err := js.Consumer(ctx, consumer.Spec.StreamName, consumer.Spec.DurableName)
+		c, err := js.Consumer(ctx, consumer.Spec.StreamName, consumer.Spec.DurableName)
 		if err == nil {
 			exists = true
 		} else if !errors.Is(err, jetstream.ErrConsumerNotFound) {
 			return err
 		}
 
+		// Check against known state. Skip Update if converged
+		// Storing returned state from the server avoids
+		// having to check default values
+		if exists {
+			var knownState *jetstream.ConsumerConfig
+			if state, ok := consumer.Annotations[stateAnnotationConsumer]; ok {
+				err := json.Unmarshal([]byte(state), &knownState)
+				if err != nil {
+					log.Error(err, "Failed to unmarshal known state from annotation.")
+				}
+			}
+
+			if knownState != nil {
+				converged, err := compareConsumerConfig(&c.CachedInfo().Config, knownState)
+				if err != nil {
+					log.Error(err, "Failed to compare consumer config.")
+				}
+
+				if converged {
+					return nil
+				}
+
+				log.Info("Consumer config drifted from desired state.")
+			}
+		}
+
+		if r.ReadOnly() {
+			log.Info("Skipping consumer creation or update.",
+				"read-only", r.ReadOnly(),
+			)
+			return nil
+		}
+
+		var updatedConsumer jetstream.Consumer
+		err = nil
+
 		if !exists {
 			log.Info("Creating Consumer.")
-			_, err := js.CreateConsumer(ctx, consumer.Spec.StreamName, *targetConfig)
-			return err
+			updatedConsumer, err = js.CreateConsumer(ctx, consumer.Spec.StreamName, *targetConfig)
 		}
 
 		if !consumer.Spec.PreventUpdate {
 			log.Info("Updating Consumer.")
-			_, err := js.UpdateConsumer(ctx, consumer.Spec.StreamName, *targetConfig)
-			return err
+			updatedConsumer, err = js.UpdateConsumer(ctx, consumer.Spec.StreamName, *targetConfig)
 		} else {
 			log.Info("Skipping Consumer update.",
 				"preventUpdate", consumer.Spec.PreventUpdate,
 			)
+		}
+		if err != nil {
+			return err
+		}
+
+		if updatedConsumer != nil {
+			// Store known state in annotation
+			knownState, err := json.Marshal(updatedConsumer.CachedInfo().Config)
+			if err != nil {
+				log.Error(err, "Failed to marshal known state to annotation.")
+			} else {
+				if consumer.Annotations == nil {
+					consumer.Annotations = map[string]string{}
+				}
+				consumer.Annotations[stateAnnotationStream] = string(knownState)
+			}
 		}
 
 		return nil
 	})
 	if err != nil {
 		err = fmt.Errorf("create or update consumer: %w", err)
-		consumer.Status.Conditions = updateReadyCondition(consumer.Status.Conditions, v1.ConditionFalse, "Errored", err.Error())
+		consumer.Status.Conditions = updateReadyCondition(consumer.Status.Conditions, v1.ConditionFalse, stateErrored, err.Error())
 		if err := r.Status().Update(ctx, consumer); err != nil {
 			log.Error(err, "Failed to update ready condition to Errored.")
 		}
@@ -227,7 +268,7 @@ func (r *ConsumerReconciler) createOrUpdate(ctx context.Context, log klog.Logger
 	consumer.Status.Conditions = updateReadyCondition(
 		consumer.Status.Conditions,
 		v1.ConditionTrue,
-		"Reconciling",
+		stateReady,
 		"Consumer successfully created or updated.",
 	)
 	err = r.Status().Update(ctx, consumer)
@@ -330,6 +371,24 @@ func consumerSpecToConfig(spec *api.ConsumerSpec) (*jetstream.ConsumerConfig, er
 	return config, nil
 }
 
+func compareConsumerConfig(actual *jetstream.ConsumerConfig, desired *jetstream.ConsumerConfig) (bool, error) {
+	if actual == nil || desired == nil {
+		return false, nil
+	}
+
+	actualJson, err := json.Marshal(actual)
+	if err != nil {
+		return false, fmt.Errorf("error marshaling source config: %w", err)
+	}
+
+	desiredJson, err := json.Marshal(desired)
+	if err != nil {
+		return false, fmt.Errorf("error marshaling target config: %w", err)
+	}
+
+	return string(actualJson) == string(desiredJson), nil
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *ConsumerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
@@ -338,40 +397,5 @@ func (r *ConsumerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: 1,
 		}).
-		Watches(
-			&api.Account{},
-			handler.EnqueueRequestsFromMapFunc(r.accountDependentConsumers),
-		).
 		Complete(r)
-}
-
-func (r *ConsumerReconciler) accountDependentConsumers(ctx context.Context, obj client.Object) []ctrl.Request {
-	log := klog.FromContext(ctx)
-
-	account, ok := obj.(*api.Consumer)
-	if !ok {
-		return nil
-	}
-
-	var consumers api.ConsumerList
-	if err := r.List(ctx, &consumers,
-		client.InNamespace(obj.GetNamespace()),
-	); err != nil {
-		log.Error(err, "Failed to list Consumers")
-		return nil
-	}
-
-	var requests []ctrl.Request
-	for _, c := range consumers.Items {
-		if c.Spec.Account == account.Name {
-			requests = append(requests, ctrl.Request{
-				NamespacedName: types.NamespacedName{
-					Namespace: c.Namespace,
-					Name:      c.Name,
-				},
-			})
-		}
-	}
-
-	return requests
 }

@@ -88,8 +88,6 @@ func (r *AccountReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	log.Info("Add Finalizer", "accountName", account.Name)
-
 	// Add finalizer
 	if !controllerutil.ContainsFinalizer(account, accountFinalizer) {
 		log.Info("Adding Account finalizer.")

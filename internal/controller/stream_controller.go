@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -28,13 +29,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 )
 
 // StreamReconciler reconciles a Stream object
@@ -78,7 +76,7 @@ func (r *StreamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	// Update ready status to unknown when no status is set
 	if len(stream.Status.Conditions) == 0 {
 		log.Info("Setting initial ready condition to unknown.")
-		stream.Status.Conditions = updateReadyCondition(stream.Status.Conditions, v1.ConditionUnknown, "Reconciling", "Starting reconciliation")
+		stream.Status.Conditions = updateReadyCondition(stream.Status.Conditions, v1.ConditionUnknown, stateReconciling, "Starting reconciliation")
 		err := r.Status().Update(ctx, stream)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("set condition unknown: %w", err)
@@ -123,7 +121,7 @@ func (r *StreamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 func (r *StreamReconciler) deleteStream(ctx context.Context, log logr.Logger, stream *api.Stream) error {
 	// Set status to false
-	stream.Status.Conditions = updateReadyCondition(stream.Status.Conditions, v1.ConditionFalse, "Finalizing", "Performing finalizer operations.")
+	stream.Status.Conditions = updateReadyCondition(stream.Status.Conditions, v1.ConditionFalse, stateFinalizing, "Performing finalizer operations.")
 	if err := r.Status().Update(ctx, stream); err != nil {
 		return fmt.Errorf("update ready condition: %w", err)
 	}
@@ -166,13 +164,6 @@ func (r *StreamReconciler) deleteStream(ctx context.Context, log logr.Logger, st
 
 func (r *StreamReconciler) createOrUpdate(ctx context.Context, log logr.Logger, stream *api.Stream) error {
 	// Create or Update the stream based on the spec
-	if r.ReadOnly() {
-		log.Info("Skipping stream creation or update.",
-			"read-only", r.ReadOnly(),
-		)
-		return nil
-	}
-
 	// Map spec to stream targetConfig
 	targetConfig, err := streamSpecToConfig(&stream.Spec)
 	if err != nil {
@@ -180,37 +171,86 @@ func (r *StreamReconciler) createOrUpdate(ctx context.Context, log logr.Logger, 
 	}
 
 	// CreateOrUpdateStream is called on every reconciliation when the stream is not to be deleted.
-	// TODO(future-feature): Do we need to check if config differs?
 	err = r.WithJetStreamClient(stream.Spec.ConnectionOpts, stream.Namespace, func(js jetstream.JetStream) error {
 		exists := false
-		_, err := js.Stream(ctx, targetConfig.Name)
+		s, err := js.Stream(ctx, targetConfig.Name)
 		if err == nil {
 			exists = true
 		} else if !errors.Is(err, jetstream.ErrStreamNotFound) {
 			return err
 		}
 
+		// Check against known state. Skip Update if converged
+		// Storing returned state from the server avoids
+		// having to check default values
+		if exists {
+			var knownState *jetstream.StreamConfig
+			if state, ok := stream.Annotations[stateAnnotationStream]; ok {
+				err := json.Unmarshal([]byte(state), &knownState)
+				if err != nil {
+					log.Error(err, "Failed to unmarshal known state from annotation.")
+				}
+			}
+
+			if knownState != nil {
+				converged, err := compareStreamConfig(&s.CachedInfo().Config, knownState)
+				if err != nil {
+					log.Error(err, "Failed to compare stream config.")
+				}
+
+				if converged {
+					return nil
+				}
+
+				log.Info("Stream config drifted from desired state.")
+			}
+		}
+
+		if r.ReadOnly() {
+			log.Info("Skipping stream creation or update.",
+				"read-only", r.ReadOnly(),
+			)
+			return nil
+		}
+
+		var updatedStream jetstream.Stream
+		err = nil
+
 		if !exists {
 			log.Info("Creating Stream.")
-			_, err := js.CreateStream(ctx, targetConfig)
-			return err
+			updatedStream, err = js.CreateStream(ctx, targetConfig)
 		}
 
 		if !stream.Spec.PreventUpdate {
 			log.Info("Updating Stream.")
-			_, err := js.UpdateStream(ctx, targetConfig)
-			return err
+			updatedStream, err = js.UpdateStream(ctx, targetConfig)
 		} else {
 			log.Info("Skipping Stream update.",
 				"preventUpdate", stream.Spec.PreventUpdate,
 			)
+		}
+		if err != nil {
+			return err
+		}
+
+		if updatedStream != nil {
+			// Store known state in annotation
+			knownState, err := json.Marshal(updatedStream.CachedInfo().Config)
+			if err != nil {
+				log.Error(err, "Failed to marshal known state to annotation.")
+			} else {
+				if stream.Annotations == nil {
+					stream.Annotations = map[string]string{}
+				}
+				stream.Annotations[stateAnnotationStream] = string(knownState)
+			}
 		}
 
 		return nil
 	})
 	if err != nil {
 		err = fmt.Errorf("create or update stream: %w", err)
-		stream.Status.Conditions = updateReadyCondition(stream.Status.Conditions, v1.ConditionFalse, "Errored", err.Error())
+		stream.Status.Conditions = updateReadyCondition(stream.Status.Conditions, v1.ConditionFalse, stateErrored, err.Error())
 		if err := r.Status().Update(ctx, stream); err != nil {
 			log.Error(err, "Failed to update ready condition to Errored.")
 		}
@@ -222,7 +262,7 @@ func (r *StreamReconciler) createOrUpdate(ctx context.Context, log logr.Logger, 
 	stream.Status.Conditions = updateReadyCondition(
 		stream.Status.Conditions,
 		v1.ConditionTrue,
-		"Reconciling",
+		stateReady,
 		"Stream successfully created or updated.",
 	)
 	err = r.Status().Update(ctx, stream)
@@ -371,6 +411,24 @@ func streamSpecToConfig(spec *api.StreamSpec) (jetstream.StreamConfig, error) {
 	return config, nil
 }
 
+func compareStreamConfig(actual *jetstream.StreamConfig, desired *jetstream.StreamConfig) (bool, error) {
+	if actual == nil || desired == nil {
+		return false, nil
+	}
+
+	actualJson, err := json.Marshal(actual)
+	if err != nil {
+		return false, fmt.Errorf("error marshaling source config: %w", err)
+	}
+
+	desiredJson, err := json.Marshal(desired)
+	if err != nil {
+		return false, fmt.Errorf("error marshaling target config: %w", err)
+	}
+
+	return string(actualJson) == string(desiredJson), nil
+}
+
 func mapStreamSource(ss *api.StreamSource) (*jetstream.StreamSource, error) {
 	jss := &jetstream.StreamSource{
 		Name:          ss.Name,
@@ -413,40 +471,5 @@ func (r *StreamReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: 1,
 		}).
-		Watches(
-			&api.Account{},
-			handler.EnqueueRequestsFromMapFunc(r.accountDependentStreams),
-		).
 		Complete(r)
-}
-
-func (r *StreamReconciler) accountDependentStreams(ctx context.Context, obj client.Object) []ctrl.Request {
-	log := klog.FromContext(ctx)
-
-	account, ok := obj.(*api.Account)
-	if !ok {
-		return nil
-	}
-
-	var streams api.StreamList
-	if err := r.List(ctx, &streams,
-		client.InNamespace(obj.GetNamespace()),
-	); err != nil {
-		log.Error(err, "Failed to list streams")
-		return nil
-	}
-
-	var requests []ctrl.Request
-	for _, stream := range streams.Items {
-		if stream.Spec.Account == account.Name {
-			requests = append(requests, ctrl.Request{
-				NamespacedName: types.NamespacedName{
-					Namespace: stream.Namespace,
-					Name:      stream.Name,
-				},
-			})
-		}
-	}
-
-	return requests
 }

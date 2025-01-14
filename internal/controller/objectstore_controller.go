@@ -28,13 +28,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 )
 
 // ObjectStoreReconciler reconciles a ObjectStore object
@@ -78,7 +75,7 @@ func (r *ObjectStoreReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	// Update ready status to unknown when no status is set
 	if len(objectStore.Status.Conditions) == 0 {
 		log.Info("Setting initial ready condition to unknown.")
-		objectStore.Status.Conditions = updateReadyCondition(objectStore.Status.Conditions, v1.ConditionUnknown, "Reconciling", "Starting reconciliation")
+		objectStore.Status.Conditions = updateReadyCondition(objectStore.Status.Conditions, v1.ConditionUnknown, stateReconciling, "Starting reconciliation")
 		err := r.Status().Update(ctx, objectStore)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("set condition unknown: %w", err)
@@ -123,7 +120,7 @@ func (r *ObjectStoreReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 func (r *ObjectStoreReconciler) deleteObjectStore(ctx context.Context, log logr.Logger, objectStore *api.ObjectStore) error {
 	// Set status to false
-	objectStore.Status.Conditions = updateReadyCondition(objectStore.Status.Conditions, v1.ConditionFalse, "Finalizing", "Performing finalizer operations.")
+	objectStore.Status.Conditions = updateReadyCondition(objectStore.Status.Conditions, v1.ConditionFalse, stateFinalizing, "Performing finalizer operations.")
 	if err := r.Status().Update(ctx, objectStore); err != nil {
 		return fmt.Errorf("update ready condition: %w", err)
 	}
@@ -166,13 +163,6 @@ func (r *ObjectStoreReconciler) deleteObjectStore(ctx context.Context, log logr.
 
 func (r *ObjectStoreReconciler) createOrUpdate(ctx context.Context, log logr.Logger, objectStore *api.ObjectStore) error {
 	// Create or Update the ObjectStore based on the spec
-	if r.ReadOnly() {
-		log.Info("Skipping ObjectStore creation or update.",
-			"read-only", r.ReadOnly(),
-		)
-		return nil
-	}
-
 	// Map spec to ObjectStore targetConfig
 	targetConfig, err := objectStoreSpecToConfig(&objectStore.Spec)
 	if err != nil {
@@ -188,6 +178,13 @@ func (r *ObjectStoreReconciler) createOrUpdate(ctx context.Context, log logr.Log
 			exists = true
 		} else if !errors.Is(err, jetstream.ErrBucketNotFound) {
 			return err
+		}
+
+		if r.ReadOnly() {
+			log.Info("Skipping ObjectStore creation or update.",
+				"read-only", r.ReadOnly(),
+			)
+			return nil
 		}
 
 		if !exists {
@@ -210,7 +207,7 @@ func (r *ObjectStoreReconciler) createOrUpdate(ctx context.Context, log logr.Log
 	})
 	if err != nil {
 		err = fmt.Errorf("create or update objectstore: %w", err)
-		objectStore.Status.Conditions = updateReadyCondition(objectStore.Status.Conditions, v1.ConditionFalse, "Errored", err.Error())
+		objectStore.Status.Conditions = updateReadyCondition(objectStore.Status.Conditions, v1.ConditionFalse, stateErrored, err.Error())
 		if err := r.Status().Update(ctx, objectStore); err != nil {
 			log.Error(err, "Failed to update ready condition to Errored.")
 		}
@@ -222,7 +219,7 @@ func (r *ObjectStoreReconciler) createOrUpdate(ctx context.Context, log logr.Log
 	objectStore.Status.Conditions = updateReadyCondition(
 		objectStore.Status.Conditions,
 		v1.ConditionTrue,
-		"Reconciling",
+		stateReady,
 		"ObjectStore successfully created or updated.",
 	)
 	err = r.Status().Update(ctx, objectStore)
@@ -281,40 +278,5 @@ func (r *ObjectStoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: 1,
 		}).
-		Watches(
-			&api.Account{},
-			handler.EnqueueRequestsFromMapFunc(r.accountDependentObjectStores),
-		).
 		Complete(r)
-}
-
-func (r *ObjectStoreReconciler) accountDependentObjectStores(ctx context.Context, obj client.Object) []ctrl.Request {
-	log := klog.FromContext(ctx)
-
-	account, ok := obj.(*api.ObjectStore)
-	if !ok {
-		return nil
-	}
-
-	var objectStores api.ObjectStoreList
-	if err := r.List(ctx, &objectStores,
-		client.InNamespace(obj.GetNamespace()),
-	); err != nil {
-		log.Error(err, "Failed to list ObjectStores")
-		return nil
-	}
-
-	var requests []ctrl.Request
-	for _, os := range objectStores.Items {
-		if os.Spec.Account == account.Name {
-			requests = append(requests, ctrl.Request{
-				NamespacedName: types.NamespacedName{
-					Namespace: os.Namespace,
-					Name:      os.Name,
-				},
-			})
-		}
-	}
-
-	return requests
 }

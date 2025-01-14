@@ -28,13 +28,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 )
 
 // KeyValueReconciler reconciles a KeyValue object
@@ -77,7 +74,7 @@ func (r *KeyValueReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	// Update ready status to unknown when no status is set
 	if len(keyValue.Status.Conditions) == 0 {
 		log.Info("Setting initial ready condition to unknown.")
-		keyValue.Status.Conditions = updateReadyCondition(keyValue.Status.Conditions, v1.ConditionUnknown, "Reconciling", "Starting reconciliation")
+		keyValue.Status.Conditions = updateReadyCondition(keyValue.Status.Conditions, v1.ConditionUnknown, stateReconciling, "Starting reconciliation")
 		err := r.Status().Update(ctx, keyValue)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("set condition unknown: %w", err)
@@ -122,7 +119,7 @@ func (r *KeyValueReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 func (r *KeyValueReconciler) deleteKeyValue(ctx context.Context, log logr.Logger, keyValue *api.KeyValue) error {
 	// Set status to false
-	keyValue.Status.Conditions = updateReadyCondition(keyValue.Status.Conditions, v1.ConditionFalse, "Finalizing", "Performing finalizer operations.")
+	keyValue.Status.Conditions = updateReadyCondition(keyValue.Status.Conditions, v1.ConditionFalse, stateFinalizing, "Performing finalizer operations.")
 	if err := r.Status().Update(ctx, keyValue); err != nil {
 		return fmt.Errorf("update ready condition: %w", err)
 	}
@@ -164,13 +161,6 @@ func (r *KeyValueReconciler) deleteKeyValue(ctx context.Context, log logr.Logger
 
 func (r *KeyValueReconciler) createOrUpdate(ctx context.Context, log logr.Logger, keyValue *api.KeyValue) error {
 	// Create or Update the KeyValue based on the spec
-	if r.ReadOnly() {
-		log.Info("Skipping KeyValue creation or update.",
-			"read-only", r.ReadOnly(),
-		)
-		return nil
-	}
-
 	// Map spec to KeyValue targetConfig
 	targetConfig, err := keyValueSpecToConfig(&keyValue.Spec)
 	if err != nil {
@@ -186,6 +176,13 @@ func (r *KeyValueReconciler) createOrUpdate(ctx context.Context, log logr.Logger
 			exists = true
 		} else if !errors.Is(err, jetstream.ErrBucketNotFound) {
 			return err
+		}
+
+		if r.ReadOnly() {
+			log.Info("Skipping KeyValue creation or update.",
+				"read-only", r.ReadOnly(),
+			)
+			return nil
 		}
 
 		if !exists {
@@ -208,7 +205,7 @@ func (r *KeyValueReconciler) createOrUpdate(ctx context.Context, log logr.Logger
 	})
 	if err != nil {
 		err = fmt.Errorf("create or update keyvalue: %w", err)
-		keyValue.Status.Conditions = updateReadyCondition(keyValue.Status.Conditions, v1.ConditionFalse, "Errored", err.Error())
+		keyValue.Status.Conditions = updateReadyCondition(keyValue.Status.Conditions, v1.ConditionFalse, stateErrored, err.Error())
 		if err := r.Status().Update(ctx, keyValue); err != nil {
 			log.Error(err, "Failed to update ready condition to Errored.")
 		}
@@ -220,7 +217,7 @@ func (r *KeyValueReconciler) createOrUpdate(ctx context.Context, log logr.Logger
 	keyValue.Status.Conditions = updateReadyCondition(
 		keyValue.Status.Conditions,
 		v1.ConditionTrue,
-		"Reconciling",
+		stateReady,
 		"KeyValue successfully created or updated.",
 	)
 	err = r.Status().Update(ctx, keyValue)
@@ -310,40 +307,5 @@ func (r *KeyValueReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: 1,
 		}).
-		Watches(
-			&api.Account{},
-			handler.EnqueueRequestsFromMapFunc(r.accountDependentKeyValues),
-		).
 		Complete(r)
-}
-
-func (r *KeyValueReconciler) accountDependentKeyValues(ctx context.Context, obj client.Object) []ctrl.Request {
-	log := klog.FromContext(ctx)
-
-	account, ok := obj.(*api.KeyValue)
-	if !ok {
-		return nil
-	}
-
-	var keyValues api.KeyValueList
-	if err := r.List(ctx, &keyValues,
-		client.InNamespace(obj.GetNamespace()),
-	); err != nil {
-		log.Error(err, "Failed to list KeyValues")
-		return nil
-	}
-
-	var requests []ctrl.Request
-	for _, kv := range keyValues.Items {
-		if kv.Spec.Account == account.Name {
-			requests = append(requests, ctrl.Request{
-				NamespacedName: types.NamespacedName{
-					Namespace: kv.Namespace,
-					Name:      kv.Name,
-				},
-			})
-		}
-	}
-
-	return requests
 }
