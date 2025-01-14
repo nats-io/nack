@@ -36,6 +36,7 @@ import (
 	klog "k8s.io/klog/v2"
 
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 )
 
@@ -163,9 +164,15 @@ func runControlLoop(config *rest.Config, natsCfg *controller.NatsConfig, control
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(v1beta2.AddToScheme(scheme))
 
+	// Reconcile periodically to detect configuration drift on the NATS Server
+	syncPeriod := time.Minute * 5
+
 	mgr, err := ctrl.NewManager(config, ctrl.Options{
 		Scheme: scheme,
 		Logger: klog.NewKlogr().WithName("controller-runtime"),
+		Cache: cache.Options{
+			SyncPeriod: &syncPeriod,
+		},
 	})
 	if err != nil {
 		return fmt.Errorf("unable to start manager: %w", err)

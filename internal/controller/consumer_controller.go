@@ -27,9 +27,12 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 
 	api "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -331,6 +334,44 @@ func consumerSpecToConfig(spec *api.ConsumerSpec) (*jetstream.ConsumerConfig, er
 func (r *ConsumerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.Consumer{}).
-		WithEventFilter(predicate.GenerationChangedPredicate{}).
+		Owns(&api.Consumer{}).
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: 1,
+		}).
+		Watches(
+			&api.Account{},
+			handler.EnqueueRequestsFromMapFunc(r.accountDependentConsumers),
+		).
 		Complete(r)
+}
+
+func (r *ConsumerReconciler) accountDependentConsumers(ctx context.Context, obj client.Object) []ctrl.Request {
+	log := klog.FromContext(ctx)
+
+	account, ok := obj.(*api.Consumer)
+	if !ok {
+		return nil
+	}
+
+	var consumers api.ConsumerList
+	if err := r.List(ctx, &consumers,
+		client.InNamespace(obj.GetNamespace()),
+	); err != nil {
+		log.Error(err, "Failed to list Consumers")
+		return nil
+	}
+
+	var requests []ctrl.Request
+	for _, c := range consumers.Items {
+		if c.Spec.Account == account.Name {
+			requests = append(requests, ctrl.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: c.Namespace,
+					Name:      c.Name,
+				},
+			})
+		}
+	}
+
+	return requests
 }

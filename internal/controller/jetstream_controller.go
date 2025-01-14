@@ -77,16 +77,31 @@ func (c *jsController) WithJetStreamClient(opts api.ConnectionOpts, ns string, o
 	return op(jsClient)
 }
 
-// Setup default options, override from account resource if configured
+// Setup default options, override from account resource and CRD options if configured
 func (c *jsController) natsConfigFromOpts(opts api.ConnectionOpts, ns string) (*NatsConfig, error) {
 	ctx, done := context.WithTimeout(context.Background(), 5*time.Second)
 	defer done()
 
-	natsConfig := c.setupNatsConfig(opts)
+	natsConfig := &NatsConfig{
+		ClientName:  c.config.ClientName,
+		Credentials: c.config.Credentials,
+		NKey:        c.config.NKey,
+		ServerURL:   c.config.ServerURL,
+		CAs:         c.config.CAs,
+		TLSFirst:    c.config.TLSFirst,
+	}
+
+	if c.config.Certificate != "" && c.config.Key != "" {
+		natsConfig.Certificate = c.config.Certificate
+		natsConfig.Key = c.config.Key
+	}
 
 	if opts.Account == "" {
-		return natsConfig, nil
+		return applyConnOpts(*natsConfig, opts), nil
 	}
+
+	// Apply Account options first, over global.
+	// Apply remaining CRD options last
 
 	account := &api.Account{}
 	err := c.Get(ctx,
@@ -182,55 +197,35 @@ func (c *jsController) natsConfigFromOpts(opts api.ConnectionOpts, ns string) (*
 		natsConfig.Credentials = account.Spec.Creds.File
 	}
 
-	return natsConfig, nil
+	return applyConnOpts(*natsConfig, opts), nil
 }
 
-// Default to global config, but always accept override from provided opts
-func (c *jsController) setupNatsConfig(opts api.ConnectionOpts) *NatsConfig {
-	servers := c.config.ServerURL
+func applyConnOpts(baseConfig NatsConfig, opts api.ConnectionOpts) *NatsConfig {
+	natsConfig := baseConfig
 	if len(opts.Servers) > 0 {
-		servers = strings.Join(opts.Servers, ",")
+		natsConfig.ServerURL = strings.Join(opts.Servers, ",")
 	}
 
 	// Currently, if the global TLSFirst is set, a false value in the CRD will not override
 	// due to that being the bool zero value. A true value in the CRD can override a global false.
-	tlsFirst := c.config.TLSFirst
 	if opts.TLSFirst {
-		tlsFirst = opts.TLSFirst
+		natsConfig.TLSFirst = opts.TLSFirst
 	}
 
-	creds := c.config.Credentials
 	if opts.Creds != "" {
-		creds = opts.Creds
+		natsConfig.Credentials = opts.Creds
 	}
 
-	rootCAs := c.config.CAs
 	if len(opts.TLS.RootCAs) > 0 {
-		rootCAs = opts.TLS.RootCAs
+		natsConfig.CAs = opts.TLS.RootCAs
 	}
 
-	var clientCert, clientKey string
-	if c.config.Certificate != "" && c.config.Key != "" {
-		clientCert = c.config.Certificate
-		clientKey = c.config.Key
-	}
 	if opts.TLS.ClientCert != "" && opts.TLS.ClientKey != "" {
-		clientCert = opts.TLS.ClientCert
-		clientKey = opts.TLS.ClientKey
+		natsConfig.Certificate = opts.TLS.ClientCert
+		natsConfig.Key = opts.TLS.ClientKey
 	}
 
-	// Takes opts values if present
-	cfg := &NatsConfig{
-		ClientName:  c.config.ClientName,
-		ServerURL:   servers,
-		TLSFirst:    tlsFirst,
-		Credentials: creds,
-		CAs:         rootCAs,
-		Certificate: clientCert,
-		Key:         clientKey,
-	}
-
-	return cfg
+	return &natsConfig
 }
 
 // updateReadyCondition returns the given conditions with an added or updated ready condition.

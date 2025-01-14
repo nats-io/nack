@@ -28,10 +28,13 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 )
 
 // StreamReconciler reconciles a Stream object
@@ -407,7 +410,43 @@ func (r *StreamReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.Stream{}).
 		Owns(&api.Stream{}).
-		// Only trigger on generation changes
-		WithEventFilter(predicate.GenerationChangedPredicate{}).
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: 1,
+		}).
+		Watches(
+			&api.Account{},
+			handler.EnqueueRequestsFromMapFunc(r.accountDependentStreams),
+		).
 		Complete(r)
+}
+
+func (r *StreamReconciler) accountDependentStreams(ctx context.Context, obj client.Object) []ctrl.Request {
+	log := klog.FromContext(ctx)
+
+	account, ok := obj.(*api.Account)
+	if !ok {
+		return nil
+	}
+
+	var streams api.StreamList
+	if err := r.List(ctx, &streams,
+		client.InNamespace(obj.GetNamespace()),
+	); err != nil {
+		log.Error(err, "Failed to list streams")
+		return nil
+	}
+
+	var requests []ctrl.Request
+	for _, stream := range streams.Items {
+		if stream.Spec.Account == account.Name {
+			requests = append(requests, ctrl.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: stream.Namespace,
+					Name:      stream.Name,
+				},
+			})
+		}
+	}
+
+	return requests
 }

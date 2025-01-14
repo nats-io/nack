@@ -28,10 +28,13 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 )
 
 // KeyValueReconciler reconciles a KeyValue object
@@ -304,7 +307,43 @@ func (r *KeyValueReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.KeyValue{}).
 		Owns(&api.KeyValue{}).
-		// Only trigger on generation changes
-		WithEventFilter(predicate.GenerationChangedPredicate{}).
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: 1,
+		}).
+		Watches(
+			&api.Account{},
+			handler.EnqueueRequestsFromMapFunc(r.accountDependentKeyValues),
+		).
 		Complete(r)
+}
+
+func (r *KeyValueReconciler) accountDependentKeyValues(ctx context.Context, obj client.Object) []ctrl.Request {
+	log := klog.FromContext(ctx)
+
+	account, ok := obj.(*api.KeyValue)
+	if !ok {
+		return nil
+	}
+
+	var keyValues api.KeyValueList
+	if err := r.List(ctx, &keyValues,
+		client.InNamespace(obj.GetNamespace()),
+	); err != nil {
+		log.Error(err, "Failed to list KeyValues")
+		return nil
+	}
+
+	var requests []ctrl.Request
+	for _, kv := range keyValues.Items {
+		if kv.Spec.Account == account.Name {
+			requests = append(requests, ctrl.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: kv.Namespace,
+					Name:      kv.Name,
+				},
+			})
+		}
+	}
+
+	return requests
 }

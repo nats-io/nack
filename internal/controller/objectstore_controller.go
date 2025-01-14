@@ -28,10 +28,13 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 )
 
 // ObjectStoreReconciler reconciles a ObjectStore object
@@ -275,7 +278,43 @@ func (r *ObjectStoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.ObjectStore{}).
 		Owns(&api.ObjectStore{}).
-		// Only trigger on generation changes
-		WithEventFilter(predicate.GenerationChangedPredicate{}).
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: 1,
+		}).
+		Watches(
+			&api.Account{},
+			handler.EnqueueRequestsFromMapFunc(r.accountDependentObjectStores),
+		).
 		Complete(r)
+}
+
+func (r *ObjectStoreReconciler) accountDependentObjectStores(ctx context.Context, obj client.Object) []ctrl.Request {
+	log := klog.FromContext(ctx)
+
+	account, ok := obj.(*api.ObjectStore)
+	if !ok {
+		return nil
+	}
+
+	var objectStores api.ObjectStoreList
+	if err := r.List(ctx, &objectStores,
+		client.InNamespace(obj.GetNamespace()),
+	); err != nil {
+		log.Error(err, "Failed to list ObjectStores")
+		return nil
+	}
+
+	var requests []ctrl.Request
+	for _, os := range objectStores.Items {
+		if os.Spec.Account == account.Name {
+			requests = append(requests, ctrl.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: os.Namespace,
+					Name:      os.Name,
+				},
+			})
+		}
+	}
+
+	return requests
 }
