@@ -30,6 +30,7 @@ import (
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -217,6 +218,8 @@ func (r *AccountReconciler) findDependentResources(ctx context.Context, log logr
 func (r *AccountReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.Account{}).
-		Owns(&api.Account{}).
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: 1,
+		}).
 		Complete(r)
 }

@@ -250,6 +250,8 @@ func (r *ConsumerReconciler) createOrUpdate(ctx context.Context, log klog.Logger
 				}
 				consumer.Annotations[stateAnnotationStream] = string(knownState)
 			}
+
+			return r.Update(ctx, consumer)
 		}
 
 		return nil
@@ -393,7 +395,6 @@ func compareConsumerConfig(actual *jetstream.ConsumerConfig, desired *jetstream.
 func (r *ConsumerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.Consumer{}).
-		Owns(&api.Consumer{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: 1,
 		}).

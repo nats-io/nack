@@ -244,6 +244,8 @@ func (r *StreamReconciler) createOrUpdate(ctx context.Context, log logr.Logger, 
 				}
 				stream.Annotations[stateAnnotationStream] = string(knownState)
 			}
+
+			return r.Update(ctx, stream)
 		}
 
 		return nil
@@ -467,7 +469,6 @@ func mapStreamSource(ss *api.StreamSource) (*jetstream.StreamSource, error) {
 func (r *StreamReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.Stream{}).
-		Owns(&api.Stream{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: 1,
 		}).

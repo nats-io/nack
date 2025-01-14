@@ -303,7 +303,6 @@ func keyValueSpecToConfig(spec *api.KeyValueSpec) (jetstream.KeyValueConfig, err
 func (r *KeyValueReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.KeyValue{}).
-		Owns(&api.KeyValue{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: 1,
 		}).

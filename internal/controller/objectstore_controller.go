@@ -274,7 +274,6 @@ func objectStoreSpecToConfig(spec *api.ObjectStoreSpec) (jetstream.ObjectStoreCo
 func (r *ObjectStoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.ObjectStore{}).
-		Owns(&api.ObjectStore{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: 1,
 		}).
