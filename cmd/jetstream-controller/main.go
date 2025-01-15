@@ -71,7 +71,9 @@ func run() error {
 	crdConnect := flag.Bool("crd-connect", false, "If true, then NATS connections will be made from CRD config, not global config. Ignored if running with control loop, CRD options will always override global config")
 	cleanupPeriod := flag.Duration("cleanup-period", 30*time.Second, "Period to run object cleanup")
 	readOnly := flag.Bool("read-only", false, "Starts the controller without causing changes to the NATS resources")
+	cacheDir := flag.String("cache-dir", "", "Directory to store cached credential and TLS files")
 	controlLoop := flag.Bool("control-loop", false, "Experimental: Run controller with a full reconciliation control loop.")
+	controlLoopSyncInterval := flag.Duration("sync-interval", 5*time.Minute, "Interval to perform scheduled reconcile")
 
 	flag.Parse()
 
@@ -109,8 +111,10 @@ func run() error {
 		}
 
 		controllerCfg := &controller.Config{
-			ReadOnly:  *readOnly,
-			Namespace: *namespace,
+			ReadOnly:     *readOnly,
+			Namespace:    *namespace,
+			CacheDir:     *cacheDir,
+			SyncInterval: *controlLoopSyncInterval,
 		}
 
 		return runControlLoop(config, natsCfg, controllerCfg)
@@ -164,26 +168,25 @@ func runControlLoop(config *rest.Config, natsCfg *controller.NatsConfig, control
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(v1beta2.AddToScheme(scheme))
 
-	// Reconcile periodically to detect configuration drift on the NATS Server
-	syncPeriod := time.Minute * 5
-
 	mgr, err := ctrl.NewManager(config, ctrl.Options{
 		Scheme: scheme,
 		Logger: klog.NewKlogr().WithName("controller-runtime"),
 		Cache: cache.Options{
-			SyncPeriod: &syncPeriod,
+			SyncPeriod: &controllerCfg.SyncInterval,
 		},
 	})
 	if err != nil {
 		return fmt.Errorf("unable to start manager: %w", err)
 	}
 
-	cacheDir, err := os.MkdirTemp(".", "nack")
-	if err != nil {
-		return fmt.Errorf("create cache dir: %w", err)
+	if controllerCfg.CacheDir == "" {
+		cacheDir, err := os.MkdirTemp(".", "nack")
+		if err != nil {
+			return fmt.Errorf("create cache dir: %w", err)
+		}
+		defer os.RemoveAll(cacheDir)
+		controllerCfg.CacheDir = cacheDir
 	}
-	defer os.RemoveAll(cacheDir)
-	controllerCfg.CacheDir = cacheDir
 
 	err = controller.RegisterAll(mgr, natsCfg, controllerCfg)
 	if err != nil {
