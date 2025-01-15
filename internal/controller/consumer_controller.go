@@ -111,12 +111,20 @@ func (r *ConsumerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	if consumer.Spec.FlowControl || consumer.Spec.DeliverSubject != "" || consumer.Spec.DeliverGroup != "" || consumer.Spec.HeartbeatInterval != "" {
-		log.Info("FlowControl, DeliverSubject, DeliverGroup, and HeartbeatInterval are Push Consumer options, which are no longer supported. Skipping consumer creation or update.")
+		log.Info("FlowControl, DeliverSubject, DeliverGroup, and HeartbeatInterval are Push Consumer options, which are not supported. Skipping consumer creation or update.")
+		consumer.Status.Conditions = updateReadyCondition(consumer.Status.Conditions, v1.ConditionFalse, stateErrored, "Push Consumer options are not supported.")
+		if err := r.Status().Update(ctx, consumer); err != nil {
+			log.Error(err, "Failed to update ready condition to Errored.")
+		}
 		return ctrl.Result{}, nil
 	}
 
 	// Create or update stream
 	if err := r.createOrUpdate(ctx, log, consumer); err != nil {
+		consumer.Status.Conditions = updateReadyCondition(consumer.Status.Conditions, v1.ConditionFalse, stateErrored, err.Error())
+		if err := r.Status().Update(ctx, consumer); err != nil {
+			log.Error(err, "Failed to update ready condition to Errored.")
+		}
 		return ctrl.Result{}, fmt.Errorf("create or update: %s", err)
 	}
 	return ctrl.Result{}, nil
@@ -129,15 +137,21 @@ func (r *ConsumerReconciler) deleteConsumer(ctx context.Context, log logr.Logger
 		return fmt.Errorf("update ready condition: %w", err)
 	}
 
+	storedState, err := getStoredConsumerState(consumer)
+	if err != nil {
+		log.Error(err, "Failed to fetch stored state.")
+	}
+
 	if !consumer.Spec.PreventDelete && !r.ReadOnly() {
 		err := r.WithJetStreamClient(consumer.Spec.ConnectionOpts, consumer.Namespace, func(js jetstream.JetStream) error {
-			_, err := js.Consumer(ctx, consumer.Spec.StreamName, consumer.Spec.DurableName)
-			if err != nil {
-				if errors.Is(err, jetstream.ErrConsumerNotFound) || errors.Is(err, jetstream.ErrJetStreamNotEnabled) || errors.Is(err, jetstream.ErrJetStreamNotEnabledForAccount) {
-					return nil
-				}
-				return err
+			_, err := getServerConsumerState(ctx, js, consumer)
+			// If we have no known state for this consumer it has never been reconciled.
+			// If we are also receiving an error fetching state, either the consumer does not exist
+			// or this resource config is invalid.
+			if err != nil && storedState == nil {
+				return nil
 			}
+
 			return js.DeleteConsumer(ctx, consumer.Spec.StreamName, consumer.Spec.DurableName)
 		})
 		switch {
@@ -178,38 +192,27 @@ func (r *ConsumerReconciler) createOrUpdate(ctx context.Context, log klog.Logger
 	}
 
 	err = r.WithJetStreamClient(consumer.Spec.ConnectionOpts, consumer.Namespace, func(js jetstream.JetStream) error {
-		exists := false
-		c, err := js.Consumer(ctx, consumer.Spec.StreamName, consumer.Spec.DurableName)
-		if err == nil {
-			exists = true
-		} else if !errors.Is(err, jetstream.ErrConsumerNotFound) {
+		storedState, err := getStoredConsumerState(consumer)
+		if err != nil {
+			log.Error(err, "Failed to fetch stored consumer state.")
+		}
+
+		serverState, err := getServerConsumerState(ctx, js, consumer)
+		if err != nil {
 			return err
 		}
 
-		// Check against known state. Skip Update if converged
-		// Storing returned state from the server avoids
-		// having to check default values
-		if exists {
-			var knownState *jetstream.ConsumerConfig
-			if state, ok := consumer.Annotations[stateAnnotationConsumer]; ok {
-				err := json.Unmarshal([]byte(state), &knownState)
-				if err != nil {
-					log.Error(err, "Failed to unmarshal known state from annotation.")
-				}
+		// Check against known state. Skip Update if converged.
+		// Storing returned state from the server avoids have to
+		// check default values or call Update on already converged resources
+		if storedState != nil && serverState != nil && consumer.Status.ObservedGeneration == consumer.Generation {
+			diff := compareConfigState(storedState, serverState)
+
+			if diff == "" {
+				return nil
 			}
 
-			if knownState != nil {
-				converged, err := compareConsumerConfig(&c.CachedInfo().Config, knownState)
-				if err != nil {
-					log.Error(err, "Failed to compare consumer config.")
-				}
-
-				if converged {
-					return nil
-				}
-
-				log.Info("Consumer config drifted from desired state.")
-			}
+			log.Info("Consumer config drifted from desired state.", "diff", diff)
 		}
 
 		if r.ReadOnly() {
@@ -222,34 +225,35 @@ func (r *ConsumerReconciler) createOrUpdate(ctx context.Context, log klog.Logger
 		var updatedConsumer jetstream.Consumer
 		err = nil
 
-		if !exists {
+		if serverState == nil {
 			log.Info("Creating Consumer.")
 			updatedConsumer, err = js.CreateConsumer(ctx, consumer.Spec.StreamName, *targetConfig)
-		}
-
-		if !consumer.Spec.PreventUpdate {
+			if err != nil {
+				return err
+			}
+		} else if !consumer.Spec.PreventUpdate {
 			log.Info("Updating Consumer.")
 			updatedConsumer, err = js.UpdateConsumer(ctx, consumer.Spec.StreamName, *targetConfig)
+			if err != nil {
+				return err
+			}
 		} else {
 			log.Info("Skipping Consumer update.",
 				"preventUpdate", consumer.Spec.PreventUpdate,
 			)
 		}
-		if err != nil {
-			return err
-		}
 
 		if updatedConsumer != nil {
 			// Store known state in annotation
-			knownState, err := json.Marshal(updatedConsumer.CachedInfo().Config)
+			updatedState, err := json.Marshal(updatedConsumer.CachedInfo().Config)
 			if err != nil {
-				log.Error(err, "Failed to marshal known state to annotation.")
-			} else {
-				if consumer.Annotations == nil {
-					consumer.Annotations = map[string]string{}
-				}
-				consumer.Annotations[stateAnnotationStream] = string(knownState)
+				return err
 			}
+
+			if consumer.Annotations == nil {
+				consumer.Annotations = map[string]string{}
+			}
+			consumer.Annotations[stateAnnotationConsumer] = string(updatedState)
 
 			return r.Update(ctx, consumer)
 		}
@@ -279,6 +283,32 @@ func (r *ConsumerReconciler) createOrUpdate(ctx context.Context, log klog.Logger
 	}
 
 	return nil
+}
+
+func getStoredConsumerState(consumer *api.Consumer) (*jetstream.ConsumerConfig, error) {
+	var storedState *jetstream.ConsumerConfig
+	if state, ok := consumer.Annotations[stateAnnotationConsumer]; ok {
+		err := json.Unmarshal([]byte(state), &storedState)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return storedState, nil
+}
+
+// Fetch the current state of the consumer from the server.
+// ErrConsumerNotFound is considered a valid response and does not return error
+func getServerConsumerState(ctx context.Context, js jetstream.JetStream, consumer *api.Consumer) (*jetstream.ConsumerConfig, error) {
+	c, err := js.Consumer(ctx, consumer.Spec.StreamName, consumer.Spec.DurableName)
+	if errors.Is(err, jetstream.ErrConsumerNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &c.CachedInfo().Config, nil
 }
 
 func consumerSpecToConfig(spec *api.ConsumerSpec) (*jetstream.ConsumerConfig, error) {
@@ -371,24 +401,6 @@ func consumerSpecToConfig(spec *api.ConsumerSpec) (*jetstream.ConsumerConfig, er
 	}
 
 	return config, nil
-}
-
-func compareConsumerConfig(actual *jetstream.ConsumerConfig, desired *jetstream.ConsumerConfig) (bool, error) {
-	if actual == nil || desired == nil {
-		return false, nil
-	}
-
-	actualJson, err := json.Marshal(actual)
-	if err != nil {
-		return false, fmt.Errorf("error marshaling source config: %w", err)
-	}
-
-	desiredJson, err := json.Marshal(desired)
-	if err != nil {
-		return false, fmt.Errorf("error marshaling target config: %w", err)
-	}
-
-	return string(actualJson) == string(desiredJson), nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

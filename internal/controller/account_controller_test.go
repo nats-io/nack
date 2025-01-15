@@ -138,7 +138,7 @@ var _ = Describe("Account Controller", func() {
 				assertReadyStateMatches(
 					account.Status.Conditions[0],
 					v1.ConditionFalse,
-					"DeletionBlocked",
+					stateFinalizing,
 					"Account has dependent resources that must be deleted first",
 					time.Now(),
 				)

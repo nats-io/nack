@@ -171,7 +171,7 @@ var _ = Describe("Consumer Controller", func() {
 				Expect(k8sClient.Get(ctx, typeNamespacedName, consumer)).To(Succeed())
 				Expect(consumer.Status.Conditions).To(HaveLen(1))
 
-				assertReadyStateMatches(consumer.Status.Conditions[0], v1.ConditionUnknown, "Reconciling", "Starting reconciliation", time.Now())
+				assertReadyStateMatches(consumer.Status.Conditions[0], v1.ConditionUnknown, stateReconciling, "Starting reconciliation", time.Now())
 			})
 		})
 
@@ -212,7 +212,7 @@ var _ = Describe("Consumer Controller", func() {
 					assertReadyStateMatches(
 						consumer.Status.Conditions[0],
 						v1.ConditionFalse,
-						"Errored",
+						stateErrored,
 						"stream", // Not existing stream as message
 						time.Now(),
 					)
@@ -230,7 +230,7 @@ var _ = Describe("Consumer Controller", func() {
 
 				By("checking if the ready state was updated")
 				Expect(consumer.Status.Conditions).To(HaveLen(1))
-				assertReadyStateMatches(consumer.Status.Conditions[0], v1.ConditionTrue, "Reconciling", "created or updated", time.Now())
+				assertReadyStateMatches(consumer.Status.Conditions[0], v1.ConditionTrue, stateReady, "created or updated", time.Now())
 
 				By("checking if the observed generation matches")
 				Expect(consumer.Status.ObservedGeneration).To(Equal(consumer.Generation))
@@ -321,7 +321,7 @@ var _ = Describe("Consumer Controller", func() {
 			When("read-only mode is enabled", func() {
 				BeforeEach(func(ctx SpecContext) {
 					By("setting read only on the controller")
-					readOnly, err := NewJSController(k8sClient, &NatsConfig{ServerURL: testServer.ClientURL()}, &Config{ReadOnly: true})
+					readOnly, err := NewJSController(k8sClient, &NatsConfig{ServerURL: clientUrl}, &Config{ReadOnly: true})
 					Expect(err).NotTo(HaveOccurred())
 					controller = &ConsumerReconciler{
 						Scheme:              k8sClient.Scheme(),
@@ -359,7 +359,7 @@ var _ = Describe("Consumer Controller", func() {
 			When("namespace restriction is enabled", func() {
 				BeforeEach(func(ctx SpecContext) {
 					By("setting a namespace on the resource")
-					namespaced, err := NewJSController(k8sClient, &NatsConfig{ServerURL: testServer.ClientURL()}, &Config{Namespace: "other-namespace"})
+					namespaced, err := NewJSController(k8sClient, &NatsConfig{ServerURL: clientUrl}, &Config{Namespace: "other-namespace"})
 					Expect(err).NotTo(HaveOccurred())
 					controller = &ConsumerReconciler{
 						Scheme:              k8sClient.Scheme(),

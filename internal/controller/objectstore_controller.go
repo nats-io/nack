@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -32,6 +33,10 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+)
+
+const (
+	objStreamPrefix = "OBJ_"
 )
 
 // ObjectStoreReconciler reconciles a ObjectStore object
@@ -125,20 +130,25 @@ func (r *ObjectStoreReconciler) deleteObjectStore(ctx context.Context, log logr.
 		return fmt.Errorf("update ready condition: %w", err)
 	}
 
+	storedState, err := getStoredObjectStoreState(objectStore)
+	if err != nil {
+		log.Error(err, "Failed to fetch stored state.")
+	}
+
 	if !objectStore.Spec.PreventDelete && !r.ReadOnly() {
 		log.Info("Deleting ObjectStore.")
 		err := r.WithJetStreamClient(objectStore.Spec.ConnectionOpts, objectStore.Namespace, func(js jetstream.JetStream) error {
-			_, err := js.ObjectStore(ctx, objectStore.Spec.Bucket)
-			if err != nil {
-				if errors.Is(err, jetstream.ErrBucketNotFound) || errors.Is(err, jetstream.ErrJetStreamNotEnabled) || errors.Is(err, jetstream.ErrJetStreamNotEnabledForAccount) {
-					return nil
-				}
-				return err
+			_, err := getServerObjectStoreState(ctx, js, objectStore)
+			// If we have no known state for this object store it has never been reconciled.
+			// If we are also receiving an error fetching state, either the object store does not exist
+			// or this resource config is invalid.
+			if err != nil && storedState == nil {
+				return nil
 			}
+
 			return js.DeleteObjectStore(ctx, objectStore.Spec.Bucket)
 		})
-		// FIX: ErrStreamNotFound -> ErrBucketNotFound once nats.go is corrected
-		if errors.Is(err, jetstream.ErrStreamNotFound) {
+		if errors.Is(err, jetstream.ErrStreamNotFound) || errors.Is(err, jetstream.ErrBucketNotFound) {
 			log.Info("ObjectStore does not exist, unable to delete.", "objectStoreName", objectStore.Spec.Bucket)
 		} else if err != nil {
 			return fmt.Errorf("delete objectstore during finalization: %w", err)
@@ -170,14 +180,28 @@ func (r *ObjectStoreReconciler) createOrUpdate(ctx context.Context, log logr.Log
 	}
 
 	// UpdateObjectStore is called on every reconciliation when the stream is not to be deleted.
-	// TODO(future-feature): Do we need to check if config differs?
 	err = r.WithJetStreamClient(objectStore.Spec.ConnectionOpts, objectStore.Namespace, func(js jetstream.JetStream) error {
-		exists := false
-		_, err := js.ObjectStore(ctx, targetConfig.Bucket)
-		if err == nil {
-			exists = true
-		} else if !errors.Is(err, jetstream.ErrBucketNotFound) {
+		storedState, err := getStoredObjectStoreState(objectStore)
+		if err != nil {
+			log.Error(err, "Failed to fetch stored objectstore state")
+		}
+
+		serverState, err := getServerObjectStoreState(ctx, js, objectStore)
+		if err != nil {
 			return err
+		}
+
+		// Check against known state. Skip Update if converged.
+		// Storing returned state from the server avoids have to
+		// check default values or call Update on already converged resources
+		if storedState != nil && serverState != nil && objectStore.Status.ObservedGeneration == objectStore.Generation {
+			diff := compareConfigState(storedState, serverState)
+
+			if diff == "" {
+				return nil
+			}
+
+			log.Info("Object Store config drifted from desired state.", "diff", diff)
 		}
 
 		if r.ReadOnly() {
@@ -187,20 +211,45 @@ func (r *ObjectStoreReconciler) createOrUpdate(ctx context.Context, log logr.Log
 			return nil
 		}
 
-		if !exists {
-			log.Info("Creating ObjectStore.")
-			_, err = js.CreateObjectStore(ctx, targetConfig)
-			return err
-		}
+		var updatedObjectStore jetstream.ObjectStore
+		err = nil
 
-		if !objectStore.Spec.PreventUpdate {
+		if serverState == nil {
+			log.Info("Creating ObjectStore.")
+			updatedObjectStore, err = js.CreateObjectStore(ctx, targetConfig)
+			if err != nil {
+				return err
+			}
+		} else if !objectStore.Spec.PreventUpdate {
 			log.Info("Updating ObjectStore.")
-			_, err = js.UpdateObjectStore(ctx, targetConfig)
-			return err
+			updatedObjectStore, err = js.UpdateObjectStore(ctx, targetConfig)
+			if err != nil {
+				return err
+			}
 		} else {
 			log.Info("Skipping ObjectStore update.",
 				"preventUpdate", objectStore.Spec.PreventUpdate,
 			)
+		}
+
+		if updatedObjectStore != nil {
+			// Store known state in annotation
+			serverState, err = getServerObjectStoreState(ctx, js, objectStore)
+			if err != nil {
+				return err
+			}
+
+			updatedState, err := json.Marshal(serverState)
+			if err != nil {
+				return err
+			}
+
+			if objectStore.Annotations == nil {
+				objectStore.Annotations = map[string]string{}
+			}
+			objectStore.Annotations[stateAnnotationObj] = string(updatedState)
+
+			return r.Update(ctx, objectStore)
 		}
 
 		return nil
@@ -228,6 +277,32 @@ func (r *ObjectStoreReconciler) createOrUpdate(ctx context.Context, log logr.Log
 	}
 
 	return nil
+}
+
+func getStoredObjectStoreState(objectStore *api.ObjectStore) (*jetstream.StreamConfig, error) {
+	var storedState *jetstream.StreamConfig
+	if state, ok := objectStore.Annotations[stateAnnotationObj]; ok {
+		err := json.Unmarshal([]byte(state), &storedState)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return storedState, nil
+}
+
+// Fetch the current state of the ObjectStore stream from the server.
+// ErrStreamNotFound is considered a valid response and does not return error
+func getServerObjectStoreState(ctx context.Context, js jetstream.JetStream, objectStore *api.ObjectStore) (*jetstream.StreamConfig, error) {
+	s, err := js.Stream(ctx, fmt.Sprintf("%s%s", objStreamPrefix, objectStore.Spec.Bucket))
+	if errors.Is(err, jetstream.ErrStreamNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &s.CachedInfo().Config, nil
 }
 
 // objectStoreSpecToConfig creates a jetstream.ObjectStoreConfig matching the given ObjectStore resource spec

@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -32,6 +33,10 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+)
+
+const (
+	kvStreamPrefix = "KV_"
 )
 
 // KeyValueReconciler reconciles a KeyValue object
@@ -124,16 +129,22 @@ func (r *KeyValueReconciler) deleteKeyValue(ctx context.Context, log logr.Logger
 		return fmt.Errorf("update ready condition: %w", err)
 	}
 
+	storedState, err := getStoredKeyValueState(keyValue)
+	if err != nil {
+		log.Error(err, "Failed to fetch stored state.")
+	}
+
 	if !keyValue.Spec.PreventDelete && !r.ReadOnly() {
 		log.Info("Deleting KeyValue.")
 		err := r.WithJetStreamClient(keyValue.Spec.ConnectionOpts, keyValue.Namespace, func(js jetstream.JetStream) error {
-			_, err := js.KeyValue(ctx, keyValue.Spec.Bucket)
-			if err != nil {
-				if errors.Is(err, jetstream.ErrBucketNotFound) || errors.Is(err, jetstream.ErrJetStreamNotEnabled) || errors.Is(err, jetstream.ErrJetStreamNotEnabledForAccount) {
-					return nil
-				}
-				return err
+			_, err := getServerKeyValueState(ctx, js, keyValue)
+			// If we have no known state for this KeyValue it has never been reconciled.
+			// If we are also receiving an error fetching state, either the KeyValue does not exist
+			// or this resource config is invalid.
+			if err != nil && storedState == nil {
+				return nil
 			}
+
 			return js.DeleteKeyValue(ctx, keyValue.Spec.Bucket)
 		})
 		if errors.Is(err, jetstream.ErrBucketNotFound) {
@@ -168,14 +179,28 @@ func (r *KeyValueReconciler) createOrUpdate(ctx context.Context, log logr.Logger
 	}
 
 	// UpdateKeyValue is called on every reconciliation when the stream is not to be deleted.
-	// TODO(future-feature): Do we need to check if config differs?
 	err = r.WithJetStreamClient(keyValue.Spec.ConnectionOpts, keyValue.Namespace, func(js jetstream.JetStream) error {
-		exists := false
-		_, err := js.KeyValue(ctx, targetConfig.Bucket)
-		if err == nil {
-			exists = true
-		} else if !errors.Is(err, jetstream.ErrBucketNotFound) {
+		storedState, err := getStoredKeyValueState(keyValue)
+		if err != nil {
+			log.Error(err, "Failed to fetch stored KeyValue state")
+		}
+
+		serverState, err := getServerKeyValueState(ctx, js, keyValue)
+		if err != nil {
 			return err
+		}
+
+		// Check against known state. Skip Update if converged.
+		// Storing returned state from the server avoids have to
+		// check default values or call Update on already converged resources
+		if storedState != nil && serverState != nil && keyValue.Status.ObservedGeneration == keyValue.Generation {
+			diff := compareConfigState(storedState, serverState)
+
+			if diff == "" {
+				return nil
+			}
+
+			log.Info("KeyValue config drifted from desired state.", "diff", diff)
 		}
 
 		if r.ReadOnly() {
@@ -185,20 +210,45 @@ func (r *KeyValueReconciler) createOrUpdate(ctx context.Context, log logr.Logger
 			return nil
 		}
 
-		if !exists {
-			log.Info("Creating KeyValue.")
-			_, err = js.CreateKeyValue(ctx, targetConfig)
-			return err
-		}
+		var updatedKeyValue jetstream.KeyValue
+		err = nil
 
-		if !keyValue.Spec.PreventUpdate {
+		if serverState == nil {
+			log.Info("Creating KeyValue.")
+			updatedKeyValue, err = js.CreateKeyValue(ctx, targetConfig)
+			if err != nil {
+				return err
+			}
+		} else if !keyValue.Spec.PreventUpdate {
 			log.Info("Updating KeyValue.")
-			_, err = js.UpdateKeyValue(ctx, targetConfig)
-			return err
+			updatedKeyValue, err = js.UpdateKeyValue(ctx, targetConfig)
+			if err != nil {
+				return err
+			}
 		} else {
 			log.Info("Skipping KeyValue update.",
 				"preventUpdate", keyValue.Spec.PreventUpdate,
 			)
+		}
+
+		if updatedKeyValue != nil {
+			// Store known state in annotation
+			serverState, err = getServerKeyValueState(ctx, js, keyValue)
+			if err != nil {
+				return err
+			}
+
+			updatedState, err := json.Marshal(serverState)
+			if err != nil {
+				return err
+			}
+
+			if keyValue.Annotations == nil {
+				keyValue.Annotations = map[string]string{}
+			}
+			keyValue.Annotations[stateAnnotationKV] = string(updatedState)
+
+			return r.Update(ctx, keyValue)
 		}
 
 		return nil
@@ -226,6 +276,32 @@ func (r *KeyValueReconciler) createOrUpdate(ctx context.Context, log logr.Logger
 	}
 
 	return nil
+}
+
+func getStoredKeyValueState(keyValue *api.KeyValue) (*jetstream.StreamConfig, error) {
+	var storedState *jetstream.StreamConfig
+	if state, ok := keyValue.Annotations[stateAnnotationKV]; ok {
+		err := json.Unmarshal([]byte(state), &storedState)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return storedState, nil
+}
+
+// Fetch the current state of the KeyValue stream from the server.
+// ErrStreamNotFound is considered a valid response and does not return error
+func getServerKeyValueState(ctx context.Context, js jetstream.JetStream, keyValue *api.KeyValue) (*jetstream.StreamConfig, error) {
+	s, err := js.Stream(ctx, fmt.Sprintf("%s%s", kvStreamPrefix, keyValue.Spec.Bucket))
+	if errors.Is(err, jetstream.ErrStreamNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &s.CachedInfo().Config, nil
 }
 
 // keyValueSpecToConfig creates a jetstream.KeyValueConfig matching the given KeyValue resource spec

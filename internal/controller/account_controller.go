@@ -79,7 +79,7 @@ func (r *AccountReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// Update ready status to unknown when no status is set
 	if len(account.Status.Conditions) == 0 {
 		log.Info("Setting initial ready condition to unknown.")
-		account.Status.Conditions = updateReadyCondition(account.Status.Conditions, v1.ConditionUnknown, "Reconciling", "Starting reconciliation")
+		account.Status.Conditions = updateReadyCondition(account.Status.Conditions, v1.ConditionUnknown, stateReconciling, "Starting reconciliation")
 		err := r.Status().Update(ctx, account)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("set condition unknown: %w", err)
@@ -113,7 +113,7 @@ func (r *AccountReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 				account.Status.Conditions = updateReadyCondition(
 					account.Status.Conditions,
 					v1.ConditionFalse,
-					"DeletionBlocked",
+					stateFinalizing,
 					"Account has dependent resources that must be deleted first",
 				)
 				if err := r.Status().Update(ctx, account); err != nil {
@@ -140,7 +140,7 @@ func (r *AccountReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	account.Status.Conditions = updateReadyCondition(
 		account.Status.Conditions,
 		v1.ConditionTrue,
-		"Ready",
+		stateReady,
 		"Account is ready",
 	)
 	if err := r.Status().Update(ctx, account); err != nil {

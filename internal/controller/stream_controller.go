@@ -126,15 +126,20 @@ func (r *StreamReconciler) deleteStream(ctx context.Context, log logr.Logger, st
 		return fmt.Errorf("update ready condition: %w", err)
 	}
 
+	storedState, err := getStoredStreamState(stream)
+	if err != nil {
+		log.Error(err, "Failed to fetch stored state.")
+	}
+
 	if !stream.Spec.PreventDelete && !r.ReadOnly() {
 		log.Info("Deleting stream.")
 		err := r.WithJetStreamClient(stream.Spec.ConnectionOpts, stream.Namespace, func(js jetstream.JetStream) error {
-			_, err := js.Stream(ctx, stream.Spec.Name)
-			if err != nil {
-				if errors.Is(err, jetstream.ErrStreamNotFound) || errors.Is(err, jetstream.ErrJetStreamNotEnabled) || errors.Is(err, jetstream.ErrJetStreamNotEnabledForAccount) {
-					return nil
-				}
-				return err
+			_, err := getServerStreamState(ctx, js, stream)
+			// If we have no known state for this stream it has never been reconciled.
+			// If we are also receiving an error fetching state, either the stream does not exist
+			// or this resource config is invalid.
+			if err != nil && storedState == nil {
+				return nil
 			}
 
 			return js.DeleteStream(ctx, stream.Spec.Name)
@@ -172,38 +177,27 @@ func (r *StreamReconciler) createOrUpdate(ctx context.Context, log logr.Logger, 
 
 	// CreateOrUpdateStream is called on every reconciliation when the stream is not to be deleted.
 	err = r.WithJetStreamClient(stream.Spec.ConnectionOpts, stream.Namespace, func(js jetstream.JetStream) error {
-		exists := false
-		s, err := js.Stream(ctx, targetConfig.Name)
-		if err == nil {
-			exists = true
-		} else if !errors.Is(err, jetstream.ErrStreamNotFound) {
+		storedState, err := getStoredStreamState(stream)
+		if err != nil {
+			log.Error(err, "Failed to fetch stored stream state")
+		}
+
+		serverState, err := getServerStreamState(ctx, js, stream)
+		if err != nil {
 			return err
 		}
 
-		// Check against known state. Skip Update if converged
-		// Storing returned state from the server avoids
-		// having to check default values
-		if exists {
-			var knownState *jetstream.StreamConfig
-			if state, ok := stream.Annotations[stateAnnotationStream]; ok {
-				err := json.Unmarshal([]byte(state), &knownState)
-				if err != nil {
-					log.Error(err, "Failed to unmarshal known state from annotation.")
-				}
+		// Check against known state. Skip Update if converged.
+		// Storing returned state from the server avoids have to
+		// check default values or call Update on already converged resources
+		if storedState != nil && serverState != nil && stream.Status.ObservedGeneration == stream.Generation {
+			diff := compareConfigState(storedState, serverState)
+
+			if diff == "" {
+				return nil
 			}
 
-			if knownState != nil {
-				converged, err := compareStreamConfig(&s.CachedInfo().Config, knownState)
-				if err != nil {
-					log.Error(err, "Failed to compare stream config.")
-				}
-
-				if converged {
-					return nil
-				}
-
-				log.Info("Stream config drifted from desired state.")
-			}
+			log.Info("Stream config drifted from desired state.", "diff", diff)
 		}
 
 		if r.ReadOnly() {
@@ -216,34 +210,35 @@ func (r *StreamReconciler) createOrUpdate(ctx context.Context, log logr.Logger, 
 		var updatedStream jetstream.Stream
 		err = nil
 
-		if !exists {
+		if serverState == nil {
 			log.Info("Creating Stream.")
 			updatedStream, err = js.CreateStream(ctx, targetConfig)
-		}
-
-		if !stream.Spec.PreventUpdate {
+			if err != nil {
+				return err
+			}
+		} else if !stream.Spec.PreventUpdate {
 			log.Info("Updating Stream.")
 			updatedStream, err = js.UpdateStream(ctx, targetConfig)
+			if err != nil {
+				return err
+			}
 		} else {
 			log.Info("Skipping Stream update.",
 				"preventUpdate", stream.Spec.PreventUpdate,
 			)
 		}
-		if err != nil {
-			return err
-		}
 
 		if updatedStream != nil {
 			// Store known state in annotation
-			knownState, err := json.Marshal(updatedStream.CachedInfo().Config)
+			updatedState, err := json.Marshal(updatedStream.CachedInfo().Config)
 			if err != nil {
-				log.Error(err, "Failed to marshal known state to annotation.")
-			} else {
-				if stream.Annotations == nil {
-					stream.Annotations = map[string]string{}
-				}
-				stream.Annotations[stateAnnotationStream] = string(knownState)
+				return err
 			}
+
+			if stream.Annotations == nil {
+				stream.Annotations = map[string]string{}
+			}
+			stream.Annotations[stateAnnotationStream] = string(updatedState)
 
 			return r.Update(ctx, stream)
 		}
@@ -273,6 +268,32 @@ func (r *StreamReconciler) createOrUpdate(ctx context.Context, log logr.Logger, 
 	}
 
 	return nil
+}
+
+func getStoredStreamState(stream *api.Stream) (*jetstream.StreamConfig, error) {
+	var storedState *jetstream.StreamConfig
+	if state, ok := stream.Annotations[stateAnnotationStream]; ok {
+		err := json.Unmarshal([]byte(state), &storedState)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return storedState, nil
+}
+
+// Fetch the current state of the stream from the server.
+// ErrStreamNotFound is considered a valid response and does not return error
+func getServerStreamState(ctx context.Context, js jetstream.JetStream, stream *api.Stream) (*jetstream.StreamConfig, error) {
+	s, err := js.Stream(ctx, stream.Spec.Name)
+	if errors.Is(err, jetstream.ErrStreamNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &s.CachedInfo().Config, nil
 }
 
 // streamSpecToConfig creates a jetstream.StreamConfig matching the given stream resource spec
@@ -411,24 +432,6 @@ func streamSpecToConfig(spec *api.StreamSpec) (jetstream.StreamConfig, error) {
 	}
 
 	return config, nil
-}
-
-func compareStreamConfig(actual *jetstream.StreamConfig, desired *jetstream.StreamConfig) (bool, error) {
-	if actual == nil || desired == nil {
-		return false, nil
-	}
-
-	actualJson, err := json.Marshal(actual)
-	if err != nil {
-		return false, fmt.Errorf("error marshaling source config: %w", err)
-	}
-
-	desiredJson, err := json.Marshal(desired)
-	if err != nil {
-		return false, fmt.Errorf("error marshaling target config: %w", err)
-	}
-
-	return string(actualJson) == string(desiredJson), nil
 }
 
 func mapStreamSource(ss *api.StreamSource) (*jetstream.StreamSource, error) {

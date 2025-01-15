@@ -47,6 +47,7 @@ var (
 	k8sClient      client.Client
 	testEnv        *envtest.Environment
 	testServer     *server.Server
+	clientUrl      string
 	jsClient       jetstream.JetStream
 	baseController JetStreamController
 )
@@ -91,7 +92,8 @@ var _ = BeforeSuite(func() {
 	testServer = CreateTestServer()
 	Expect(err).NotTo(HaveOccurred())
 
-	testNatsConfig := &NatsConfig{ServerURL: testServer.ClientURL()}
+	clientUrl = testServer.ClientURL()
+	testNatsConfig := &NatsConfig{ServerURL: clientUrl}
 	baseController, err = NewJSController(k8sClient, testNatsConfig, &Config{})
 	Expect(err).NotTo(HaveOccurred())
 	jsClient, _, err = CreateJetStreamClient(testNatsConfig, true)

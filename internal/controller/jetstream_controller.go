@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	js "github.com/nats-io/nack/controllers/jetstream"
 	api "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 	"github.com/nats-io/nats.go/jetstream"
@@ -263,4 +264,8 @@ func updateReadyCondition(conditions []api.Condition, status v1.ConditionStatus,
 // Helper for mapping spec config to jetStream config using UnmarshalJSON.
 func jsonString(v string) []byte {
 	return []byte("\"" + v + "\"")
+}
+
+func compareConfigState(actual any, desired any) string {
+	return cmp.Diff(actual, desired)
 }

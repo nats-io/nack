@@ -10,7 +10,7 @@ const (
 
 	stateAnnotationConsumer = "consumer.nats.io/state"
 	stateAnnotationKV       = "kv.nats.io/state"
-	stateAnnotationOS       = "objectstore.nats.io/state"
+	stateAnnotationObj      = "objectstore.nats.io/state"
 	stateAnnotationStream   = "stream.nats.io/state"
 
 	stateReady       = "Ready"
