@@ -25,7 +25,7 @@ import (
 
 	"github.com/nats-io/nack/controllers/jetstream"
 	"github.com/nats-io/nack/internal/controller"
-	jetstreamnatsiov1beta2 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
+	v1beta2 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 	clientset "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -67,10 +67,12 @@ func run() error {
 	ca := flag.String("tlsca", "", "NATS TLS certificate authority chain")
 	tlsfirst := flag.Bool("tlsfirst", false, "If enabled, forces explicit TLS without waiting for Server INFO")
 	server := flag.String("s", "", "NATS Server URL")
-	crdConnect := flag.Bool("crd-connect", false, "If true, then NATS connections will be made from CRD config, not global config")
+	crdConnect := flag.Bool("crd-connect", false, "If true, then NATS connections will be made from CRD config, not global config. Ignored if running with control loop, CRD options will always override global config")
 	cleanupPeriod := flag.Duration("cleanup-period", 30*time.Second, "Period to run object cleanup")
 	readOnly := flag.Bool("read-only", false, "Starts the controller without causing changes to the NATS resources")
+	cacheDir := flag.String("cache-dir", "", "Directory to store cached credential and TLS files")
 	controlLoop := flag.Bool("control-loop", false, "Experimental: Run controller with a full reconciliation control loop.")
+	controlLoopSyncInterval := flag.Duration("sync-interval", 5*time.Minute, "Interval to perform scheduled reconcile")
 
 	flag.Parse()
 
@@ -108,9 +110,12 @@ func run() error {
 		}
 
 		controllerCfg := &controller.Config{
-			ReadOnly:  *readOnly,
-			Namespace: *namespace,
+			ReadOnly:        *readOnly,
+			Namespace:       *namespace,
+			CacheDir:        *cacheDir,
+			RequeueInterval: *controlLoopSyncInterval,
 		}
+
 		return runControlLoop(config, natsCfg, controllerCfg)
 	}
 
@@ -160,15 +165,23 @@ func runControlLoop(config *rest.Config, natsCfg *controller.NatsConfig, control
 	// Setup scheme
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(jetstreamnatsiov1beta2.AddToScheme(scheme))
+	utilruntime.Must(v1beta2.AddToScheme(scheme))
 
 	mgr, err := ctrl.NewManager(config, ctrl.Options{
 		Scheme: scheme,
 		Logger: klog.NewKlogr().WithName("controller-runtime"),
-		// TODO Add full configuration
 	})
 	if err != nil {
 		return fmt.Errorf("unable to start manager: %w", err)
+	}
+
+	if controllerCfg.CacheDir == "" {
+		cacheDir, err := os.MkdirTemp(".", "nack")
+		if err != nil {
+			return fmt.Errorf("create cache dir: %w", err)
+		}
+		defer os.RemoveAll(cacheDir)
+		controllerCfg.CacheDir = cacheDir
 	}
 
 	err = controller.RegisterAll(mgr, natsCfg, controllerCfg)

@@ -92,7 +92,7 @@ func (c *Controller) processConsumerObject(cns *apis.Consumer, jsm jsmClientFunc
 			}
 		}
 		// Lookup the UserCredentials.
-		if acc.Spec.Creds != nil {
+		if acc.Spec.Creds != nil && acc.Spec.Creds.Secret != nil {
 			secretName := acc.Spec.Creds.Secret.Name
 			secret, err := c.ki.Secrets(ns).Get(c.ctx, secretName, k8smeta.GetOptions{})
 			if err != nil {

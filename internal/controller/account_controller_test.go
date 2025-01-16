@@ -17,67 +17,164 @@ limitations under the License.
 package controller
 
 import (
-	"context"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	jetstreamnatsiov1beta2 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
+	api "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 )
 
 var _ = Describe("Account Controller", func() {
 	Context("When reconciling a resource", func() {
-		const resourceName = "test-resource"
-
-		ctx := context.Background()
+		const resourceName = "test-account"
 
 		typeNamespacedName := types.NamespacedName{
 			Name:      resourceName,
-			Namespace: "default", // TODO(user):Modify as needed
+			Namespace: "default",
 		}
-		account := &jetstreamnatsiov1beta2.Account{}
+		account := &api.Account{}
 
-		BeforeEach(func() {
-			By("creating the custom resource for the Kind Account")
-			err := k8sClient.Get(ctx, typeNamespacedName, account)
-			if err != nil && errors.IsNotFound(err) {
-				resource := &jetstreamnatsiov1beta2.Account{
+		// Tested controller
+		var controller *AccountReconciler
+
+		BeforeEach(func(ctx SpecContext) {
+			controller = &AccountReconciler{
+				Scheme:              k8sClient.Scheme(),
+				JetStreamController: baseController,
+			}
+		})
+
+		When("the resource is marked for deletion", func() {
+			var stream *api.Stream
+			var streamName types.NamespacedName
+
+			BeforeEach(func(ctx SpecContext) {
+				By("creating the custom resource for the Kind Account")
+				err := k8sClient.Get(ctx, typeNamespacedName, account)
+				if err != nil && k8serrors.IsNotFound(err) {
+					resource := &api.Account{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      resourceName,
+							Namespace: "default",
+						},
+						Spec: api.AccountSpec{
+							Servers: []string{"nats://nats.io"},
+						},
+					}
+
+					Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+					Expect(k8sClient.Get(ctx, typeNamespacedName, account)).To(Succeed())
+
+					controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
+					controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
+
+					Expect(k8sClient.Get(ctx, typeNamespacedName, account)).To(Succeed())
+					Expect(controllerutil.ContainsFinalizer(account, accountFinalizer)).To(BeTrue())
+				}
+
+				By("creating a dependent stream resource")
+				stream = &api.Stream{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      resourceName,
+						Name:      "test-stream",
 						Namespace: "default",
 					},
-					// TODO(user): Specify other spec details if needed.
+					Spec: api.StreamSpec{
+						Name:      "test-stream",
+						Replicas:  1,
+						Discard:   "old",
+						Storage:   "file",
+						Retention: "workqueue",
+						BaseStreamConfig: api.BaseStreamConfig{
+							ConnectionOpts: api.ConnectionOpts{
+								Account: resourceName,
+							},
+						},
+					},
 				}
-				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
-			}
-		})
+				streamName = types.NamespacedName{
+					Name:      stream.Name,
+					Namespace: stream.Namespace,
+				}
+				Expect(k8sClient.Create(ctx, stream)).To(Succeed())
 
-		AfterEach(func() {
-			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			resource := &jetstreamnatsiov1beta2.Account{}
-			err := k8sClient.Get(ctx, typeNamespacedName, resource)
-			Expect(err).NotTo(HaveOccurred())
-
-			By("Cleanup the specific resource instance Account")
-			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
-		})
-		It("should successfully reconcile the resource", func() {
-			By("Reconciling the created resource")
-			controllerReconciler := &AccountReconciler{
-				baseController,
-			}
-
-			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
+				By("marking the account for deletion")
+				Expect(k8sClient.Delete(ctx, account)).To(Succeed())
+				Expect(k8sClient.Get(ctx, typeNamespacedName, account)).To(Succeed())
 			})
-			Expect(err).NotTo(HaveOccurred())
-			// TODO(user): Add more specific assertions depending on your controller's reconciliation logic.
-			// Example: If you expect a certain status condition after reconciliation, verify it here.
+
+			AfterEach(func(ctx SpecContext) {
+				By("cleaning up the stream")
+				stream := &api.Stream{}
+				err := k8sClient.Get(ctx, streamName, stream)
+				if err == nil {
+					Expect(k8sClient.Delete(ctx, stream)).To(Succeed())
+				}
+
+				By("removing the account resource")
+				controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
+				Expect(k8sClient.Get(ctx, typeNamespacedName, account)).To(Not(Succeed()))
+			})
+
+			It("should not remove finalizer while dependent resources exist", func(ctx SpecContext) {
+				By("reconciling the deletion")
+				result, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result.Requeue).To(BeTrue())
+
+				By("checking the account still exists")
+				Expect(k8sClient.Get(ctx, typeNamespacedName, account)).To(Succeed())
+				Expect(account.Finalizers).To(ContainElement(accountFinalizer))
+
+				By("verifying the ready condition is set to false")
+				Expect(account.Status.Conditions).To(HaveLen(1))
+				assertReadyStateMatches(
+					account.Status.Conditions[0],
+					v1.ConditionFalse,
+					stateFinalizing,
+					"Account has dependent resources that must be deleted first",
+					time.Now(),
+				)
+			})
+
+			It("should remove finalizer after dependent resources are removed", func(ctx SpecContext) {
+				By("removing the dependent stream")
+				Expect(k8sClient.Delete(ctx, stream)).To(Succeed())
+
+				By("reconciling the deletion")
+				result, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result.IsZero()).To(BeTrue())
+
+				By("checking the account is deleted")
+				err = k8sClient.Get(ctx, typeNamespacedName, account)
+				Expect(err).To(HaveOccurred())
+				Expect(k8serrors.IsNotFound(err)).To(BeTrue())
+			})
+
+			It("should remove finalizer after dependent resources are updated", func(ctx SpecContext) {
+				By("updating the dependent stream to remove account reference")
+				Expect(k8sClient.Get(ctx, streamName, stream)).To(Succeed())
+				stream.Spec.Account = ""
+				Expect(k8sClient.Update(ctx, stream)).To(Succeed())
+
+				By("reconciling the deletion")
+				result, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result.IsZero()).To(BeTrue())
+
+				By("checking the account is deleted")
+				err = k8sClient.Get(ctx, typeNamespacedName, account)
+				Expect(err).To(HaveOccurred())
+				Expect(k8serrors.IsNotFound(err)).To(BeTrue())
+			})
 		})
 	})
 })

@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -27,14 +28,22 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
+const (
+	objStreamPrefix = "OBJ_"
+)
+
 // ObjectStoreReconciler reconciles a ObjectStore object
 type ObjectStoreReconciler struct {
+	Scheme *runtime.Scheme
+
 	JetStreamController
 }
 
@@ -61,7 +70,7 @@ func (r *ObjectStoreReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	objectStore := &api.ObjectStore{}
 	if err := r.Get(ctx, req.NamespacedName, objectStore); err != nil {
 		if apierrors.IsNotFound(err) {
-			log.Info("ObjectStore resource not found. Ignoring since object must be deleted.")
+			log.Info("ObjectStore deleted.", "objectStoreName", req.NamespacedName.String())
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, fmt.Errorf("get objectstore resource '%s': %w", req.NamespacedName.String(), err)
@@ -72,25 +81,12 @@ func (r *ObjectStoreReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	// Update ready status to unknown when no status is set
 	if len(objectStore.Status.Conditions) == 0 {
 		log.Info("Setting initial ready condition to unknown.")
-		objectStore.Status.Conditions = updateReadyCondition(objectStore.Status.Conditions, v1.ConditionUnknown, "Reconciling", "Starting reconciliation")
+		objectStore.Status.Conditions = updateReadyCondition(objectStore.Status.Conditions, v1.ConditionUnknown, stateReconciling, "Starting reconciliation")
 		err := r.Status().Update(ctx, objectStore)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("set condition unknown: %w", err)
 		}
 		return ctrl.Result{Requeue: true}, nil
-	}
-
-	// Add finalizer
-	if !controllerutil.ContainsFinalizer(objectStore, objectStoreFinalizer) {
-		log.Info("Adding ObjectStore finalizer.")
-		if ok := controllerutil.AddFinalizer(objectStore, objectStoreFinalizer); !ok {
-			return ctrl.Result{}, errors.New("failed to add finalizer to objectstore resource")
-		}
-
-		if err := r.Update(ctx, objectStore); err != nil {
-			return ctrl.Result{}, fmt.Errorf("update objectstore resource to add finalizer: %w", err)
-		}
-		return ctrl.Result{}, nil
 	}
 
 	// Check Deletion
@@ -108,28 +104,56 @@ func (r *ObjectStoreReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, nil
 	}
 
+	// Add finalizer
+	if !controllerutil.ContainsFinalizer(objectStore, objectStoreFinalizer) {
+		log.Info("Adding ObjectStore finalizer.")
+		if ok := controllerutil.AddFinalizer(objectStore, objectStoreFinalizer); !ok {
+			return ctrl.Result{}, errors.New("failed to add finalizer to objectstore resource")
+		}
+
+		if err := r.Update(ctx, objectStore); err != nil {
+			return ctrl.Result{}, fmt.Errorf("update objectstore resource to add finalizer: %w", err)
+		}
+		return ctrl.Result{}, nil
+	}
+
 	// Create or update ObjectStore
 	if err := r.createOrUpdate(ctx, log, objectStore); err != nil {
 		return ctrl.Result{}, fmt.Errorf("create or update: %s", err)
 	}
-	return ctrl.Result{}, nil
+
+	return ctrl.Result{RequeueAfter: r.RequeueInterval()}, nil
 }
 
 func (r *ObjectStoreReconciler) deleteObjectStore(ctx context.Context, log logr.Logger, objectStore *api.ObjectStore) error {
 	// Set status to false
-	objectStore.Status.Conditions = updateReadyCondition(objectStore.Status.Conditions, v1.ConditionFalse, "Finalizing", "Performing finalizer operations.")
+	objectStore.Status.Conditions = updateReadyCondition(objectStore.Status.Conditions, v1.ConditionFalse, stateFinalizing, "Performing finalizer operations.")
 	if err := r.Status().Update(ctx, objectStore); err != nil {
 		return fmt.Errorf("update ready condition: %w", err)
 	}
 
+	storedState, err := getStoredObjectStoreState(objectStore)
+	if err != nil {
+		log.Error(err, "Failed to fetch stored state.")
+	}
+
 	if !objectStore.Spec.PreventDelete && !r.ReadOnly() {
 		log.Info("Deleting ObjectStore.")
-		err := r.WithJetStreamClient(objectStoreConnOpts(objectStore.Spec), func(js jetstream.JetStream) error {
+		err := r.WithJetStreamClient(objectStore.Spec.ConnectionOpts, objectStore.Namespace, func(js jetstream.JetStream) error {
+			_, err := getServerObjectStoreState(ctx, js, objectStore)
+			// If we have no known state for this object store it has never been reconciled.
+			// If we are also receiving an error fetching state, either the object store does not exist
+			// or this resource config is invalid.
+			if err != nil && storedState == nil {
+				return nil
+			}
+
 			return js.DeleteObjectStore(ctx, objectStore.Spec.Bucket)
 		})
-		// FIX: ErrStreamNotFound -> ErrBucketNotFound once nats.go is corrected
-		if errors.Is(err, jetstream.ErrStreamNotFound) {
+		if errors.Is(err, jetstream.ErrStreamNotFound) || errors.Is(err, jetstream.ErrBucketNotFound) {
 			log.Info("ObjectStore does not exist, unable to delete.", "objectStoreName", objectStore.Spec.Bucket)
+		} else if err != nil && storedState == nil {
+			log.Info("ObjectStore not reconciled and no state received from server. Removing finalizer.")
 		} else if err != nil {
 			return fmt.Errorf("delete objectstore during finalization: %w", err)
 		}
@@ -153,13 +177,6 @@ func (r *ObjectStoreReconciler) deleteObjectStore(ctx context.Context, log logr.
 
 func (r *ObjectStoreReconciler) createOrUpdate(ctx context.Context, log logr.Logger, objectStore *api.ObjectStore) error {
 	// Create or Update the ObjectStore based on the spec
-	if r.ReadOnly() {
-		log.Info("Skipping ObjectStore creation or update.",
-			"read-only", r.ReadOnly(),
-		)
-		return nil
-	}
-
 	// Map spec to ObjectStore targetConfig
 	targetConfig, err := objectStoreSpecToConfig(&objectStore.Spec)
 	if err != nil {
@@ -167,37 +184,83 @@ func (r *ObjectStoreReconciler) createOrUpdate(ctx context.Context, log logr.Log
 	}
 
 	// UpdateObjectStore is called on every reconciliation when the stream is not to be deleted.
-	// TODO(future-feature): Do we need to check if config differs?
-	err = r.WithJetStreamClient(objectStoreConnOpts(objectStore.Spec), func(js jetstream.JetStream) error {
-		exists := false
-		_, err := js.ObjectStore(ctx, targetConfig.Bucket)
-		if err == nil {
-			exists = true
-		} else if !errors.Is(err, jetstream.ErrBucketNotFound) {
+	err = r.WithJetStreamClient(objectStore.Spec.ConnectionOpts, objectStore.Namespace, func(js jetstream.JetStream) error {
+		storedState, err := getStoredObjectStoreState(objectStore)
+		if err != nil {
+			log.Error(err, "Failed to fetch stored objectstore state")
+		}
+
+		serverState, err := getServerObjectStoreState(ctx, js, objectStore)
+		if err != nil {
 			return err
 		}
 
-		if !exists {
+		// Check against known state. Skip Update if converged.
+		// Storing returned state from the server avoids have to
+		// check default values or call Update on already converged resources
+		if storedState != nil && serverState != nil && objectStore.Status.ObservedGeneration == objectStore.Generation {
+			diff := compareConfigState(storedState, serverState)
+
+			if diff == "" {
+				return nil
+			}
+
+			log.Info("Object Store config drifted from desired state.", "diff", diff)
+		}
+
+		if r.ReadOnly() {
+			log.Info("Skipping ObjectStore creation or update.",
+				"read-only", r.ReadOnly(),
+			)
+			return nil
+		}
+
+		var updatedObjectStore jetstream.ObjectStore
+		err = nil
+
+		if serverState == nil {
 			log.Info("Creating ObjectStore.")
-			_, err = js.CreateObjectStore(ctx, targetConfig)
-			return err
-		}
-
-		if !objectStore.Spec.PreventUpdate {
+			updatedObjectStore, err = js.CreateObjectStore(ctx, targetConfig)
+			if err != nil {
+				return err
+			}
+		} else if !objectStore.Spec.PreventUpdate {
 			log.Info("Updating ObjectStore.")
-			_, err = js.UpdateObjectStore(ctx, targetConfig)
-			return err
+			updatedObjectStore, err = js.UpdateObjectStore(ctx, targetConfig)
+			if err != nil {
+				return err
+			}
 		} else {
 			log.Info("Skipping ObjectStore update.",
 				"preventUpdate", objectStore.Spec.PreventUpdate,
 			)
 		}
 
+		if updatedObjectStore != nil {
+			// Store known state in annotation
+			serverState, err = getServerObjectStoreState(ctx, js, objectStore)
+			if err != nil {
+				return err
+			}
+
+			updatedState, err := json.Marshal(serverState)
+			if err != nil {
+				return err
+			}
+
+			if objectStore.Annotations == nil {
+				objectStore.Annotations = map[string]string{}
+			}
+			objectStore.Annotations[stateAnnotationObj] = string(updatedState)
+
+			return r.Update(ctx, objectStore)
+		}
+
 		return nil
 	})
 	if err != nil {
 		err = fmt.Errorf("create or update objectstore: %w", err)
-		objectStore.Status.Conditions = updateReadyCondition(objectStore.Status.Conditions, v1.ConditionFalse, "Errored", err.Error())
+		objectStore.Status.Conditions = updateReadyCondition(objectStore.Status.Conditions, v1.ConditionFalse, stateErrored, err.Error())
 		if err := r.Status().Update(ctx, objectStore); err != nil {
 			log.Error(err, "Failed to update ready condition to Errored.")
 		}
@@ -209,7 +272,7 @@ func (r *ObjectStoreReconciler) createOrUpdate(ctx context.Context, log logr.Log
 	objectStore.Status.Conditions = updateReadyCondition(
 		objectStore.Status.Conditions,
 		v1.ConditionTrue,
-		"Reconciling",
+		stateReady,
 		"ObjectStore successfully created or updated.",
 	)
 	err = r.Status().Update(ctx, objectStore)
@@ -220,15 +283,30 @@ func (r *ObjectStoreReconciler) createOrUpdate(ctx context.Context, log logr.Log
 	return nil
 }
 
-// objectStoreConnOpts extracts nats connection relevant fields from the given ObjectStore spec as connectionOptions.
-func objectStoreConnOpts(spec api.ObjectStoreSpec) *connectionOptions {
-	return &connectionOptions{
-		Account: spec.Account,
-		Creds:   spec.Creds,
-		Nkey:    spec.Nkey,
-		Servers: spec.Servers,
-		TLS:     spec.TLS,
+func getStoredObjectStoreState(objectStore *api.ObjectStore) (*jetstream.StreamConfig, error) {
+	var storedState *jetstream.StreamConfig
+	if state, ok := objectStore.Annotations[stateAnnotationObj]; ok {
+		err := json.Unmarshal([]byte(state), &storedState)
+		if err != nil {
+			return nil, err
+		}
 	}
+
+	return storedState, nil
+}
+
+// Fetch the current state of the ObjectStore stream from the server.
+// ErrStreamNotFound is considered a valid response and does not return error
+func getServerObjectStoreState(ctx context.Context, js jetstream.JetStream, objectStore *api.ObjectStore) (*jetstream.StreamConfig, error) {
+	s, err := js.Stream(ctx, fmt.Sprintf("%s%s", objStreamPrefix, objectStore.Spec.Bucket))
+	if errors.Is(err, jetstream.ErrStreamNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &s.CachedInfo().Config, nil
 }
 
 // objectStoreSpecToConfig creates a jetstream.ObjectStoreConfig matching the given ObjectStore resource spec
@@ -254,7 +332,7 @@ func objectStoreSpecToConfig(spec *api.ObjectStoreSpec) (jetstream.ObjectStoreCo
 
 	// storage
 	if spec.Storage != "" {
-		err := config.Storage.UnmarshalJSON(asJsonString(spec.Storage))
+		err := config.Storage.UnmarshalJSON(jsonString(spec.Storage))
 		if err != nil {
 			return jetstream.ObjectStoreConfig{}, fmt.Errorf("invalid storage: %w", err)
 		}
@@ -275,8 +353,9 @@ func objectStoreSpecToConfig(spec *api.ObjectStoreSpec) (jetstream.ObjectStoreCo
 func (r *ObjectStoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.ObjectStore{}).
-		Owns(&api.ObjectStore{}).
-		// Only trigger on generation changes
 		WithEventFilter(predicate.GenerationChangedPredicate{}).
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: 1,
+		}).
 		Complete(r)
 }

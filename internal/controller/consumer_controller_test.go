@@ -61,7 +61,7 @@ var _ = Describe("Consumer Controller", func() {
 			Durable: consumerName,
 		}
 
-		// Tested coontroller
+		// Tested controller
 		var controller *ConsumerReconciler
 
 		BeforeEach(func(ctx SpecContext) {
@@ -93,7 +93,8 @@ var _ = Describe("Consumer Controller", func() {
 
 			By("setting up the tested controller")
 			controller = &ConsumerReconciler{
-				baseController,
+				Scheme:              k8sClient.Scheme(),
+				JetStreamController: baseController,
 			}
 		})
 
@@ -170,7 +171,7 @@ var _ = Describe("Consumer Controller", func() {
 				Expect(k8sClient.Get(ctx, typeNamespacedName, consumer)).To(Succeed())
 				Expect(consumer.Status.Conditions).To(HaveLen(1))
 
-				assertReadyStateMatches(consumer.Status.Conditions[0], v1.ConditionUnknown, "Reconciling", "Starting reconciliation", time.Now())
+				assertReadyStateMatches(consumer.Status.Conditions[0], v1.ConditionUnknown, stateReconciling, "Starting reconciliation", time.Now())
 			})
 		})
 
@@ -211,7 +212,7 @@ var _ = Describe("Consumer Controller", func() {
 					assertReadyStateMatches(
 						consumer.Status.Conditions[0],
 						v1.ConditionFalse,
-						"Errored",
+						stateErrored,
 						"stream", // Not existing stream as message
 						time.Now(),
 					)
@@ -229,7 +230,7 @@ var _ = Describe("Consumer Controller", func() {
 
 				By("checking if the ready state was updated")
 				Expect(consumer.Status.Conditions).To(HaveLen(1))
-				assertReadyStateMatches(consumer.Status.Conditions[0], v1.ConditionTrue, "Reconciling", "created or updated", time.Now())
+				assertReadyStateMatches(consumer.Status.Conditions[0], v1.ConditionTrue, stateReady, "created or updated", time.Now())
 
 				By("checking if the observed generation matches")
 				Expect(consumer.Status.ObservedGeneration).To(Equal(consumer.Generation))
@@ -320,9 +321,10 @@ var _ = Describe("Consumer Controller", func() {
 			When("read-only mode is enabled", func() {
 				BeforeEach(func(ctx SpecContext) {
 					By("setting read only on the controller")
-					readOnly, err := NewJSController(k8sClient, &NatsConfig{ServerURL: testServer.ClientURL()}, &Config{ReadOnly: true})
+					readOnly, err := NewJSController(k8sClient, &NatsConfig{ServerURL: clientUrl}, &Config{ReadOnly: true})
 					Expect(err).NotTo(HaveOccurred())
 					controller = &ConsumerReconciler{
+						Scheme:              k8sClient.Scheme(),
 						JetStreamController: readOnly,
 					}
 				})
@@ -357,9 +359,10 @@ var _ = Describe("Consumer Controller", func() {
 			When("namespace restriction is enabled", func() {
 				BeforeEach(func(ctx SpecContext) {
 					By("setting a namespace on the resource")
-					namespaced, err := NewJSController(k8sClient, &NatsConfig{ServerURL: testServer.ClientURL()}, &Config{Namespace: "other-namespace"})
+					namespaced, err := NewJSController(k8sClient, &NatsConfig{ServerURL: clientUrl}, &Config{Namespace: "other-namespace"})
 					Expect(err).NotTo(HaveOccurred())
 					controller = &ConsumerReconciler{
+						Scheme:              k8sClient.Scheme(),
 						JetStreamController: namespaced,
 					}
 				})
@@ -485,6 +488,7 @@ var _ = Describe("Consumer Controller", func() {
 							readOnly, err := NewJSController(k8sClient, &NatsConfig{ServerURL: testServer.ClientURL()}, &Config{ReadOnly: true})
 							Expect(err).NotTo(HaveOccurred())
 							controller = &ConsumerReconciler{
+								Scheme:              k8sClient.Scheme(),
 								JetStreamController: readOnly,
 							}
 						})
@@ -510,6 +514,7 @@ var _ = Describe("Consumer Controller", func() {
 							namespaced, err := NewJSController(k8sClient, &NatsConfig{ServerURL: testServer.ClientURL()}, &Config{Namespace: "other-namespace"})
 							Expect(err).NotTo(HaveOccurred())
 							controller = &ConsumerReconciler{
+								Scheme:              k8sClient.Scheme(),
 								JetStreamController: namespaced,
 							}
 						})
@@ -594,13 +599,10 @@ func Test_consumerSpecToConfig(t *testing.T) {
 				AckPolicy:          "explicit",
 				AckWait:            "10ns",
 				BackOff:            []string{"1s", "5m"},
-				Creds:              "",
 				DeliverGroup:       "",
 				DeliverPolicy:      "new",
 				DeliverSubject:     "",
 				Description:        "test consumer",
-				PreventDelete:      false,
-				PreventUpdate:      false,
 				DurableName:        "test-consumer",
 				FilterSubject:      "time.us.>",
 				FilterSubjects:     []string{"time.us.east", "time.us.west"},
@@ -614,23 +616,29 @@ func Test_consumerSpecToConfig(t *testing.T) {
 				MaxRequestMaxBytes: 1024,
 				MaxWaiting:         5,
 				MemStorage:         true,
-				Nkey:               "",
 				OptStartSeq:        17,
 				OptStartTime:       dateString,
 				RateLimitBps:       512,
 				ReplayPolicy:       "instant",
 				Replicas:           9,
 				SampleFreq:         "25%",
-				Servers:            nil,
 				StreamName:         "",
-				TLS:                api.TLS{},
-				Account:            "",
 				Metadata: map[string]string{
 					"meta": "data",
 				},
+				BaseStreamConfig: api.BaseStreamConfig{
+					PreventDelete: false,
+					PreventUpdate: false,
+					ConnectionOpts: api.ConnectionOpts{
+						Account: "",
+						Creds:   "",
+						Nkey:    "",
+						TLS:     api.TLS{},
+						Servers: nil,
+					},
+				},
 			},
 			want: &jetstream.ConsumerConfig{
-				Name:               "", // Optional, not mapped
 				Durable:            "test-consumer",
 				Description:        "test consumer",
 				DeliverPolicy:      jetstream.DeliverNewPolicy,
