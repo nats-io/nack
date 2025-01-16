@@ -85,7 +85,8 @@ var _ = Describe("ObjectStore Controller", func() {
 
 		By("setting up the tested controller")
 		controller = &ObjectStoreReconciler{
-			baseController,
+			Scheme:              k8sClient.Scheme(),
+			JetStreamController: baseController,
 		}
 	})
 
@@ -152,7 +153,7 @@ var _ = Describe("ObjectStore Controller", func() {
 			Expect(k8sClient.Get(ctx, typeNamespacedName, objectStore)).To(Succeed())
 			Expect(objectStore.Status.Conditions).To(HaveLen(1))
 
-			assertReadyStateMatches(objectStore.Status.Conditions[0], v1.ConditionUnknown, "Reconciling", "Starting reconciliation", time.Now())
+			assertReadyStateMatches(objectStore.Status.Conditions[0], v1.ConditionUnknown, stateReconciling, "Starting reconciliation", time.Now())
 		})
 	})
 
@@ -186,7 +187,7 @@ var _ = Describe("ObjectStore Controller", func() {
 
 			By("checking if the ready state was updated")
 			Expect(objectStore.Status.Conditions).To(HaveLen(1))
-			assertReadyStateMatches(objectStore.Status.Conditions[0], v1.ConditionTrue, "Reconciling", "created or updated", time.Now())
+			assertReadyStateMatches(objectStore.Status.Conditions[0], v1.ConditionTrue, stateReady, "created or updated", time.Now())
 
 			By("checking if the observed generation matches")
 			Expect(objectStore.Status.ObservedGeneration).To(Equal(objectStore.Generation))
@@ -239,9 +240,10 @@ var _ = Describe("ObjectStore Controller", func() {
 		When("read-only mode is enabled", func() {
 			BeforeEach(func(ctx SpecContext) {
 				By("setting read only on the controller")
-				readOnly, err := NewJSController(k8sClient, &NatsConfig{ServerURL: testServer.ClientURL()}, &Config{ReadOnly: true})
+				readOnly, err := NewJSController(k8sClient, &NatsConfig{ServerURL: clientUrl}, &Config{ReadOnly: true})
 				Expect(err).NotTo(HaveOccurred())
 				controller = &ObjectStoreReconciler{
+					Scheme:              k8sClient.Scheme(),
 					JetStreamController: readOnly,
 				}
 			})
@@ -278,9 +280,10 @@ var _ = Describe("ObjectStore Controller", func() {
 		When("namespace restriction is enabled", func() {
 			BeforeEach(func(ctx SpecContext) {
 				By("setting a namespace on the resource")
-				namespaced, err := NewJSController(k8sClient, &NatsConfig{ServerURL: testServer.ClientURL()}, &Config{Namespace: "other-namespace"})
+				namespaced, err := NewJSController(k8sClient, &NatsConfig{ServerURL: clientUrl}, &Config{Namespace: "other-namespace"})
 				Expect(err).NotTo(HaveOccurred())
 				controller = &ObjectStoreReconciler{
+					Scheme:              k8sClient.Scheme(),
 					JetStreamController: namespaced,
 				}
 			})
@@ -360,12 +363,13 @@ var _ = Describe("ObjectStore Controller", func() {
 			// Setup client for not running server
 			// Use actual test server to ensure port not used by other service on test instance
 			sv := CreateTestServer()
-			base, err := NewJSController(k8sClient, &NatsConfig{ServerURL: sv.ClientURL()}, &Config{})
+			disconnectedController, err := NewJSController(k8sClient, &NatsConfig{ServerURL: sv.ClientURL()}, &Config{})
 			Expect(err).NotTo(HaveOccurred())
 			sv.Shutdown()
 
 			controller := &ObjectStoreReconciler{
-				base,
+				Scheme:              k8sClient.Scheme(),
+				JetStreamController: disconnectedController,
 			}
 
 			By("reconciling resource")
@@ -384,7 +388,7 @@ var _ = Describe("ObjectStore Controller", func() {
 			assertReadyStateMatches(
 				objectStore.Status.Conditions[0],
 				v1.ConditionFalse,
-				"Errored",
+				stateErrored,
 				"create or update objectstore:",
 				time.Now(),
 			)
@@ -468,9 +472,10 @@ var _ = Describe("ObjectStore Controller", func() {
 				When("read only is set", func() {
 					BeforeEach(func(ctx SpecContext) {
 						By("setting read only on the controller")
-						readOnly, err := NewJSController(k8sClient, &NatsConfig{ServerURL: testServer.ClientURL()}, &Config{ReadOnly: true})
+						readOnly, err := NewJSController(k8sClient, &NatsConfig{ServerURL: clientUrl}, &Config{ReadOnly: true})
 						Expect(err).NotTo(HaveOccurred())
 						controller = &ObjectStoreReconciler{
+							Scheme:              k8sClient.Scheme(),
 							JetStreamController: readOnly,
 						}
 					})
@@ -493,9 +498,10 @@ var _ = Describe("ObjectStore Controller", func() {
 
 				When("controller is restricted to different namespace", func() {
 					BeforeEach(func(ctx SpecContext) {
-						namespaced, err := NewJSController(k8sClient, &NatsConfig{ServerURL: testServer.ClientURL()}, &Config{Namespace: "other-namespace"})
+						namespaced, err := NewJSController(k8sClient, &NatsConfig{ServerURL: clientUrl}, &Config{Namespace: "other-namespace"})
 						Expect(err).NotTo(HaveOccurred())
 						controller = &ObjectStoreReconciler{
+							Scheme:              k8sClient.Scheme(),
 							JetStreamController: namespaced,
 						}
 					})
@@ -584,13 +590,15 @@ func Test_mapobjectstoreSpecToConfig(t *testing.T) {
 					"foo": "bar",
 				},
 				BaseStreamConfig: api.BaseStreamConfig{
-					Account:       "",
-					Creds:         "",
 					PreventDelete: false,
 					PreventUpdate: false,
-					Nkey:          "",
-					Servers:       nil,
-					TLS:           api.TLS{},
+					ConnectionOpts: api.ConnectionOpts{
+						Account: "",
+						Creds:   "",
+						Nkey:    "",
+						Servers: nil,
+						TLS:     api.TLS{},
+					},
 				},
 			},
 			want: jetstream.ObjectStoreConfig{

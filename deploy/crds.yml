@@ -287,6 +287,10 @@ spec:
                     type: array
                     items:
                       type: string
+              tlsFirst:
+                description: When true, the KV Store will iniate TLS before server INFO.
+                type: boolean
+                default: false
           status:
             type: object
             properties:
@@ -513,6 +517,11 @@ spec:
           spec:
             type: object
             properties:
+              durableName:
+                description: The name of the Consumer.
+                type: string
+                pattern: '^[^.*>]+$'
+                minLength: 1
               streamName:
                 description: The name of the Stream to create the Consumer in.
                 type: string
@@ -533,11 +542,6 @@ spec:
               optStartTime:
                 description: Time format must be RFC3339.
                 type: string
-              durableName:
-                description: The name of the Consumer.
-                type: string
-                pattern: '^[^.*>]+$'
-                minLength: 1
               deliverSubject:
                 description: The subject to deliver observed messages, when not set, a pull-based Consumer is created.
                 type: string
@@ -626,6 +630,32 @@ spec:
                 type: object
                 additionalProperties:
                   type: string
+              account:
+                description: Name of the account to which the Consumer belongs.
+                type: string
+                pattern: '^[^.*>]*$'
+              creds:
+                description: NATS user credentials for connecting to servers. Please make sure your controller has mounted the cerds on its path.
+                type: string
+                default: ''
+              nkey:
+                description: NATS user NKey for connecting to servers.
+                type: string
+                default: ''
+              preventDelete:
+                description: When true, the managed Consumer will not be deleted when the resource is deleted
+                type: boolean
+                default: false
+              preventUpdate:
+                description: When true, the managed Consumer will not be updated when the resource is updated
+                type: boolean
+                default: false
+              servers:
+                description: A list of servers for creating consumer
+                type: array
+                items:
+                  type: string
+                default: []
               tls:
                 description: A client's TLS certs and keys.
                 type: object
@@ -641,30 +671,8 @@ spec:
                     type: array
                     items:
                       type: string
-              servers:
-                description: A list of servers for creating consumer
-                type: array
-                items:
-                  type: string
-                default: []
-              creds:
-                description: NATS user credentials for connecting to servers. Please make sure your controller has mounted the cerds on its path.
-                type: string
-                default: ''
-              nkey:
-                description: NATS user NKey for connecting to servers.
-                type: string
-                default: ''
-              account:
-                description: Name of the account to which the Consumer belongs.
-                type: string
-                pattern: '^[^.*>]*$'
-              preventDelete:
-                description: When true, the managed Consumer will not be deleted when the resource is deleted
-                type: boolean
-                default: false
-              preventUpdate:
-                description: When true, the managed Consumer will not be updated when the resource is updated
+              tlsFirst:
+                description: When true, the KV Store will iniate TLS before server INFO.
                 type: boolean
                 default: false
           status:
@@ -991,6 +999,19 @@ spec:
                 type: string
                 pattern: '^[^.*>]*$'
                 minLength: 1
+              creds:
+                description: The creds to be used to connect to the NATS Service.
+                type: object
+                properties:
+                  secret:
+                    type: object
+                    properties:
+                      name:
+                        description: Name of the secret with the creds.
+                        type: string
+                  file:
+                    description: Credentials file, generated with github.com/nats-io/nsc tool.
+                    type: string
               servers:
                 description: A list of servers to connect.
                 type: array
@@ -1016,19 +1037,6 @@ spec:
                     type: string
                   key:
                     description: Filename of the TLS cert key.
-                    type: string
-              creds:
-                description: The creds to be used to connect to the NATS Service.
-                type: object
-                properties:
-                  secret:
-                    type: object
-                    properties:
-                      name:
-                        description: Name of the secret with the creds.
-                        type: string
-                  file:
-                    description: Credentials file, generated with github.com/nats-io/nsc tool.
                     type: string
               token:
                 description: The token to be used to connect to the NATS Service.
@@ -1059,6 +1067,30 @@ spec:
                   password:
                     description: Key in the secret that contains the password.
                     type: string
+              tlsFirst:
+                description: When true, the KV Store will iniate TLS before server INFO.
+                type: boolean
+                default: false
+          status:
+            type: object
+            properties:
+              observedGeneration:
+                type: integer
+              conditions:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                    status:
+                      type: string
+                    lastTransitionTime:
+                      type: string
+                    reason:
+                      type: string
+                    message:
+                      type: string
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
@@ -1241,6 +1273,10 @@ spec:
                     type: array
                     items:
                       type: string
+              tlsFirst:
+                description: When true, the KV Store will iniate TLS before server INFO.
+                type: boolean
+                default: false
           status:
             type: object
             properties:
@@ -1377,6 +1413,10 @@ spec:
                     type: array
                     items:
                       type: string
+              tlsFirst:
+                description: When true, the KV Store will iniate TLS before server INFO.
+                type: boolean
+                default: false
           status:
             type: object
             properties:

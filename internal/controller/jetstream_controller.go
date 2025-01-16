@@ -1,25 +1,23 @@
 package controller
 
 import (
+	"context"
 	"fmt"
+	"math/rand/v2"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	js "github.com/nats-io/nack/controllers/jetstream"
 	api "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 	"github.com/nats-io/nats.go/jetstream"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
-
-type connectionOptions struct {
-	Account string   `json:"account"`
-	Creds   string   `json:"creds"`
-	Nkey    string   `json:"nkey"`
-	Servers []string `json:"servers"`
-	TLS     api.TLS  `json:"tls"`
-}
 
 type JetStreamController interface {
 	client.Client
@@ -36,7 +34,9 @@ type JetStreamController interface {
 	// The given opts values take precedence over the controllers base configuration.
 	//
 	// Returns the error of the operation or errors during client setup.
-	WithJetStreamClient(opts *connectionOptions, op func(js jetstream.JetStream) error) error
+	WithJetStreamClient(opts api.ConnectionOpts, ns string, op func(js jetstream.JetStream) error) error
+
+	RequeueInterval() time.Duration
 }
 
 func NewJSController(k8sClient client.Client, natsConfig *NatsConfig, controllerConfig *Config) (JetStreamController, error) {
@@ -44,6 +44,7 @@ func NewJSController(k8sClient client.Client, natsConfig *NatsConfig, controller
 		Client:           k8sClient,
 		config:           natsConfig,
 		controllerConfig: controllerConfig,
+		cacheDir:         controllerConfig.CacheDir,
 	}, nil
 }
 
@@ -51,6 +52,19 @@ type jsController struct {
 	client.Client
 	config           *NatsConfig
 	controllerConfig *Config
+	cacheDir         string
+}
+
+func (c *jsController) RequeueInterval() time.Duration {
+	// Stagger the requeue slightly
+	interval := c.controllerConfig.RequeueInterval
+
+	// Allow up to a 10% variance
+	intervalRange := float64(interval.Nanoseconds()) * 0.1
+
+	randomFactor := (rand.Float64() * 2) - 1.0
+
+	return time.Duration(float64(interval.Nanoseconds()) + (intervalRange * randomFactor))
 }
 
 func (c *jsController) ReadOnly() bool {
@@ -62,10 +76,13 @@ func (c *jsController) ValidNamespace(namespace string) bool {
 	return ns == "" || ns == namespace
 }
 
-func (c *jsController) WithJetStreamClient(opts *connectionOptions, op func(js jetstream.JetStream) error) error {
+func (c *jsController) WithJetStreamClient(opts api.ConnectionOpts, ns string, op func(js jetstream.JetStream) error) error {
 	// Build single use client
 	// TODO(future-feature): Use client-pool instead of single use client
-	cfg := c.buildNatsConfig(opts)
+	cfg, err := c.natsConfigFromOpts(opts, ns)
+	if err != nil {
+		return err
+	}
 
 	jsClient, closer, err := CreateJetStreamClient(cfg, true)
 	if err != nil {
@@ -76,56 +93,155 @@ func (c *jsController) WithJetStreamClient(opts *connectionOptions, op func(js j
 	return op(jsClient)
 }
 
-// buildNatsConfig uses given opts to override the base NatsConfig.
-func (c *jsController) buildNatsConfig(opts *connectionOptions) *NatsConfig {
-	serverUrls := strings.Join(opts.Servers, ",")
+// Setup default options, override from account resource and CRD options if configured
+func (c *jsController) natsConfigFromOpts(opts api.ConnectionOpts, ns string) (*NatsConfig, error) {
+	ctx, done := context.WithTimeout(context.Background(), 5*time.Second)
+	defer done()
 
-	// Takes opts values if present
-	cfg := &NatsConfig{
-		CRDConnect: false,
-		ClientName: c.config.ClientName,
-		ServerURL:  or(serverUrls, c.config.ServerURL),
-		TLSFirst:   c.config.TLSFirst, // TODO(future-feature): expose TLSFirst in the spec config
+	natsConfig := &NatsConfig{
+		ClientName:  c.config.ClientName,
+		Credentials: c.config.Credentials,
+		NKey:        c.config.NKey,
+		ServerURL:   c.config.ServerURL,
+		CAs:         c.config.CAs,
+		TLSFirst:    c.config.TLSFirst,
 	}
 
-	// Note: The opts.Account value coming from the resource spec is currently not considered.
-	// creds/nkey are associated with an account, the account field might be redundant.
-	// See https://github.com/nats-io/nack/pull/211#pullrequestreview-2511111670
-
-	// Authentication either from opts or base config
-	if opts.Creds != "" || opts.Nkey != "" {
-		cfg.Credentials = opts.Creds
-		cfg.NKey = opts.Nkey
-	} else {
-		cfg.Credentials = c.config.Credentials
-		cfg.NKey = c.config.NKey
+	if c.config.Certificate != "" && c.config.Key != "" {
+		natsConfig.Certificate = c.config.Certificate
+		natsConfig.Key = c.config.Key
 	}
 
-	// CAs from opts or base config
-	if len(opts.TLS.RootCAs) > 0 {
-		cfg.CAs = opts.TLS.RootCAs
-	} else {
-		cfg.CAs = c.config.CAs
+	if opts.Account == "" {
+		return applyConnOpts(*natsConfig, opts), nil
 	}
 
-	// Client Cert and Key either from opts or base config
-	if opts.TLS.ClientCert != "" && opts.TLS.ClientKey != "" {
-		cfg.Certificate = opts.TLS.ClientCert
-		cfg.Key = opts.TLS.ClientKey
-	} else {
-		cfg.Certificate = c.config.Certificate
-		cfg.Key = c.config.Key
+	// Apply Account options first, over global.
+	// Apply remaining CRD options last
+
+	account := &api.Account{}
+	err := c.Get(ctx,
+		types.NamespacedName{
+			Name:      opts.Account,
+			Namespace: ns,
+		},
+		account,
+	)
+	if err != nil {
+		return nil, err
 	}
 
-	return cfg
+	if len(account.Spec.Servers) > 0 {
+		natsConfig.ServerURL = strings.Join(account.Spec.Servers, ",")
+	}
+
+	if account.Spec.TLS != nil && account.Spec.TLS.Secret != nil {
+		tlsSecret := &v1.Secret{}
+		err := c.Get(ctx,
+			types.NamespacedName{
+				Name:      account.Spec.TLS.Secret.Name,
+				Namespace: ns,
+			},
+			tlsSecret,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		accDir := filepath.Join(c.cacheDir, c.controllerConfig.Namespace, opts.Account)
+		if err := os.MkdirAll(accDir, 0o755); err != nil {
+			return nil, err
+		}
+
+		for k, v := range tlsSecret.Data {
+			filePath := ""
+			switch k {
+			case account.Spec.TLS.ClientCert:
+				filePath = filepath.Join(accDir, account.Spec.TLS.ClientCert)
+				natsConfig.Certificate = filePath
+			case account.Spec.TLS.ClientKey:
+				filePath = filepath.Join(accDir, account.Spec.TLS.ClientKey)
+				natsConfig.Key = filePath
+			case account.Spec.TLS.RootCAs:
+				filePath = filepath.Join(accDir, account.Spec.TLS.RootCAs)
+				natsConfig.CAs = append(natsConfig.CAs, filePath)
+			default:
+				return nil, fmt.Errorf("key in TLS secret does not match any of the expected values")
+			}
+			if err := os.WriteFile(filePath, v, 0o600); err != nil {
+				return nil, err
+			}
+		}
+	} else if account.Spec.TLS != nil {
+		natsConfig.Certificate = account.Spec.TLS.ClientCert
+		natsConfig.Key = account.Spec.TLS.ClientKey
+		natsConfig.CAs = []string{account.Spec.TLS.RootCAs}
+	}
+
+	if account.Spec.Creds != nil && account.Spec.Creds.Secret != nil {
+		credsSecret := &v1.Secret{}
+		err := c.Get(ctx,
+			types.NamespacedName{
+				Name:      account.Spec.Creds.Secret.Name,
+				Namespace: ns,
+			},
+			credsSecret,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		accDir := filepath.Join(c.cacheDir, c.controllerConfig.Namespace, opts.Account)
+		if err := os.MkdirAll(accDir, 0o755); err != nil {
+			return nil, err
+		}
+
+		for k, v := range credsSecret.Data {
+			filePath := ""
+			switch k {
+			case account.Spec.Creds.File:
+				filePath = filepath.Join(accDir, account.Spec.Creds.File)
+				natsConfig.Credentials = filePath
+			default:
+				return nil, fmt.Errorf("key in Creds secret does not match any of the expected values")
+			}
+			if err := os.WriteFile(filePath, v, 0o600); err != nil {
+				return nil, err
+			}
+		}
+	} else if account.Spec.Creds.File != "" {
+		natsConfig.Credentials = account.Spec.Creds.File
+	}
+
+	return applyConnOpts(*natsConfig, opts), nil
 }
 
-// or returns the value if it is not the null value. Otherwise, the fallback value is returned
-func or[T comparable](v T, fallback T) T {
-	if v == *new(T) {
-		return fallback
+func applyConnOpts(baseConfig NatsConfig, opts api.ConnectionOpts) *NatsConfig {
+	natsConfig := baseConfig
+	if len(opts.Servers) > 0 {
+		natsConfig.ServerURL = strings.Join(opts.Servers, ",")
 	}
-	return v
+
+	// Currently, if the global TLSFirst is set, a false value in the CRD will not override
+	// due to that being the bool zero value. A true value in the CRD can override a global false.
+	if opts.TLSFirst {
+		natsConfig.TLSFirst = opts.TLSFirst
+	}
+
+	if opts.Creds != "" {
+		natsConfig.Credentials = opts.Creds
+	}
+
+	if len(opts.TLS.RootCAs) > 0 {
+		natsConfig.CAs = opts.TLS.RootCAs
+	}
+
+	if opts.TLS.ClientCert != "" && opts.TLS.ClientKey != "" {
+		natsConfig.Certificate = opts.TLS.ClientCert
+		natsConfig.Key = opts.TLS.ClientKey
+	}
+
+	return &natsConfig
 }
 
 // updateReadyCondition returns the given conditions with an added or updated ready condition.
@@ -159,8 +275,12 @@ func updateReadyCondition(conditions []api.Condition, status v1.ConditionStatus,
 	}
 }
 
-// asJsonString returns the given string wrapped in " and converted to []byte.
+// jsonString returns the given string wrapped in " and converted to []byte.
 // Helper for mapping spec config to jetStream config using UnmarshalJSON.
-func asJsonString(v string) []byte {
+func jsonString(v string) []byte {
 	return []byte("\"" + v + "\"")
+}
+
+func compareConfigState(actual any, desired any) string {
+	return cmp.Diff(actual, desired)
 }

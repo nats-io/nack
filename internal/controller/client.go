@@ -23,6 +23,10 @@ type NatsConfig struct {
 func (o *NatsConfig) buildOptions() ([]nats.Option, error) {
 	opts := make([]nats.Option, 0)
 
+	if o.ServerURL == "" {
+		return nil, fmt.Errorf("server url is required")
+	}
+
 	if o.TLSFirst {
 		opts = append(opts, nats.TLSHandshakeFirst())
 	}
@@ -31,25 +35,24 @@ func (o *NatsConfig) buildOptions() ([]nats.Option, error) {
 		opts = append(opts, nats.Name(o.ClientName))
 	}
 
-	if !o.CRDConnect {
-		// Use JWT/NKEYS based credentials if present.
-		if o.Credentials != "" {
-			opts = append(opts, nats.UserCredentials(o.Credentials))
-		} else if o.NKey != "" {
-			opt, err := nats.NkeyOptionFromSeed(o.NKey)
-			if err != nil {
-				return nil, fmt.Errorf("nkey option from seed: %w", err)
-			}
-			opts = append(opts, opt)
-		}
+	if o.Credentials != "" {
+		opts = append(opts, nats.UserCredentials(o.Credentials))
+	}
 
-		if o.Certificate != "" && o.Key != "" {
-			opts = append(opts, nats.ClientCert(o.Certificate, o.Key))
+	if o.NKey != "" {
+		opt, err := nats.NkeyOptionFromSeed(o.NKey)
+		if err != nil {
+			return nil, fmt.Errorf("nkey option from seed: %w", err)
 		}
+		opts = append(opts, opt)
+	}
 
-		if len(o.CAs) > 0 {
-			opts = append(opts, nats.RootCAs(o.CAs...))
-		}
+	if o.Certificate != "" && o.Key != "" {
+		opts = append(opts, nats.ClientCert(o.Certificate, o.Key))
+	}
+
+	if len(o.CAs) > 0 {
+		opts = append(opts, nats.RootCAs(o.CAs...))
 	}
 
 	return opts, nil

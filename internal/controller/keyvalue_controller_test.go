@@ -86,7 +86,8 @@ var _ = Describe("KeyValue Controller", func() {
 
 		By("setting up the tested controller")
 		controller = &KeyValueReconciler{
-			baseController,
+			Scheme:              k8sClient.Scheme(),
+			JetStreamController: baseController,
 		}
 	})
 
@@ -154,7 +155,7 @@ var _ = Describe("KeyValue Controller", func() {
 			Expect(k8sClient.Get(ctx, typeNamespacedName, keyValue)).To(Succeed())
 			Expect(keyValue.Status.Conditions).To(HaveLen(1))
 
-			assertReadyStateMatches(keyValue.Status.Conditions[0], v1.ConditionUnknown, "Reconciling", "Starting reconciliation", time.Now())
+			assertReadyStateMatches(keyValue.Status.Conditions[0], v1.ConditionUnknown, stateReconciling, "Starting reconciliation", time.Now())
 		})
 	})
 
@@ -188,7 +189,7 @@ var _ = Describe("KeyValue Controller", func() {
 
 			By("checking if the ready state was updated")
 			Expect(keyValue.Status.Conditions).To(HaveLen(1))
-			assertReadyStateMatches(keyValue.Status.Conditions[0], v1.ConditionTrue, "Reconciling", "created or updated", time.Now())
+			assertReadyStateMatches(keyValue.Status.Conditions[0], v1.ConditionTrue, stateReady, "created or updated", time.Now())
 
 			By("checking if the observed generation matches")
 			Expect(keyValue.Status.ObservedGeneration).To(Equal(keyValue.Generation))
@@ -243,9 +244,10 @@ var _ = Describe("KeyValue Controller", func() {
 		When("read-only mode is enabled", func() {
 			BeforeEach(func(ctx SpecContext) {
 				By("setting read only on the controller")
-				readOnly, err := NewJSController(k8sClient, &NatsConfig{ServerURL: testServer.ClientURL()}, &Config{ReadOnly: true})
+				readOnly, err := NewJSController(k8sClient, &NatsConfig{ServerURL: clientUrl}, &Config{ReadOnly: true})
 				Expect(err).NotTo(HaveOccurred())
 				controller = &KeyValueReconciler{
+					Scheme:              k8sClient.Scheme(),
 					JetStreamController: readOnly,
 				}
 			})
@@ -283,9 +285,10 @@ var _ = Describe("KeyValue Controller", func() {
 		When("namespace restriction is enabled", func() {
 			BeforeEach(func(ctx SpecContext) {
 				By("setting a namespace on the resource")
-				namespaced, err := NewJSController(k8sClient, &NatsConfig{ServerURL: testServer.ClientURL()}, &Config{Namespace: "other-namespace"})
+				namespaced, err := NewJSController(k8sClient, &NatsConfig{ServerURL: clientUrl}, &Config{Namespace: "other-namespace"})
 				Expect(err).NotTo(HaveOccurred())
 				controller = &KeyValueReconciler{
+					Scheme:              k8sClient.Scheme(),
 					JetStreamController: namespaced,
 				}
 			})
@@ -368,12 +371,13 @@ var _ = Describe("KeyValue Controller", func() {
 			// Setup client for not running server
 			// Use actual test server to ensure port not used by other service on test instance
 			sv := CreateTestServer()
-			base, err := NewJSController(k8sClient, &NatsConfig{ServerURL: sv.ClientURL()}, &Config{})
+			disconnectedController, err := NewJSController(k8sClient, &NatsConfig{ServerURL: sv.ClientURL()}, &Config{})
 			Expect(err).NotTo(HaveOccurred())
 			sv.Shutdown()
 
 			controller := &KeyValueReconciler{
-				base,
+				Scheme:              k8sClient.Scheme(),
+				JetStreamController: disconnectedController,
 			}
 
 			By("reconciling resource")
@@ -392,7 +396,7 @@ var _ = Describe("KeyValue Controller", func() {
 			assertReadyStateMatches(
 				keyValue.Status.Conditions[0],
 				v1.ConditionFalse,
-				"Errored",
+				stateErrored,
 				"create or update keyvalue:",
 				time.Now(),
 			)
@@ -476,9 +480,10 @@ var _ = Describe("KeyValue Controller", func() {
 				When("read only is set", func() {
 					BeforeEach(func(ctx SpecContext) {
 						By("setting read only on the controller")
-						readOnly, err := NewJSController(k8sClient, &NatsConfig{ServerURL: testServer.ClientURL()}, &Config{ReadOnly: true})
+						readOnly, err := NewJSController(k8sClient, &NatsConfig{ServerURL: clientUrl}, &Config{ReadOnly: true})
 						Expect(err).NotTo(HaveOccurred())
 						controller = &KeyValueReconciler{
+							Scheme:              k8sClient.Scheme(),
 							JetStreamController: readOnly,
 						}
 					})
@@ -501,9 +506,10 @@ var _ = Describe("KeyValue Controller", func() {
 
 				When("controller is restricted to different namespace", func() {
 					BeforeEach(func(ctx SpecContext) {
-						namespaced, err := NewJSController(k8sClient, &NatsConfig{ServerURL: testServer.ClientURL()}, &Config{Namespace: "other-namespace"})
+						namespaced, err := NewJSController(k8sClient, &NatsConfig{ServerURL: clientUrl}, &Config{Namespace: "other-namespace"})
 						Expect(err).NotTo(HaveOccurred())
 						controller = &KeyValueReconciler{
+							Scheme:              k8sClient.Scheme(),
 							JetStreamController: namespaced,
 						}
 					})
@@ -623,13 +629,15 @@ func Test_mapKVSpecToConfig(t *testing.T) {
 				}},
 				Storage: "memory",
 				BaseStreamConfig: api.BaseStreamConfig{
-					Account:       "",
-					Creds:         "",
 					PreventDelete: false,
 					PreventUpdate: false,
-					Nkey:          "",
-					Servers:       nil,
-					TLS:           api.TLS{},
+					ConnectionOpts: api.ConnectionOpts{
+						Account: "",
+						Creds:   "",
+						Nkey:    "",
+						Servers: nil,
+						TLS:     api.TLS{},
+					},
 				},
 			},
 			want: jetstream.KeyValueConfig{

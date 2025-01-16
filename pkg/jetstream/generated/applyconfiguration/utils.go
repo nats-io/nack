@@ -37,6 +37,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &jetstreamv1beta2.BaseStreamConfigApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("Condition"):
 		return &jetstreamv1beta2.ConditionApplyConfiguration{}
+	case v1beta2.SchemeGroupVersion.WithKind("ConnectionOpts"):
+		return &jetstreamv1beta2.ConnectionOptsApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("Consumer"):
 		return &jetstreamv1beta2.ConsumerApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("ConsumerLimits"):
