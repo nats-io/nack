@@ -117,7 +117,8 @@ func (r *StreamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	if err := r.createOrUpdate(ctx, log, stream); err != nil {
 		return ctrl.Result{}, fmt.Errorf("create or update: %s", err)
 	}
-	return ctrl.Result{}, nil
+
+	return ctrl.Result{RequeueAfter: r.RequeueInterval()}, nil
 }
 
 func (r *StreamReconciler) deleteStream(ctx context.Context, log logr.Logger, stream *api.Stream) error {

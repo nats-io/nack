@@ -120,7 +120,8 @@ func (r *KeyValueReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	if err := r.createOrUpdate(ctx, log, keyValue); err != nil {
 		return ctrl.Result{}, fmt.Errorf("create or update: %s", err)
 	}
-	return ctrl.Result{}, nil
+
+	return ctrl.Result{RequeueAfter: r.RequeueInterval()}, nil
 }
 
 func (r *KeyValueReconciler) deleteKeyValue(ctx context.Context, log logr.Logger, keyValue *api.KeyValue) error {

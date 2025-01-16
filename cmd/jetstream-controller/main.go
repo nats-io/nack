@@ -36,7 +36,6 @@ import (
 	klog "k8s.io/klog/v2"
 
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 )
 
@@ -111,10 +110,10 @@ func run() error {
 		}
 
 		controllerCfg := &controller.Config{
-			ReadOnly:     *readOnly,
-			Namespace:    *namespace,
-			CacheDir:     *cacheDir,
-			SyncInterval: *controlLoopSyncInterval,
+			ReadOnly:        *readOnly,
+			Namespace:       *namespace,
+			CacheDir:        *cacheDir,
+			RequeueInterval: *controlLoopSyncInterval,
 		}
 
 		return runControlLoop(config, natsCfg, controllerCfg)
@@ -171,9 +170,6 @@ func runControlLoop(config *rest.Config, natsCfg *controller.NatsConfig, control
 	mgr, err := ctrl.NewManager(config, ctrl.Options{
 		Scheme: scheme,
 		Logger: klog.NewKlogr().WithName("controller-runtime"),
-		Cache: cache.Options{
-			SyncPeriod: &controllerCfg.SyncInterval,
-		},
 	})
 	if err != nil {
 		return fmt.Errorf("unable to start manager: %w", err)

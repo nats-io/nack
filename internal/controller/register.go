@@ -13,10 +13,10 @@ import (
 //
 // Namespace restricts the controller to resources of the given namespace.
 type Config struct {
-	ReadOnly     bool
-	Namespace    string
-	SyncInterval time.Duration
-	CacheDir     string
+	ReadOnly        bool
+	Namespace       string
+	RequeueInterval time.Duration
+	CacheDir        string
 }
 
 // RegisterAll registers all available jetStream controllers to the manager.

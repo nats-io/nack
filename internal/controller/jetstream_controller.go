@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"math/rand/v2"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,6 +35,8 @@ type JetStreamController interface {
 	//
 	// Returns the error of the operation or errors during client setup.
 	WithJetStreamClient(opts api.ConnectionOpts, ns string, op func(js jetstream.JetStream) error) error
+
+	RequeueInterval() time.Duration
 }
 
 func NewJSController(k8sClient client.Client, natsConfig *NatsConfig, controllerConfig *Config) (JetStreamController, error) {
@@ -50,6 +53,18 @@ type jsController struct {
 	config           *NatsConfig
 	controllerConfig *Config
 	cacheDir         string
+}
+
+func (c *jsController) RequeueInterval() time.Duration {
+	// Stagger the requeue slightly
+	interval := c.controllerConfig.RequeueInterval
+
+	// Allow up to a 10% variance
+	intervalRange := float64(interval.Nanoseconds()) * 0.1
+
+	randomFactor := (rand.Float64() * 2) - 1.0
+
+	return time.Duration(float64(interval.Nanoseconds()) + (intervalRange * randomFactor))
 }
 
 func (c *jsController) ReadOnly() bool {
