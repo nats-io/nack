@@ -33,6 +33,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
 // StreamReconciler reconciles a Stream object
@@ -84,19 +85,6 @@ func (r *StreamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	// Add finalizer
-	if !controllerutil.ContainsFinalizer(stream, streamFinalizer) {
-		log.Info("Adding stream finalizer.")
-		if ok := controllerutil.AddFinalizer(stream, streamFinalizer); !ok {
-			return ctrl.Result{}, errors.New("failed to add finalizer to stream resource")
-		}
-
-		if err := r.Update(ctx, stream); err != nil {
-			return ctrl.Result{}, fmt.Errorf("update stream resource to add finalizer: %w", err)
-		}
-		return ctrl.Result{}, nil
-	}
-
 	// Check Deletion
 	markedForDeletion := stream.GetDeletionTimestamp() != nil
 	if markedForDeletion {
@@ -109,6 +97,19 @@ func (r *StreamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			log.Info("Stream marked for deletion and already finalized. Ignoring.")
 		}
 
+		return ctrl.Result{}, nil
+	}
+
+	// Add finalizer
+	if !controllerutil.ContainsFinalizer(stream, streamFinalizer) {
+		log.Info("Adding stream finalizer.")
+		if ok := controllerutil.AddFinalizer(stream, streamFinalizer); !ok {
+			return ctrl.Result{}, errors.New("failed to add finalizer to stream resource")
+		}
+
+		if err := r.Update(ctx, stream); err != nil {
+			return ctrl.Result{}, fmt.Errorf("update stream resource to add finalizer: %w", err)
+		}
 		return ctrl.Result{}, nil
 	}
 
@@ -146,6 +147,8 @@ func (r *StreamReconciler) deleteStream(ctx context.Context, log logr.Logger, st
 		})
 		if errors.Is(err, jetstream.ErrStreamNotFound) {
 			log.Info("Stream does not exist, unable to delete.", "streamName", stream.Spec.Name)
+		} else if err != nil && storedState == nil {
+			log.Info("Stream not reconciled and no state received from server. Removing finalizer.")
 		} else if err != nil {
 			return fmt.Errorf("delete stream during finalization: %w", err)
 		}
@@ -472,6 +475,7 @@ func mapStreamSource(ss *api.StreamSource) (*jetstream.StreamSource, error) {
 func (r *StreamReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.Stream{}).
+		WithEventFilter(predicate.GenerationChangedPredicate{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: 1,
 		}).

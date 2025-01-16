@@ -33,6 +33,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
 const (
@@ -88,19 +89,6 @@ func (r *ObjectStoreReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	// Add finalizer
-	if !controllerutil.ContainsFinalizer(objectStore, objectStoreFinalizer) {
-		log.Info("Adding ObjectStore finalizer.")
-		if ok := controllerutil.AddFinalizer(objectStore, objectStoreFinalizer); !ok {
-			return ctrl.Result{}, errors.New("failed to add finalizer to objectstore resource")
-		}
-
-		if err := r.Update(ctx, objectStore); err != nil {
-			return ctrl.Result{}, fmt.Errorf("update objectstore resource to add finalizer: %w", err)
-		}
-		return ctrl.Result{}, nil
-	}
-
 	// Check Deletion
 	markedForDeletion := objectStore.GetDeletionTimestamp() != nil
 	if markedForDeletion {
@@ -113,6 +101,19 @@ func (r *ObjectStoreReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			log.Info("ObjectStore marked for deletion and already finalized. Ignoring.")
 		}
 
+		return ctrl.Result{}, nil
+	}
+
+	// Add finalizer
+	if !controllerutil.ContainsFinalizer(objectStore, objectStoreFinalizer) {
+		log.Info("Adding ObjectStore finalizer.")
+		if ok := controllerutil.AddFinalizer(objectStore, objectStoreFinalizer); !ok {
+			return ctrl.Result{}, errors.New("failed to add finalizer to objectstore resource")
+		}
+
+		if err := r.Update(ctx, objectStore); err != nil {
+			return ctrl.Result{}, fmt.Errorf("update objectstore resource to add finalizer: %w", err)
+		}
 		return ctrl.Result{}, nil
 	}
 
@@ -150,6 +151,8 @@ func (r *ObjectStoreReconciler) deleteObjectStore(ctx context.Context, log logr.
 		})
 		if errors.Is(err, jetstream.ErrStreamNotFound) || errors.Is(err, jetstream.ErrBucketNotFound) {
 			log.Info("ObjectStore does not exist, unable to delete.", "objectStoreName", objectStore.Spec.Bucket)
+		} else if err != nil && storedState == nil {
+			log.Info("ObjectStore not reconciled and no state received from server. Removing finalizer.")
 		} else if err != nil {
 			return fmt.Errorf("delete objectstore during finalization: %w", err)
 		}
@@ -349,6 +352,7 @@ func objectStoreSpecToConfig(spec *api.ObjectStoreSpec) (jetstream.ObjectStoreCo
 func (r *ObjectStoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.ObjectStore{}).
+		WithEventFilter(predicate.GenerationChangedPredicate{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: 1,
 		}).

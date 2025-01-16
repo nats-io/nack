@@ -29,8 +29,10 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	api "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -82,19 +84,6 @@ func (r *ConsumerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	// Add finalizer
-	if !controllerutil.ContainsFinalizer(consumer, consumerFinalizer) {
-		log.Info("Adding consumer finalizer.")
-		if ok := controllerutil.AddFinalizer(consumer, consumerFinalizer); !ok {
-			return ctrl.Result{}, errors.New("failed to add finalizer to consumer resource")
-		}
-
-		if err := r.Update(ctx, consumer); err != nil {
-			return ctrl.Result{}, fmt.Errorf("update consumer resource to add finalizer: %w", err)
-		}
-		return ctrl.Result{}, nil
-	}
-
 	// Check Deletion
 	markedForDeletion := consumer.GetDeletionTimestamp() != nil
 	if markedForDeletion {
@@ -110,6 +99,19 @@ func (r *ConsumerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, nil
 	}
 
+	// Add finalizer
+	if !controllerutil.ContainsFinalizer(consumer, consumerFinalizer) {
+		log.Info("Adding consumer finalizer.")
+		if ok := controllerutil.AddFinalizer(consumer, consumerFinalizer); !ok {
+			return ctrl.Result{}, errors.New("failed to add finalizer to consumer resource")
+		}
+
+		if err := r.Update(ctx, consumer); err != nil {
+			return ctrl.Result{}, fmt.Errorf("update consumer resource to add finalizer: %w", err)
+		}
+		return ctrl.Result{}, nil
+	}
+
 	if consumer.Spec.FlowControl || consumer.Spec.DeliverSubject != "" || consumer.Spec.DeliverGroup != "" || consumer.Spec.HeartbeatInterval != "" {
 		log.Info("FlowControl, DeliverSubject, DeliverGroup, and HeartbeatInterval are Push Consumer options, which are not supported. Skipping consumer creation or update.")
 		consumer.Status.Conditions = updateReadyCondition(consumer.Status.Conditions, v1.ConditionFalse, stateErrored, "Push Consumer options are not supported.")
@@ -121,6 +123,9 @@ func (r *ConsumerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	// Create or update stream
 	if err := r.createOrUpdate(ctx, log, consumer); err != nil {
+		if err := r.Get(ctx, client.ObjectKeyFromObject(consumer), consumer); err != nil {
+			return ctrl.Result{}, fmt.Errorf("get consumer resource: %w", err)
+		}
 		consumer.Status.Conditions = updateReadyCondition(consumer.Status.Conditions, v1.ConditionFalse, stateErrored, err.Error())
 		if err := r.Status().Update(ctx, consumer); err != nil {
 			log.Error(err, "Failed to update ready condition to Errored.")
@@ -160,7 +165,11 @@ func (r *ConsumerReconciler) deleteConsumer(ctx context.Context, log logr.Logger
 		case errors.Is(err, jetstream.ErrStreamNotFound):
 			log.Info("Stream of consumer does not exist. Unable to delete.")
 		case err != nil:
-			return fmt.Errorf("delete jetstream consumer: %w", err)
+			if storedState == nil {
+				log.Info("Consumer not reconciled and no state received from server. Removing finalizer.")
+			} else {
+				return fmt.Errorf("delete jetstream consumer: %w", err)
+			}
 		default:
 			log.Info("Consumer deleted.")
 		}
@@ -407,6 +416,7 @@ func consumerSpecToConfig(spec *api.ConsumerSpec) (*jetstream.ConsumerConfig, er
 func (r *ConsumerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.Consumer{}).
+		WithEventFilter(predicate.GenerationChangedPredicate{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: 1,
 		}).

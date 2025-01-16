@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -89,19 +90,6 @@ func (r *AccountReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	// Add finalizer
-	if !controllerutil.ContainsFinalizer(account, accountFinalizer) {
-		log.Info("Adding Account finalizer.")
-		if ok := controllerutil.AddFinalizer(account, accountFinalizer); !ok {
-			return ctrl.Result{}, errors.New("failed to add finalizer to account resource")
-		}
-
-		if err := r.Update(ctx, account); err != nil {
-			return ctrl.Result{}, fmt.Errorf("update account resource to add finalizer: %w", err)
-		}
-		return ctrl.Result{}, nil
-	}
-
 	// Check Deletion
 	markedForDeletion := account.GetDeletionTimestamp() != nil
 	if markedForDeletion {
@@ -131,6 +119,19 @@ func (r *AccountReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			}
 		} else {
 			log.Info("Account marked for deletion and already finalized. Ignoring.")
+		}
+		return ctrl.Result{}, nil
+	}
+
+	// Add finalizer
+	if !controllerutil.ContainsFinalizer(account, accountFinalizer) {
+		log.Info("Adding Account finalizer.")
+		if ok := controllerutil.AddFinalizer(account, accountFinalizer); !ok {
+			return ctrl.Result{}, errors.New("failed to add finalizer to account resource")
+		}
+
+		if err := r.Update(ctx, account); err != nil {
+			return ctrl.Result{}, fmt.Errorf("update account resource to add finalizer: %w", err)
 		}
 		return ctrl.Result{}, nil
 	}
@@ -218,6 +219,7 @@ func (r *AccountReconciler) findDependentResources(ctx context.Context, log logr
 func (r *AccountReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.Account{}).
+		WithEventFilter(predicate.GenerationChangedPredicate{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: 1,
 		}).

@@ -33,6 +33,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
 const (
@@ -87,19 +88,6 @@ func (r *KeyValueReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	// Add finalizer
-	if !controllerutil.ContainsFinalizer(keyValue, keyValueFinalizer) {
-		log.Info("Adding KeyValue finalizer.")
-		if ok := controllerutil.AddFinalizer(keyValue, keyValueFinalizer); !ok {
-			return ctrl.Result{}, errors.New("failed to add finalizer to keyvalue resource")
-		}
-
-		if err := r.Update(ctx, keyValue); err != nil {
-			return ctrl.Result{}, fmt.Errorf("update keyvalue resource to add finalizer: %w", err)
-		}
-		return ctrl.Result{}, nil
-	}
-
 	// Check Deletion
 	markedForDeletion := keyValue.GetDeletionTimestamp() != nil
 	if markedForDeletion {
@@ -112,6 +100,19 @@ func (r *KeyValueReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 			log.Info("KeyValue marked for deletion and already finalized. Ignoring.")
 		}
 
+		return ctrl.Result{}, nil
+	}
+
+	// Add finalizer
+	if !controllerutil.ContainsFinalizer(keyValue, keyValueFinalizer) {
+		log.Info("Adding KeyValue finalizer.")
+		if ok := controllerutil.AddFinalizer(keyValue, keyValueFinalizer); !ok {
+			return ctrl.Result{}, errors.New("failed to add finalizer to keyvalue resource")
+		}
+
+		if err := r.Update(ctx, keyValue); err != nil {
+			return ctrl.Result{}, fmt.Errorf("update keyvalue resource to add finalizer: %w", err)
+		}
 		return ctrl.Result{}, nil
 	}
 
@@ -149,6 +150,8 @@ func (r *KeyValueReconciler) deleteKeyValue(ctx context.Context, log logr.Logger
 		})
 		if errors.Is(err, jetstream.ErrBucketNotFound) {
 			log.Info("KeyValue does not exist, unable to delete.", "keyValueName", keyValue.Spec.Bucket)
+		} else if err != nil && storedState == nil {
+			log.Info("KeyValue not reconciled and no state received from server. Removing finalizer.")
 		} else if err != nil {
 			return fmt.Errorf("delete keyvalue during finalization: %w", err)
 		}
@@ -379,6 +382,7 @@ func keyValueSpecToConfig(spec *api.KeyValueSpec) (jetstream.KeyValueConfig, err
 func (r *KeyValueReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.KeyValue{}).
+		WithEventFilter(predicate.GenerationChangedPredicate{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: 1,
 		}).
