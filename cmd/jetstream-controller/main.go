@@ -182,6 +182,13 @@ func runControlLoop(config *rest.Config, natsCfg *controller.NatsConfig, control
 		}
 		defer os.RemoveAll(cacheDir)
 		controllerCfg.CacheDir = cacheDir
+	} else {
+		if _, err := os.Stat(controllerCfg.CacheDir); os.IsNotExist(err) {
+			err = os.MkdirAll(controllerCfg.CacheDir, 0o755)
+			if err != nil {
+				return fmt.Errorf("create cache dir: %w", err)
+			}
+		}
 	}
 
 	err = controller.RegisterAll(mgr, natsCfg, controllerCfg)
