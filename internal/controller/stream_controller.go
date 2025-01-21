@@ -190,7 +190,6 @@ func (r *StreamReconciler) createOrUpdate(ctx context.Context, log logr.Logger, 
 
 		serverState, err := getServerStreamState(js, stream)
 		if err != nil {
-			log.Info("get err", "err", err, "code", getErrCode(err))
 			return err
 		}
 
@@ -324,6 +323,7 @@ func streamSpecToConfig(spec *api.StreamSpec) ([]jsm.StreamOption, error) {
 		jsm.MaxBytes(int64(spec.MaxBytes)),
 		jsm.MaxMessageSize(int32(spec.MaxMsgSize)),
 		jsm.Replicas(spec.Replicas),
+		jsm.StreamMetadata(spec.Metadata),
 	}
 
 	// Set not directly mapped fields
@@ -487,11 +487,6 @@ func streamSpecToConfig(spec *api.StreamSpec) ([]jsm.StreamOption, error) {
 	// firstSequence
 	if spec.FirstSequence > 0 {
 		opts = append(opts, jsm.FirstSequence(spec.FirstSequence))
-	}
-
-	// metadata
-	if spec.Metadata != nil {
-		opts = append(opts, jsm.StreamMetadata(spec.Metadata))
 	}
 
 	// consumerLimits
