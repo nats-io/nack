@@ -14,7 +14,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/nats-io/jsm.go"
-	jsmapi "github.com/nats-io/jsm.go/api"
 	js "github.com/nats-io/nack/controllers/jetstream"
 	api "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 	"github.com/nats-io/nats.go/jetstream"
@@ -313,14 +312,6 @@ func jsonString(v string) []byte {
 
 func compareConfigState(actual any, desired any) string {
 	return cmp.Diff(actual, desired)
-}
-
-func getErrCode(err error) uint16 {
-	if apiErr, ok := err.(jsmapi.ApiError); ok {
-		return apiErr.NatsErrorCode()
-	}
-
-	return 0
 }
 
 func versionComponents(version string) (major, minor, patch int, err error) {
