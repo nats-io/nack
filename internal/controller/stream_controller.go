@@ -148,7 +148,7 @@ func (r *StreamReconciler) deleteStream(ctx context.Context, log logr.Logger, st
 
 			return js.DeleteStream(stream.Spec.Name)
 		})
-		if errors.Is(err, jetstream.ErrStreamNotFound) {
+		if jsmapi.IsNatsErr(err, JSStreamNotFoundErr) {
 			log.Info("Stream does not exist, unable to delete.", "streamName", stream.Spec.Name)
 		} else if err != nil && storedState == nil {
 			log.Info("Stream not reconciled and no state received from server. Removing finalizer.")
@@ -303,8 +303,7 @@ func getStoredStreamState(stream *api.Stream) (*jsmapi.StreamConfig, error) {
 // JSStreamNotFoundErr is considered a valid response and does not return error
 func getServerStreamState(jsm *jsm.Manager, stream *api.Stream) (*jsmapi.StreamConfig, error) {
 	s, err := jsm.LoadStream(stream.Spec.Name)
-	// 10059 -> JSStreamNotFoundErr
-	if jsmapi.IsNatsErr(err, 10059) {
+	if jsmapi.IsNatsErr(err, JSStreamNotFoundErr) {
 		return nil, nil
 	}
 	if err != nil {

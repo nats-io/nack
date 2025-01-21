@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	jsmapi "github.com/nats-io/jsm.go/api"
 	"github.com/nats-io/nats.go/jetstream"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -584,13 +585,13 @@ func Test_consumerSpecToConfig(t *testing.T) {
 	tests := []struct {
 		name    string
 		spec    *api.ConsumerSpec
-		want    *jetstream.ConsumerConfig
+		want    *jsmapi.ConsumerConfig
 		wantErr bool
 	}{
 		{
 			name:    "empty spec",
 			spec:    &api.ConsumerSpec{},
-			want:    &jetstream.ConsumerConfig{},
+			want:    &jsmapi.ConsumerConfig{},
 			wantErr: false,
 		},
 		{
@@ -600,11 +601,11 @@ func Test_consumerSpecToConfig(t *testing.T) {
 				AckWait:            "10ns",
 				BackOff:            []string{"1s", "5m"},
 				DeliverGroup:       "",
-				DeliverPolicy:      "new",
+				DeliverPolicy:      "byStartSequence",
 				DeliverSubject:     "",
 				Description:        "test consumer",
 				DurableName:        "test-consumer",
-				FilterSubject:      "time.us.>",
+				FilterSubject:      "",
 				FilterSubjects:     []string{"time.us.east", "time.us.west"},
 				FlowControl:        false,
 				HeadersOnly:        true,
@@ -617,7 +618,7 @@ func Test_consumerSpecToConfig(t *testing.T) {
 				MaxWaiting:         5,
 				MemStorage:         true,
 				OptStartSeq:        17,
-				OptStartTime:       dateString,
+				OptStartTime:       "",
 				RateLimitBps:       512,
 				ReplayPolicy:       "instant",
 				Replicas:           9,
@@ -638,18 +639,17 @@ func Test_consumerSpecToConfig(t *testing.T) {
 					},
 				},
 			},
-			want: &jetstream.ConsumerConfig{
+			want: &jsmapi.ConsumerConfig{
 				Durable:            "test-consumer",
 				Description:        "test consumer",
-				DeliverPolicy:      jetstream.DeliverNewPolicy,
+				DeliverPolicy:      jsmapi.DeliverByStartSequence,
 				OptStartSeq:        17,
-				OptStartTime:       &date,
-				AckPolicy:          jetstream.AckExplicitPolicy,
+				AckPolicy:          jsmapi.AckExplicit,
 				AckWait:            10 * time.Nanosecond,
 				MaxDeliver:         3,
 				BackOff:            []time.Duration{time.Second, 5 * time.Minute},
-				FilterSubject:      "time.us.>",
-				ReplayPolicy:       jetstream.ReplayInstantPolicy,
+				FilterSubject:      "",
+				ReplayPolicy:       jsmapi.ReplayInstant,
 				RateLimit:          512,
 				SampleFrequency:    "25%",
 				MaxWaiting:         5,
@@ -668,14 +668,94 @@ func Test_consumerSpecToConfig(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "full spec alt",
+			spec: &api.ConsumerSpec{
+				AckPolicy:          "all",
+				AckWait:            "20ns",
+				BackOff:            []string{"1s", "5m"},
+				DeliverGroup:       "",
+				DeliverPolicy:      "byStartTime",
+				DeliverSubject:     "",
+				Description:        "test consumer",
+				DurableName:        "test-consumer",
+				FilterSubject:      "time.us.>",
+				FlowControl:        true,
+				HeadersOnly:        false,
+				HeartbeatInterval:  "",
+				MaxAckPending:      5,
+				MaxDeliver:         6,
+				MaxRequestBatch:    7,
+				MaxRequestExpires:  "8s",
+				MaxRequestMaxBytes: 1024,
+				MaxWaiting:         5,
+				MemStorage:         false,
+				OptStartSeq:        17,
+				OptStartTime:       dateString,
+				RateLimitBps:       1024,
+				ReplayPolicy:       "original",
+				Replicas:           9,
+				SampleFreq:         "30%",
+				StreamName:         "",
+				Metadata: map[string]string{
+					"meta": "data",
+				},
+				BaseStreamConfig: api.BaseStreamConfig{
+					PreventDelete: false,
+					PreventUpdate: false,
+					ConnectionOpts: api.ConnectionOpts{
+						Account: "",
+						Creds:   "",
+						Nkey:    "",
+						TLS:     api.TLS{},
+						Servers: nil,
+					},
+				},
+			},
+			want: &jsmapi.ConsumerConfig{
+				Durable:            "test-consumer",
+				Description:        "test consumer",
+				DeliverPolicy:      jsmapi.DeliverByStartTime,
+				OptStartSeq:        0,
+				OptStartTime:       &date,
+				AckPolicy:          jsmapi.AckAll,
+				AckWait:            20 * time.Nanosecond,
+				MaxDeliver:         6,
+				BackOff:            []time.Duration{time.Second, 5 * time.Minute},
+				FlowControl:        true,
+				FilterSubject:      "time.us.>",
+				ReplayPolicy:       jsmapi.ReplayOriginal,
+				RateLimit:          1024,
+				SampleFrequency:    "30%",
+				MaxWaiting:         5,
+				MaxAckPending:      5,
+				HeadersOnly:        false,
+				MaxRequestBatch:    7,
+				MaxRequestExpires:  8 * time.Second,
+				MaxRequestMaxBytes: 1024,
+				InactiveThreshold:  0, // TODO no value?
+				Replicas:           9,
+				MemoryStorage:      false,
+				Metadata: map[string]string{
+					"meta": "data",
+				},
+			},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := consumerSpecToConfig(tt.spec)
+			cOpts, err := consumerSpecToConfig(tt.spec)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("consumerSpecToConfig() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+
+			got := &jsmapi.ConsumerConfig{}
+			for _, o := range cOpts {
+				o(got)
+			}
+
 			assert.EqualValues(t, tt.want, got, "consumerSpecToConfig(%v)", tt.spec)
 		})
 	}
