@@ -2,14 +2,19 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand/v2"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/nats-io/jsm.go"
+	jsmapi "github.com/nats-io/jsm.go/api"
 	js "github.com/nats-io/nack/controllers/jetstream"
 	api "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 	"github.com/nats-io/nats.go/jetstream"
@@ -18,6 +23,8 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+var semVerRe = regexp.MustCompile(`\Av?([0-9]+)\.?([0-9]+)?\.?([0-9]+)?`)
 
 type JetStreamController interface {
 	client.Client
@@ -35,6 +42,9 @@ type JetStreamController interface {
 	//
 	// Returns the error of the operation or errors during client setup.
 	WithJetStreamClient(opts api.ConnectionOpts, ns string, op func(js jetstream.JetStream) error) error
+
+	// WithJSMClient provides a jsm.go client to the given operation.
+	WithJSMClient(opts api.ConnectionOpts, ns string, op func(jsm *jsm.Manager) error) error
 
 	RequeueInterval() time.Duration
 }
@@ -74,6 +84,21 @@ func (c *jsController) ReadOnly() bool {
 func (c *jsController) ValidNamespace(namespace string) bool {
 	ns := c.controllerConfig.Namespace
 	return ns == "" || ns == namespace
+}
+
+func (c *jsController) WithJSMClient(opts api.ConnectionOpts, ns string, op func(js *jsm.Manager) error) error {
+	cfg, err := c.natsConfigFromOpts(opts, ns)
+	if err != nil {
+		return err
+	}
+
+	jsmClient, closer, err := CreateJSMClient(cfg, true)
+	if err != nil {
+		return fmt.Errorf("create jsm client: %w", err)
+	}
+	defer closer.Close()
+
+	return op(jsmClient)
 }
 
 func (c *jsController) WithJetStreamClient(opts api.ConnectionOpts, ns string, op func(js jetstream.JetStream) error) error {
@@ -283,4 +308,32 @@ func jsonString(v string) []byte {
 
 func compareConfigState(actual any, desired any) string {
 	return cmp.Diff(actual, desired)
+}
+
+func getErrCode(err error) uint16 {
+	if apiErr, ok := err.(jsmapi.ApiError); ok {
+		return apiErr.NatsErrorCode()
+	}
+
+	return 0
+}
+
+func versionComponents(version string) (major, minor, patch int, err error) {
+	m := semVerRe.FindStringSubmatch(version)
+	if m == nil {
+		return 0, 0, 0, errors.New("invalid semver")
+	}
+	major, err = strconv.Atoi(m[1])
+	if err != nil {
+		return -1, -1, -1, err
+	}
+	minor, err = strconv.Atoi(m[2])
+	if err != nil {
+		return -1, -1, -1, err
+	}
+	patch, err = strconv.Atoi(m[3])
+	if err != nil {
+		return -1, -1, -1, err
+	}
+	return major, minor, patch, err
 }

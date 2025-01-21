@@ -1,5 +1,5 @@
 /*
-Copyright 2024.
+Copyright 2025.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	jsmapi "github.com/nats-io/jsm.go/api"
 	"github.com/nats-io/nats.go/jetstream"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -215,7 +216,7 @@ var _ = Describe("Stream Controller", func() {
 			})
 			It("should not create the stream", func(ctx SpecContext) {
 				_, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
-				Expect(err.Error()).To(HaveSuffix("can not be sealed"))
+				Expect(err.Error()).To(HaveSuffix("can not be sealed (10052)"))
 			})
 		})
 
@@ -579,13 +580,13 @@ func Test_mapSpecToConfig(t *testing.T) {
 	tests := []struct {
 		name    string
 		spec    *api.StreamSpec
-		want    jetstream.StreamConfig
+		want    jsmapi.StreamConfig
 		wantErr bool
 	}{
 		{
 			name:    "empty spec",
 			spec:    &api.StreamSpec{},
-			want:    jetstream.StreamConfig{},
+			want:    jsmapi.StreamConfig{},
 			wantErr: false,
 		},
 		{
@@ -617,7 +618,6 @@ func Test_mapSpecToConfig(t *testing.T) {
 						Dest:   "transform-dest",
 					}},
 				},
-				Name:  "stream-name",
 				NoAck: true,
 				Placement: &api.StreamPlacement{
 					Cluster: "test-cluster",
@@ -665,75 +665,72 @@ func Test_mapSpecToConfig(t *testing.T) {
 					},
 				},
 			},
-			want: jetstream.StreamConfig{
-				Name:                 "stream-name",
-				Description:          "stream description",
-				Subjects:             []string{"orders.*"},
-				Retention:            jetstream.InterestPolicy,
-				MaxConsumers:         -1,
-				MaxMsgs:              -1,
-				MaxBytes:             -1,
-				Discard:              jetstream.DiscardNew,
-				DiscardNewPerSubject: true,
-				MaxAge:               time.Second * 30,
-				MaxMsgsPerSubject:    10,
-				MaxMsgSize:           -1,
-				Storage:              jetstream.FileStorage,
-				Replicas:             3,
-				NoAck:                true,
-				Duplicates:           time.Second * 5,
-				Placement: &jetstream.Placement{
+			want: jsmapi.StreamConfig{
+				Description:   "stream description",
+				Subjects:      []string{"orders.*"},
+				Retention:     jsmapi.InterestPolicy,
+				MaxConsumers:  -1,
+				MaxMsgs:       -1,
+				MaxBytes:      -1,
+				Discard:       jsmapi.DiscardNew,
+				DiscardNewPer: true,
+				MaxAge:        time.Second * 30,
+				MaxMsgsPer:    10,
+				MaxMsgSize:    -1,
+				Storage:       jsmapi.FileStorage,
+				Replicas:      3,
+				NoAck:         true,
+				Duplicates:    time.Second * 5,
+				Placement: &jsmapi.Placement{
 					Cluster: "test-cluster",
 					Tags:    []string{"tag"},
 				},
-				Mirror: &jetstream.StreamSource{
+				Mirror: &jsmapi.StreamSource{
 					Name:          "mirror",
 					OptStartSeq:   5,
 					OptStartTime:  &date,
 					FilterSubject: "orders",
-					SubjectTransforms: []jetstream.SubjectTransformConfig{{
+					SubjectTransforms: []jsmapi.SubjectTransformConfig{{
 						Source:      "transform-source",
 						Destination: "transform-dest",
 					}},
-					External: &jetstream.ExternalStream{
-						APIPrefix:     "api",
+					External: &jsmapi.ExternalStream{
+						ApiPrefix:     "api",
 						DeliverPrefix: "deliver",
 					},
-					Domain: "",
 				},
-				Sources: []*jetstream.StreamSource{{
+				Sources: []*jsmapi.StreamSource{{
 					Name:          "source",
 					OptStartSeq:   5,
 					OptStartTime:  &date,
 					FilterSubject: "orders",
-					SubjectTransforms: []jetstream.SubjectTransformConfig{{
+					SubjectTransforms: []jsmapi.SubjectTransformConfig{{
 						Source:      "transform-source",
 						Destination: "transform-dest",
 					}},
-					External: &jetstream.ExternalStream{
-						APIPrefix:     "api",
+					External: &jsmapi.ExternalStream{
+						ApiPrefix:     "api",
 						DeliverPrefix: "deliver",
 					},
-					Domain: "",
 				}},
-				Sealed:      false,
-				DenyDelete:  true,
-				DenyPurge:   true,
-				AllowRollup: true,
-				Compression: jetstream.S2Compression,
-				FirstSeq:    42,
-				SubjectTransform: &jetstream.SubjectTransformConfig{
+				Sealed:        false,
+				DenyDelete:    true,
+				DenyPurge:     true,
+				RollupAllowed: true,
+				Compression:   jsmapi.S2Compression,
+				FirstSeq:      42,
+				SubjectTransform: &jsmapi.SubjectTransformConfig{
 					Source:      "transform-source",
 					Destination: "transform-dest",
 				},
-				RePublish: &jetstream.RePublish{
+				RePublish: &jsmapi.RePublish{
 					Source:      "re-publish-source",
 					Destination: "re-publish-dest",
 					HeadersOnly: true,
 				},
 				AllowDirect:    true,
 				MirrorDirect:   false,
-				ConsumerLimits: jetstream.StreamConsumerLimits{},
+				ConsumerLimits: jsmapi.StreamConsumerLimits{},
 				Metadata: map[string]string{
 					"meta": "data",
 				},
@@ -745,14 +742,19 @@ func Test_mapSpecToConfig(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert := assert.New(t)
-			got, err := streamSpecToConfig(tt.spec)
+			sOpts, err := streamSpecToConfig(tt.spec)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("streamSpecToConfig() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 
+			got := &jsmapi.StreamConfig{}
+			for _, o := range sOpts {
+				o(got)
+			}
+
 			// Compare nested structs
-			assert.EqualValues(tt.want, got)
+			assert.EqualValues(tt.want, *got)
 		})
 	}
 }

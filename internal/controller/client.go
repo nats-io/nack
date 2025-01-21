@@ -3,6 +3,7 @@ package controller
 import (
 	"fmt"
 
+	"github.com/nats-io/jsm.go"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 )
@@ -62,13 +63,55 @@ type Closable interface {
 	Close()
 }
 
+func CreateJSMClient(cfg *NatsConfig, pedantic bool) (*jsm.Manager, Closable, error) {
+	nc, err := createNatsConn(cfg, pedantic)
+	if err != nil {
+		return nil, nil, fmt.Errorf("create nats connection: %w", err)
+	}
+
+	major, minor, _, err := versionComponents(nc.ConnectedServerVersion())
+	if err != nil {
+		return nil, nil, fmt.Errorf("parse server version: %w", err)
+	}
+
+	// JetStream pedantic mode unsupported prior to NATS Server 2.11
+	if pedantic && major < 2 || (major == 2 && minor < 11) {
+		pedantic = false
+	}
+
+	jsmOpts := make([]jsm.Option, 0)
+	if pedantic {
+		jsmOpts = append(jsmOpts, jsm.WithPedanticRequests())
+	}
+
+	jsmClient, err := jsm.New(nc, jsmOpts...)
+	if err != nil {
+		return nil, nil, fmt.Errorf("new jsm client: %w", err)
+	}
+
+	return jsmClient, nc, nil
+}
+
 // CreateJetStreamClient creates new Jetstream client with a connection based on the given NatsConfig.
 // Returns a jetstream.Jetstream client and the Closable of the underlying connection.
 // Close should be called when the client is no longer used.
 func CreateJetStreamClient(cfg *NatsConfig, pedantic bool) (jetstream.JetStream, Closable, error) {
+	nc, err := createNatsConn(cfg, pedantic)
+	if err != nil {
+		return nil, nil, fmt.Errorf("create nats connection: %w", err)
+	}
+
+	js, err := jetstream.New(nc)
+	if err != nil {
+		return nil, nil, fmt.Errorf("new jetstream: %w", err)
+	}
+	return js, nc, nil
+}
+
+func createNatsConn(cfg *NatsConfig, pedantic bool) (*nats.Conn, error) {
 	opts, err := cfg.buildOptions()
 	if err != nil {
-		return nil, nil, fmt.Errorf("nats options: %w", err)
+		return nil, err
 	}
 
 	// Set pedantic option
@@ -82,14 +125,5 @@ func CreateJetStreamClient(cfg *NatsConfig, pedantic bool) (jetstream.JetStream,
 	// client should always attempt to reconnect
 	opts = append(opts, nats.MaxReconnects(-1))
 
-	nc, err := nats.Connect(cfg.ServerURL, opts...)
-	if err != nil {
-		return nil, nil, fmt.Errorf("nats connect: %w", err)
-	}
-
-	js, err := jetstream.New(nc)
-	if err != nil {
-		return nil, nil, fmt.Errorf("new jetstream: %w", err)
-	}
-	return js, nc, nil
+	return nats.Connect(cfg.ServerURL, opts...)
 }
