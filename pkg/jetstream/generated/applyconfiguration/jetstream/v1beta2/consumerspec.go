@@ -18,21 +18,26 @@ package v1beta2
 // ConsumerSpecApplyConfiguration represents a declarative configuration of the ConsumerSpec type for use
 // with apply.
 type ConsumerSpecApplyConfiguration struct {
-	DurableName        *string           `json:"durableName,omitempty"`
 	Description        *string           `json:"description,omitempty"`
-	DeliverPolicy      *string           `json:"deliverPolicy,omitempty"`
-	OptStartSeq        *int              `json:"optStartSeq,omitempty"`
-	OptStartTime       *string           `json:"optStartTime,omitempty"`
 	AckPolicy          *string           `json:"ackPolicy,omitempty"`
 	AckWait            *string           `json:"ackWait,omitempty"`
+	DeliverPolicy      *string           `json:"deliverPolicy,omitempty"`
+	DeliverSubject     *string           `json:"deliverSubject,omitempty"`
+	DeliverGroup       *string           `json:"deliverGroup,omitempty"`
+	DurableName        *string           `json:"durableName,omitempty"`
+	FilterSubject      *string           `json:"filterSubject,omitempty"`
+	FilterSubjects     []string          `json:"filterSubjects,omitempty"`
+	FlowControl        *bool             `json:"flowControl,omitempty"`
+	HeartbeatInterval  *string           `json:"heartbeatInterval,omitempty"`
+	MaxAckPending      *int              `json:"maxAckPending,omitempty"`
 	MaxDeliver         *int              `json:"maxDeliver,omitempty"`
 	BackOff            []string          `json:"backoff,omitempty"`
-	FilterSubject      *string           `json:"filterSubject,omitempty"`
-	ReplayPolicy       *string           `json:"replayPolicy,omitempty"`
-	RateLimitBps       *int              `json:"rateLimitBps,omitempty"`
-	SampleFreq         *string           `json:"sampleFreq,omitempty"`
 	MaxWaiting         *int              `json:"maxWaiting,omitempty"`
-	MaxAckPending      *int              `json:"maxAckPending,omitempty"`
+	OptStartSeq        *int              `json:"optStartSeq,omitempty"`
+	OptStartTime       *string           `json:"optStartTime,omitempty"`
+	RateLimitBps       *int              `json:"rateLimitBps,omitempty"`
+	ReplayPolicy       *string           `json:"replayPolicy,omitempty"`
+	SampleFreq         *string           `json:"sampleFreq,omitempty"`
 	HeadersOnly        *bool             `json:"headersOnly,omitempty"`
 	MaxRequestBatch    *int              `json:"maxRequestBatch,omitempty"`
 	MaxRequestExpires  *string           `json:"maxRequestExpires,omitempty"`
@@ -40,12 +45,7 @@ type ConsumerSpecApplyConfiguration struct {
 	InactiveThreshold  *string           `json:"inactiveThreshold,omitempty"`
 	Replicas           *int              `json:"replicas,omitempty"`
 	MemStorage         *bool             `json:"memStorage,omitempty"`
-	FilterSubjects     []string          `json:"filterSubjects,omitempty"`
 	Metadata           map[string]string `json:"metadata,omitempty"`
-	FlowControl        *bool             `json:"flowControl,omitempty"`
-	DeliverSubject     *string           `json:"deliverSubject,omitempty"`
-	DeliverGroup       *string           `json:"deliverGroup,omitempty"`
-	HeartbeatInterval  *string           `json:"heartbeatInterval,omitempty"`
 	StreamName         *string           `json:"streamName,omitempty"`
 }
 
@@ -55,43 +55,11 @@ func ConsumerSpec() *ConsumerSpecApplyConfiguration {
 	return &ConsumerSpecApplyConfiguration{}
 }
 
-// WithDurableName sets the DurableName field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the DurableName field is set to the value of the last call.
-func (b *ConsumerSpecApplyConfiguration) WithDurableName(value string) *ConsumerSpecApplyConfiguration {
-	b.DurableName = &value
-	return b
-}
-
 // WithDescription sets the Description field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Description field is set to the value of the last call.
 func (b *ConsumerSpecApplyConfiguration) WithDescription(value string) *ConsumerSpecApplyConfiguration {
 	b.Description = &value
-	return b
-}
-
-// WithDeliverPolicy sets the DeliverPolicy field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the DeliverPolicy field is set to the value of the last call.
-func (b *ConsumerSpecApplyConfiguration) WithDeliverPolicy(value string) *ConsumerSpecApplyConfiguration {
-	b.DeliverPolicy = &value
-	return b
-}
-
-// WithOptStartSeq sets the OptStartSeq field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the OptStartSeq field is set to the value of the last call.
-func (b *ConsumerSpecApplyConfiguration) WithOptStartSeq(value int) *ConsumerSpecApplyConfiguration {
-	b.OptStartSeq = &value
-	return b
-}
-
-// WithOptStartTime sets the OptStartTime field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the OptStartTime field is set to the value of the last call.
-func (b *ConsumerSpecApplyConfiguration) WithOptStartTime(value string) *ConsumerSpecApplyConfiguration {
-	b.OptStartTime = &value
 	return b
 }
 
@@ -108,6 +76,80 @@ func (b *ConsumerSpecApplyConfiguration) WithAckPolicy(value string) *ConsumerSp
 // If called multiple times, the AckWait field is set to the value of the last call.
 func (b *ConsumerSpecApplyConfiguration) WithAckWait(value string) *ConsumerSpecApplyConfiguration {
 	b.AckWait = &value
+	return b
+}
+
+// WithDeliverPolicy sets the DeliverPolicy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the DeliverPolicy field is set to the value of the last call.
+func (b *ConsumerSpecApplyConfiguration) WithDeliverPolicy(value string) *ConsumerSpecApplyConfiguration {
+	b.DeliverPolicy = &value
+	return b
+}
+
+// WithDeliverSubject sets the DeliverSubject field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the DeliverSubject field is set to the value of the last call.
+func (b *ConsumerSpecApplyConfiguration) WithDeliverSubject(value string) *ConsumerSpecApplyConfiguration {
+	b.DeliverSubject = &value
+	return b
+}
+
+// WithDeliverGroup sets the DeliverGroup field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the DeliverGroup field is set to the value of the last call.
+func (b *ConsumerSpecApplyConfiguration) WithDeliverGroup(value string) *ConsumerSpecApplyConfiguration {
+	b.DeliverGroup = &value
+	return b
+}
+
+// WithDurableName sets the DurableName field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the DurableName field is set to the value of the last call.
+func (b *ConsumerSpecApplyConfiguration) WithDurableName(value string) *ConsumerSpecApplyConfiguration {
+	b.DurableName = &value
+	return b
+}
+
+// WithFilterSubject sets the FilterSubject field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the FilterSubject field is set to the value of the last call.
+func (b *ConsumerSpecApplyConfiguration) WithFilterSubject(value string) *ConsumerSpecApplyConfiguration {
+	b.FilterSubject = &value
+	return b
+}
+
+// WithFilterSubjects adds the given value to the FilterSubjects field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the FilterSubjects field.
+func (b *ConsumerSpecApplyConfiguration) WithFilterSubjects(values ...string) *ConsumerSpecApplyConfiguration {
+	for i := range values {
+		b.FilterSubjects = append(b.FilterSubjects, values[i])
+	}
+	return b
+}
+
+// WithFlowControl sets the FlowControl field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the FlowControl field is set to the value of the last call.
+func (b *ConsumerSpecApplyConfiguration) WithFlowControl(value bool) *ConsumerSpecApplyConfiguration {
+	b.FlowControl = &value
+	return b
+}
+
+// WithHeartbeatInterval sets the HeartbeatInterval field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the HeartbeatInterval field is set to the value of the last call.
+func (b *ConsumerSpecApplyConfiguration) WithHeartbeatInterval(value string) *ConsumerSpecApplyConfiguration {
+	b.HeartbeatInterval = &value
+	return b
+}
+
+// WithMaxAckPending sets the MaxAckPending field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the MaxAckPending field is set to the value of the last call.
+func (b *ConsumerSpecApplyConfiguration) WithMaxAckPending(value int) *ConsumerSpecApplyConfiguration {
+	b.MaxAckPending = &value
 	return b
 }
 
@@ -129,19 +171,27 @@ func (b *ConsumerSpecApplyConfiguration) WithBackOff(values ...string) *Consumer
 	return b
 }
 
-// WithFilterSubject sets the FilterSubject field in the declarative configuration to the given value
+// WithMaxWaiting sets the MaxWaiting field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the FilterSubject field is set to the value of the last call.
-func (b *ConsumerSpecApplyConfiguration) WithFilterSubject(value string) *ConsumerSpecApplyConfiguration {
-	b.FilterSubject = &value
+// If called multiple times, the MaxWaiting field is set to the value of the last call.
+func (b *ConsumerSpecApplyConfiguration) WithMaxWaiting(value int) *ConsumerSpecApplyConfiguration {
+	b.MaxWaiting = &value
 	return b
 }
 
-// WithReplayPolicy sets the ReplayPolicy field in the declarative configuration to the given value
+// WithOptStartSeq sets the OptStartSeq field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the ReplayPolicy field is set to the value of the last call.
-func (b *ConsumerSpecApplyConfiguration) WithReplayPolicy(value string) *ConsumerSpecApplyConfiguration {
-	b.ReplayPolicy = &value
+// If called multiple times, the OptStartSeq field is set to the value of the last call.
+func (b *ConsumerSpecApplyConfiguration) WithOptStartSeq(value int) *ConsumerSpecApplyConfiguration {
+	b.OptStartSeq = &value
+	return b
+}
+
+// WithOptStartTime sets the OptStartTime field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the OptStartTime field is set to the value of the last call.
+func (b *ConsumerSpecApplyConfiguration) WithOptStartTime(value string) *ConsumerSpecApplyConfiguration {
+	b.OptStartTime = &value
 	return b
 }
 
@@ -153,27 +203,19 @@ func (b *ConsumerSpecApplyConfiguration) WithRateLimitBps(value int) *ConsumerSp
 	return b
 }
 
+// WithReplayPolicy sets the ReplayPolicy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ReplayPolicy field is set to the value of the last call.
+func (b *ConsumerSpecApplyConfiguration) WithReplayPolicy(value string) *ConsumerSpecApplyConfiguration {
+	b.ReplayPolicy = &value
+	return b
+}
+
 // WithSampleFreq sets the SampleFreq field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the SampleFreq field is set to the value of the last call.
 func (b *ConsumerSpecApplyConfiguration) WithSampleFreq(value string) *ConsumerSpecApplyConfiguration {
 	b.SampleFreq = &value
-	return b
-}
-
-// WithMaxWaiting sets the MaxWaiting field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the MaxWaiting field is set to the value of the last call.
-func (b *ConsumerSpecApplyConfiguration) WithMaxWaiting(value int) *ConsumerSpecApplyConfiguration {
-	b.MaxWaiting = &value
-	return b
-}
-
-// WithMaxAckPending sets the MaxAckPending field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the MaxAckPending field is set to the value of the last call.
-func (b *ConsumerSpecApplyConfiguration) WithMaxAckPending(value int) *ConsumerSpecApplyConfiguration {
-	b.MaxAckPending = &value
 	return b
 }
 
@@ -233,16 +275,6 @@ func (b *ConsumerSpecApplyConfiguration) WithMemStorage(value bool) *ConsumerSpe
 	return b
 }
 
-// WithFilterSubjects adds the given value to the FilterSubjects field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the FilterSubjects field.
-func (b *ConsumerSpecApplyConfiguration) WithFilterSubjects(values ...string) *ConsumerSpecApplyConfiguration {
-	for i := range values {
-		b.FilterSubjects = append(b.FilterSubjects, values[i])
-	}
-	return b
-}
-
 // WithMetadata puts the entries into the Metadata field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, the entries provided by each call will be put on the Metadata field,
@@ -254,38 +286,6 @@ func (b *ConsumerSpecApplyConfiguration) WithMetadata(entries map[string]string)
 	for k, v := range entries {
 		b.Metadata[k] = v
 	}
-	return b
-}
-
-// WithFlowControl sets the FlowControl field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the FlowControl field is set to the value of the last call.
-func (b *ConsumerSpecApplyConfiguration) WithFlowControl(value bool) *ConsumerSpecApplyConfiguration {
-	b.FlowControl = &value
-	return b
-}
-
-// WithDeliverSubject sets the DeliverSubject field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the DeliverSubject field is set to the value of the last call.
-func (b *ConsumerSpecApplyConfiguration) WithDeliverSubject(value string) *ConsumerSpecApplyConfiguration {
-	b.DeliverSubject = &value
-	return b
-}
-
-// WithDeliverGroup sets the DeliverGroup field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the DeliverGroup field is set to the value of the last call.
-func (b *ConsumerSpecApplyConfiguration) WithDeliverGroup(value string) *ConsumerSpecApplyConfiguration {
-	b.DeliverGroup = &value
-	return b
-}
-
-// WithHeartbeatInterval sets the HeartbeatInterval field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the HeartbeatInterval field is set to the value of the last call.
-func (b *ConsumerSpecApplyConfiguration) WithHeartbeatInterval(value string) *ConsumerSpecApplyConfiguration {
-	b.HeartbeatInterval = &value
 	return b
 }
 

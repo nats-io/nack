@@ -22,21 +22,26 @@ func (c *Consumer) GetSpec() interface{} {
 
 // ConsumerSpec is the spec for a Consumer resource
 type ConsumerSpec struct {
-	DurableName        string            `json:"durableName"` // Maps to Durable
 	Description        string            `json:"description"`
-	DeliverPolicy      string            `json:"deliverPolicy"`
-	OptStartSeq        int               `json:"optStartSeq"`
-	OptStartTime       string            `json:"optStartTime"`
 	AckPolicy          string            `json:"ackPolicy"`
 	AckWait            string            `json:"ackWait"`
+	DeliverPolicy      string            `json:"deliverPolicy"`
+	DeliverSubject     string            `json:"deliverSubject"`
+	DeliverGroup       string            `json:"deliverGroup"`
+	DurableName        string            `json:"durableName"` // Maps to Durable
+	FilterSubject      string            `json:"filterSubject"`
+	FilterSubjects     []string          `json:"filterSubjects"`
+	FlowControl        bool              `json:"flowControl"`
+	HeartbeatInterval  string            `json:"heartbeatInterval"` // Maps to Heartbeat
+	MaxAckPending      int               `json:"maxAckPending"`
 	MaxDeliver         int               `json:"maxDeliver"`
 	BackOff            []string          `json:"backoff"`
-	FilterSubject      string            `json:"filterSubject"`
-	ReplayPolicy       string            `json:"replayPolicy"`
-	RateLimitBps       int               `json:"rateLimitBps"` // Maps to RateLimit
-	SampleFreq         string            `json:"sampleFreq"`   // Maps to SampleFrequency
 	MaxWaiting         int               `json:"maxWaiting"`
-	MaxAckPending      int               `json:"maxAckPending"`
+	OptStartSeq        int               `json:"optStartSeq"`
+	OptStartTime       string            `json:"optStartTime"`
+	RateLimitBps       int               `json:"rateLimitBps"` // Maps to RateLimit
+	ReplayPolicy       string            `json:"replayPolicy"`
+	SampleFreq         string            `json:"sampleFreq"` // Maps to SampleFrequency
 	HeadersOnly        bool              `json:"headersOnly"`
 	MaxRequestBatch    int               `json:"maxRequestBatch"`
 	MaxRequestExpires  string            `json:"maxRequestExpires"`
@@ -44,16 +49,7 @@ type ConsumerSpec struct {
 	InactiveThreshold  string            `json:"inactiveThreshold"`
 	Replicas           int               `json:"replicas"`
 	MemStorage         bool              `json:"memStorage"` // Maps to MemoryStorage
-	FilterSubjects     []string          `json:"filterSubjects"`
 	Metadata           map[string]string `json:"metadata"`
-
-	// Legacy API options for Push Consumers.
-	// controller-runtime implementation moves to modern JetStream API over legacy
-	// which does not support Push Consumers
-	FlowControl       bool   `json:"flowControl"`
-	DeliverSubject    string `json:"deliverSubject"`
-	DeliverGroup      string `json:"deliverGroup"`
-	HeartbeatInterval string `json:"heartbeatInterval"`
 
 	StreamName string `json:"streamName"`
 	BaseStreamConfig

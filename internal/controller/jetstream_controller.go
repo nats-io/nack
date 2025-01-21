@@ -24,6 +24,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const (
+	JSConsumerNotFoundErr uint16 = 10014
+	JSStreamNotFoundErr   uint16 = 10059
+)
+
 var semVerRe = regexp.MustCompile(`\Av?([0-9]+)\.?([0-9]+)?\.?([0-9]+)?`)
 
 type JetStreamController interface {
