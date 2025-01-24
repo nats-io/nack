@@ -1,4 +1,4 @@
-// Copyright 2020 The NATS Authors
+// Copyright 2025 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -15,7 +15,7 @@
 
 package v1beta2
 
-// UserApplyConfiguration represents an declarative configuration of the User type for use
+// UserApplyConfiguration represents a declarative configuration of the User type for use
 // with apply.
 type UserApplyConfiguration struct {
 	User     *string                      `json:"user,omitempty"`
@@ -23,7 +23,7 @@ type UserApplyConfiguration struct {
 	Secret   *SecretRefApplyConfiguration `json:"secret,omitempty"`
 }
 
-// UserApplyConfiguration constructs an declarative configuration of the User type for use with
+// UserApplyConfiguration constructs a declarative configuration of the User type for use with
 // apply.
 func User() *UserApplyConfiguration {
 	return &UserApplyConfiguration{}
