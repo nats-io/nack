@@ -457,12 +457,34 @@ func (c *Controller) getAccountOverrides(account string, ns string) (*accountOve
 			return nil, err
 		}
 
-		overrides.remoteClientCert = filepath.Join(accDir, acc.Spec.TLS.ClientCert)
-		overrides.remoteClientKey = filepath.Join(accDir, acc.Spec.TLS.ClientKey)
-		overrides.remoteRootCA = filepath.Join(accDir, acc.Spec.TLS.RootCAs)
+		filesToWrite := make(map[string]string)
 
-		for k, v := range secret.Data {
-			if err := os.WriteFile(filepath.Join(accDir, k), v, 0o644); err != nil {
+		getSecretValue := func(key string) string {
+			value, ok := secret.Data[key]
+			if !ok {
+				return ""
+			}
+			return string(value)
+		}
+
+		remoteClientCertValue := getSecretValue(acc.Spec.TLS.ClientCert)
+		remoteClientKeyValue := getSecretValue(acc.Spec.TLS.ClientKey)
+		if remoteClientCertValue != "" && remoteClientKeyValue != "" {
+			overrides.remoteClientCert = filepath.Join(accDir, acc.Spec.TLS.ClientCert)
+			overrides.remoteClientKey = filepath.Join(accDir, acc.Spec.TLS.ClientKey)
+
+			filesToWrite[acc.Spec.TLS.ClientCert] = remoteClientCertValue
+			filesToWrite[acc.Spec.TLS.ClientKey] = remoteClientKeyValue
+		}
+
+		remoteRootCAValue := getSecretValue(acc.Spec.TLS.RootCAs)
+		if remoteRootCAValue != "" {
+			overrides.remoteRootCA = filepath.Join(accDir, acc.Spec.TLS.RootCAs)
+			filesToWrite[acc.Spec.TLS.RootCAs] = remoteRootCAValue
+		}
+
+		for file, v := range filesToWrite {
+			if err := os.WriteFile(filepath.Join(accDir, file), []byte(v), 0o644); err != nil {
 				return nil, err
 			}
 		}
@@ -505,19 +527,19 @@ func (c *Controller) getAccountOverrides(account string, ns string) (*accountOve
 		}
 	}
 
-	// Lookup the UserWithPassword.
-	if acc.Spec.UserWithPassword != nil {
-		secretName := acc.Spec.UserWithPassword.Secret.Name
+	// Lookup the User.
+	if acc.Spec.User != nil {
+		secretName := acc.Spec.User.Secret.Name
 		secret, err := c.ki.Secrets(ns).Get(c.ctx, secretName, k8smeta.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
 
 		for k, v := range secret.Data {
-			if k == acc.Spec.UserWithPassword.User {
+			if k == acc.Spec.User.User {
 				overrides.user = string(v)
 			}
-			if k == acc.Spec.UserWithPassword.Password {
+			if k == acc.Spec.User.Password {
 				overrides.password = string(v)
 			}
 		}
@@ -527,10 +549,13 @@ func (c *Controller) getAccountOverrides(account string, ns string) (*accountOve
 }
 
 type jsmcSpecOverrides struct {
-	servers []string
-	tls     apis.TLS
-	creds   string
-	nkey    string
+	servers      []string
+	tls          apis.TLS
+	creds        string
+	nkey         string
+	userName     string
+	userPassword string
+	token        string
 }
 
 func (c *Controller) runWithJsmc(jsm jsmClientFunc, acc *accountOverrides, spec *jsmcSpecOverrides, o runtime.Object, op func(jsmClient) error) error {
@@ -545,7 +570,7 @@ func (c *Controller) runWithJsmc(jsm jsmClientFunc, acc *accountOverrides, spec 
 
 	// Create a new client
 	natsCtx := &natsContext{}
-	// Use JWT/NKEYS based credentials if present.
+	// Use JWT/NKEYS/user-password/token based credentials if present.
 	if spec.creds != "" {
 		natsCtx.Credentials = spec.creds
 	} else if spec.nkey != "" {
@@ -554,6 +579,12 @@ func (c *Controller) runWithJsmc(jsm jsmClientFunc, acc *accountOverrides, spec 
 	if spec.tls.ClientCert != "" && spec.tls.ClientKey != "" {
 		natsCtx.TLSCert = spec.tls.ClientCert
 		natsCtx.TLSKey = spec.tls.ClientKey
+	}
+	if spec.userName != "" && spec.userPassword != "" {
+		natsCtx.Username = spec.userName
+		natsCtx.Password = spec.userPassword
+	} else if spec.token != "" {
+		natsCtx.Token = spec.token
 	}
 
 	// Use fetched secrets for the account and server if defined.
@@ -568,9 +599,12 @@ func (c *Controller) runWithJsmc(jsm jsmClientFunc, acc *accountOverrides, spec 
 		natsCtx.Credentials = acc.userCreds
 	}
 
-	natsCtx.Username = acc.user
-	natsCtx.Password = acc.password
-	natsCtx.Token = acc.token
+	if acc.user != "" && acc.password != "" {
+		natsCtx.Username = acc.user
+		natsCtx.Password = acc.password
+	} else if acc.token != "" {
+		natsCtx.Token = acc.token
+	}
 
 	if len(spec.tls.RootCAs) > 0 {
 		natsCtx.TLSCAs = spec.tls.RootCAs

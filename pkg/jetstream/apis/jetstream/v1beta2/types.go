@@ -45,7 +45,7 @@ type TokenSecret struct {
 	Secret SecretRef `json:"secret"`
 }
 
-type UserWithPassword struct {
+type User struct {
 	User     string    `json:"user"`
 	Password string    `json:"password"`
 	Secret   SecretRef `json:"secret"`

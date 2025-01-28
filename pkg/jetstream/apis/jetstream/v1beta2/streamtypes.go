@@ -43,6 +43,9 @@ type StreamSpec struct {
 	Mirror            *StreamSource     `json:"mirror"`
 	Name              string            `json:"name"`
 	Nkey              string            `json:"nkey"`
+	UserName          string            `json:"userName"`
+	UserPassword      string            `json:"userPassword"`
+	Token             string            `json:"token"`
 	NoAck             bool              `json:"noAck"`
 	Placement         *StreamPlacement  `json:"placement"`
 	Replicas          int               `json:"replicas"`
