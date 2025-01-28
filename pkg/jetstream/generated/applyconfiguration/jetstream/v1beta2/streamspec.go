@@ -43,6 +43,9 @@ type StreamSpecApplyConfiguration struct {
 	Mirror            *StreamSourceApplyConfiguration     `json:"mirror,omitempty"`
 	Name              *string                             `json:"name,omitempty"`
 	Nkey              *string                             `json:"nkey,omitempty"`
+	UserName          *string                             `json:"userName,omitempty"`
+	UserPassword      *string                             `json:"userPassword,omitempty"`
+	Token             *string                             `json:"token,omitempty"`
 	NoAck             *bool                               `json:"noAck,omitempty"`
 	Placement         *StreamPlacementApplyConfiguration  `json:"placement,omitempty"`
 	Replicas          *int                                `json:"replicas,omitempty"`
@@ -230,6 +233,30 @@ func (b *StreamSpecApplyConfiguration) WithName(value string) *StreamSpecApplyCo
 // If called multiple times, the Nkey field is set to the value of the last call.
 func (b *StreamSpecApplyConfiguration) WithNkey(value string) *StreamSpecApplyConfiguration {
 	b.Nkey = &value
+	return b
+}
+
+// WithUserName sets the UserName field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the UserName field is set to the value of the last call.
+func (b *StreamSpecApplyConfiguration) WithUserName(value string) *StreamSpecApplyConfiguration {
+	b.UserName = &value
+	return b
+}
+
+// WithUserPassword sets the UserPassword field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the UserPassword field is set to the value of the last call.
+func (b *StreamSpecApplyConfiguration) WithUserPassword(value string) *StreamSpecApplyConfiguration {
+	b.UserPassword = &value
+	return b
+}
+
+// WithToken sets the Token field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Token field is set to the value of the last call.
+func (b *StreamSpecApplyConfiguration) WithToken(value string) *StreamSpecApplyConfiguration {
+	b.Token = &value
 	return b
 }
 

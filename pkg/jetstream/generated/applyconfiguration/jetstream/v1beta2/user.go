@@ -15,24 +15,24 @@
 
 package v1beta2
 
-// UserWithPasswordApplyConfiguration represents an declarative configuration of the UserWithPassword type for use
+// UserApplyConfiguration represents an declarative configuration of the User type for use
 // with apply.
-type UserWithPasswordApplyConfiguration struct {
+type UserApplyConfiguration struct {
 	User     *string                      `json:"user,omitempty"`
 	Password *string                      `json:"password,omitempty"`
 	Secret   *SecretRefApplyConfiguration `json:"secret,omitempty"`
 }
 
-// UserWithPasswordApplyConfiguration constructs an declarative configuration of the UserWithPassword type for use with
+// UserApplyConfiguration constructs an declarative configuration of the User type for use with
 // apply.
-func UserWithPassword() *UserWithPasswordApplyConfiguration {
-	return &UserWithPasswordApplyConfiguration{}
+func User() *UserApplyConfiguration {
+	return &UserApplyConfiguration{}
 }
 
 // WithUser sets the User field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the User field is set to the value of the last call.
-func (b *UserWithPasswordApplyConfiguration) WithUser(value string) *UserWithPasswordApplyConfiguration {
+func (b *UserApplyConfiguration) WithUser(value string) *UserApplyConfiguration {
 	b.User = &value
 	return b
 }
@@ -40,7 +40,7 @@ func (b *UserWithPasswordApplyConfiguration) WithUser(value string) *UserWithPas
 // WithPassword sets the Password field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Password field is set to the value of the last call.
-func (b *UserWithPasswordApplyConfiguration) WithPassword(value string) *UserWithPasswordApplyConfiguration {
+func (b *UserApplyConfiguration) WithPassword(value string) *UserApplyConfiguration {
 	b.Password = &value
 	return b
 }
@@ -48,7 +48,7 @@ func (b *UserWithPasswordApplyConfiguration) WithPassword(value string) *UserWit
 // WithSecret sets the Secret field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Secret field is set to the value of the last call.
-func (b *UserWithPasswordApplyConfiguration) WithSecret(value *SecretRefApplyConfiguration) *UserWithPasswordApplyConfiguration {
+func (b *UserApplyConfiguration) WithSecret(value *SecretRefApplyConfiguration) *UserApplyConfiguration {
 	b.Secret = value
 	return b
 }

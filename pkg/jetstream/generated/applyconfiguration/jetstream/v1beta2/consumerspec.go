@@ -42,6 +42,9 @@ type ConsumerSpecApplyConfiguration struct {
 	MaxWaiting         *int                   `json:"maxWaiting,omitempty"`
 	MemStorage         *bool                  `json:"memStorage,omitempty"`
 	Nkey               *string                `json:"nkey,omitempty"`
+	UserName           *string                `json:"userName,omitempty"`
+	UserPassword       *string                `json:"userPassword,omitempty"`
+	Token              *string                `json:"token,omitempty"`
 	OptStartSeq        *int                   `json:"optStartSeq,omitempty"`
 	OptStartTime       *string                `json:"optStartTime,omitempty"`
 	RateLimitBps       *int                   `json:"rateLimitBps,omitempty"`
@@ -254,6 +257,30 @@ func (b *ConsumerSpecApplyConfiguration) WithMemStorage(value bool) *ConsumerSpe
 // If called multiple times, the Nkey field is set to the value of the last call.
 func (b *ConsumerSpecApplyConfiguration) WithNkey(value string) *ConsumerSpecApplyConfiguration {
 	b.Nkey = &value
+	return b
+}
+
+// WithUserName sets the UserName field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the UserName field is set to the value of the last call.
+func (b *ConsumerSpecApplyConfiguration) WithUserName(value string) *ConsumerSpecApplyConfiguration {
+	b.UserName = &value
+	return b
+}
+
+// WithUserPassword sets the UserPassword field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the UserPassword field is set to the value of the last call.
+func (b *ConsumerSpecApplyConfiguration) WithUserPassword(value string) *ConsumerSpecApplyConfiguration {
+	b.UserPassword = &value
+	return b
+}
+
+// WithToken sets the Token field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Token field is set to the value of the last call.
+func (b *ConsumerSpecApplyConfiguration) WithToken(value string) *ConsumerSpecApplyConfiguration {
+	b.Token = &value
 	return b
 }
 

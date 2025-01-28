@@ -60,8 +60,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &jetstreamv1beta2.TLSSecretApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("TokenSecret"):
 		return &jetstreamv1beta2.TokenSecretApplyConfiguration{}
-	case v1beta2.SchemeGroupVersion.WithKind("UserWithPassword"):
-		return &jetstreamv1beta2.UserWithPasswordApplyConfiguration{}
+	case v1beta2.SchemeGroupVersion.WithKind("User"):
+		return &jetstreamv1beta2.UserApplyConfiguration{}
 
 	}
 	return nil
