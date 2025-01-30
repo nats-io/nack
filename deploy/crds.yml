@@ -1013,3 +1013,32 @@ spec:
                   file:
                     description: Credentials file, generated with github.com/nats-io/nsc tool.
                     type: string
+              token:
+                description: The token to be used to connect to the NATS Service.
+                type: object
+                properties:
+                  secret:
+                    type: object
+                    properties:
+                      name:
+                        description: Name of the secret with the token.
+                        type: string
+                  token:
+                    description: Key in the secret that contains the token.
+                    type: string
+              user:
+                description: The user and password to be used to connect to the NATS Service.
+                type: object
+                properties:
+                  secret:
+                    type: object
+                    properties:
+                      name:
+                        description: Name of the secret with the user and password.
+                        type: string
+                  user:
+                    description: Key in the secret that contains the user.
+                    type: string
+                  password:
+                    description: Key in the secret that contains the password.
+                    type: string
