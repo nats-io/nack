@@ -191,18 +191,6 @@ spec:
                 description: NATS user NKey for connecting to servers.
                 type: string
                 default: ''
-              userName:
-                description: NATS user name for connecting to servers.
-                type: string
-                default: ''
-              userPassword:
-                description: NATS user password for connecting to servers.
-                type: string
-                default: ''
-              token:
-                description: The token to be used to connect to the NATS Service.
-                type: string
-                default: ''
               tls:
                 description: A client's TLS certs and keys.
                 type: object
@@ -648,18 +636,6 @@ spec:
                 default: ''
               nkey:
                 description: NATS user NKey for connecting to servers.
-                type: string
-                default: ''
-              userName:
-                description: NATS user name for connecting to servers.
-                type: string
-                default: ''
-              userPassword:
-                description: NATS user password for connecting to servers.
-                type: string
-                default: ''
-              token:
-                description: The token to be used to connect to the NATS Service.
                 type: string
                 default: ''
               account:

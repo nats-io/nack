@@ -46,9 +46,6 @@ type ConsumerSpec struct {
 	MaxWaiting         int               `json:"maxWaiting"`
 	MemStorage         bool              `json:"memStorage"`
 	Nkey               string            `json:"nkey"`
-	UserName           string            `json:"userName"`
-	UserPassword       string            `json:"userPassword"`
-	Token              string            `json:"token"`
 	OptStartSeq        int               `json:"optStartSeq"`
 	OptStartTime       string            `json:"optStartTime"`
 	RateLimitBps       int               `json:"rateLimitBps"`
