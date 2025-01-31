@@ -6,8 +6,8 @@ require (
 	github.com/fsnotify/fsnotify v1.8.0
 	github.com/go-logr/logr v1.4.2
 	github.com/google/go-cmp v0.6.0
-	github.com/nats-io/jsm.go v0.1.1-0.20250120135113-0db99fd62ad9
-	github.com/nats-io/nats-server/v2 v2.11.0-dev.0.20250109022000-c0ae95d0be26
+	github.com/nats-io/jsm.go v0.1.1-0.20250127160126-62a6bf0def83
+	github.com/nats-io/nats-server/v2 v2.11.0-dev.0.20250126014539-f2eb5650d200
 	github.com/nats-io/nats.go v1.38.0
 	github.com/onsi/ginkgo/v2 v2.22.2
 	github.com/onsi/gomega v1.36.2

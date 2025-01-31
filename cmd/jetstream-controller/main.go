@@ -92,7 +92,7 @@ func run() error {
 	}
 
 	if *controlLoop {
-		klog.Warning("Starting jetStream controller in experimental control loop mode")
+		klog.Warning("Starting JetStream controller in experimental control loop mode")
 
 		natsCfg := &controller.NatsConfig{
 			ClientName:  "jetstream-controller",

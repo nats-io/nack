@@ -81,10 +81,14 @@ github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 h1:C3w9PqII01/Oq
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822/go.mod h1:+n7T8mK8HuQTcFwEeznm/DIxMOiR9yIdICNftLE1DvQ=
 github.com/nats-io/jsm.go v0.1.1-0.20250120135113-0db99fd62ad9 h1:2DfL+nZjlB8kQh5GN5IEBdVroHbRaRod3BAi07Ag89Q=
 github.com/nats-io/jsm.go v0.1.1-0.20250120135113-0db99fd62ad9/go.mod h1:w/SA3/rNK5xl6ZsCqKLVgQzVLfxbYNScle8LcQ5gSBM=
+github.com/nats-io/jsm.go v0.1.1-0.20250127160126-62a6bf0def83 h1:0NXdeCr1J2bytMkdGgCLW//ymhAM716HFnnSU8OxnVc=
+github.com/nats-io/jsm.go v0.1.1-0.20250127160126-62a6bf0def83/go.mod h1:+wiVkC1oBBVXnJaWdbsLwXN/vH5rZgjkkfsu5a76q3s=
 github.com/nats-io/jwt/v2 v2.7.3 h1:6bNPK+FXgBeAqdj4cYQ0F8ViHRbi7woQLq4W29nUAzE=
 github.com/nats-io/jwt/v2 v2.7.3/go.mod h1:GvkcbHhKquj3pkioy5put1wvPxs78UlZ7D/pY+BgZk4=
 github.com/nats-io/nats-server/v2 v2.11.0-dev.0.20250109022000-c0ae95d0be26 h1:mN0eraizaHih90T32ItWe58+l31eVjoD6JOu99WqdNc=
 github.com/nats-io/nats-server/v2 v2.11.0-dev.0.20250109022000-c0ae95d0be26/go.mod h1:nXRZ6eQo2lmNpZLVNIMDNwKM7FgbHgPJ1pIRcPOpVuk=
+github.com/nats-io/nats-server/v2 v2.11.0-dev.0.20250126014539-f2eb5650d200 h1:JTZQwrehqUHpEO+DRjm0734B4a0porO1Cb5ACT0nSJY=
+github.com/nats-io/nats-server/v2 v2.11.0-dev.0.20250126014539-f2eb5650d200/go.mod h1:NLseHFkD5ZPPkHVYn4JEG8LguxveaOXJPiIfswZugHg=
 github.com/nats-io/nats.go v1.38.0 h1:A7P+g7Wjp4/NWqDOOP/K6hfhr54DvdDQUznt5JFg9XA=
 github.com/nats-io/nats.go v1.38.0/go.mod h1:IGUM++TwokGnXPs82/wCuiHS02/aKrdYUQkU8If6yjw=
 github.com/nats-io/nkeys v0.4.9 h1:qe9Faq2Gxwi6RZnZMXfmGMZkg3afLLOtrU+gDZJ35b0=

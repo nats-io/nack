@@ -251,7 +251,7 @@ spec:
                 type: string
                 pattern: '^[^.*>]*$'
               creds:
-                description: NATS user credentials for connecting to servers. Please make sure your controller has mounted the cerds on its path.
+                description: NATS user credentials for connecting to servers. Please make sure your controller has mounted the creds on its path.
                 type: string
                 default: ''
               nkey:
@@ -638,7 +638,7 @@ spec:
                 type: string
                 pattern: '^[^.*>]*$'
               creds:
-                description: NATS user credentials for connecting to servers. Please make sure your controller has mounted the cerds on its path.
+                description: NATS user credentials for connecting to servers. Please make sure your controller has mounted the creds on its path.
                 type: string
                 default: ''
               nkey:
@@ -1240,7 +1240,7 @@ spec:
                 type: string
                 pattern: '^[^.*>]*$'
               creds:
-                description: NATS user credentials for connecting to servers. Please make sure your controller has mounted the cerds on its path.
+                description: NATS user credentials for connecting to servers. Please make sure your controller has mounted the creds on its path.
                 type: string
                 default: ''
               nkey:
@@ -1380,7 +1380,7 @@ spec:
                 type: string
                 pattern: '^[^.*>]*$'
               creds:
-                description: NATS user credentials for connecting to servers. Please make sure your controller has mounted the cerds on its path.
+                description: NATS user credentials for connecting to servers. Please make sure your controller has mounted the creds on its path.
                 type: string
                 default: ''
               nkey:
