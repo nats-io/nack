@@ -1,4 +1,4 @@
-#syntax=docker/dockerfile-upstream:1.5
+#syntax=docker/dockerfile-upstream:1.13
 ARG GO_APP
 
 FROM alpine:3.21.2 as deps

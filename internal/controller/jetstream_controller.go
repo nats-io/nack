@@ -362,7 +362,7 @@ func jsonString(v string) []byte {
 }
 
 func compareConfigState(actual any, desired any) string {
-	return cmp.Diff(actual, desired)
+	return cmp.Diff(desired, actual)
 }
 
 func versionComponents(version string) (major, minor, patch int, err error) {

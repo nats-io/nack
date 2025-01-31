@@ -584,9 +584,11 @@ func Test_mapSpecToConfig(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:    "empty spec",
-			spec:    &api.StreamSpec{},
-			want:    jsmapi.StreamConfig{},
+			name: "empty spec",
+			spec: &api.StreamSpec{},
+			want: jsmapi.StreamConfig{
+				Placement: &jsmapi.Placement{},
+			},
 			wantErr: false,
 		},
 		{

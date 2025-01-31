@@ -393,6 +393,10 @@ func streamSpecToConfig(spec *api.StreamSpec) ([]jsm.StreamOption, error) {
 		if spec.Placement.Tags != nil {
 			opts = append(opts, jsm.PlacementTags(spec.Placement.Tags...))
 		}
+	} else {
+		// This will set Placement to its zero value.
+		// Without this, Placement set externally would not be undone by the controller.
+		opts = append(opts, jsm.PlacementCluster(""))
 	}
 
 	// mirror
