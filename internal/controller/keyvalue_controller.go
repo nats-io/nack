@@ -229,6 +229,14 @@ func (r *KeyValueReconciler) createOrUpdate(ctx context.Context, log logr.Logger
 			if err != nil {
 				return err
 			}
+
+			updatedKeyValue, err := getServerKeyValueState(ctx, js, keyValue)
+			if err != nil {
+				log.Error(err, "Failed to fetch updated KeyValue state")
+			} else {
+				diff := compareConfigState(updatedKeyValue, serverState)
+				log.Info("Updated KeyValue.", "diff", diff)
+			}
 		} else {
 			log.Info("Skipping KeyValue update.",
 				"preventUpdate", keyValue.Spec.PreventUpdate,

@@ -238,6 +238,9 @@ func (r *StreamReconciler) createOrUpdate(ctx context.Context, log logr.Logger, 
 			if err != nil {
 				return err
 			}
+
+			diff := compareConfigState(updatedStream.Configuration(), *serverState)
+			log.Info("Updated Stream.", "diff", diff)
 		} else {
 			log.Info("Skipping Stream update.",
 				"preventUpdate", stream.Spec.PreventUpdate,

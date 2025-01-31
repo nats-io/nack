@@ -230,6 +230,14 @@ func (r *ObjectStoreReconciler) createOrUpdate(ctx context.Context, log logr.Log
 			if err != nil {
 				return err
 			}
+
+			updatedObjectStore, err := getServerObjectStoreState(ctx, js, objectStore)
+			if err != nil {
+				log.Error(err, "Failed to fetch updated objectstore state")
+			} else {
+				diff := compareConfigState(updatedObjectStore, serverState)
+				log.Info("Updated ObjectStore.", "diff", diff)
+			}
 		} else {
 			log.Info("Skipping ObjectStore update.",
 				"preventUpdate", objectStore.Spec.PreventUpdate,

@@ -261,6 +261,9 @@ func (r *ConsumerReconciler) createOrUpdate(ctx context.Context, log klog.Logger
 			if err != nil {
 				return err
 			}
+
+			diff := compareConfigState(updatedConsumer.Configuration(), *serverState)
+			log.Info("Updated Consumer.", "diff", diff)
 		} else {
 			log.Info("Skipping Consumer update.",
 				"preventUpdate", consumer.Spec.PreventUpdate,
