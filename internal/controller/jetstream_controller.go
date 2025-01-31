@@ -127,26 +127,18 @@ func (c *jsController) natsConfigFromOpts(opts api.ConnectionOpts, ns string) (*
 	ctx, done := context.WithTimeout(context.Background(), 5*time.Second)
 	defer done()
 
-	natsConfig := &NatsConfig{
-		ClientName:  c.config.ClientName,
-		Credentials: c.config.Credentials,
-		NKey:        c.config.NKey,
-		ServerURL:   c.config.ServerURL,
-		CAs:         c.config.CAs,
-		TLSFirst:    c.config.TLSFirst,
-	}
-
-	if c.config.Certificate != "" && c.config.Key != "" {
-		natsConfig.Certificate = c.config.Certificate
-		natsConfig.Key = c.config.Key
-	}
+	natsConfig := &NatsConfig{}
+	natsConfig.Overlay(c.config)
 
 	if opts.Account == "" {
-		return applyConnOpts(*natsConfig, opts), nil
+		natsConfig.Overlay(natsConfigFromOpts(opts))
+		return natsConfig, nil
 	}
 
 	// Apply Account options first, over global.
 	// Apply remaining CRD options last
+
+	accountOverlay := &NatsConfig{}
 
 	account := &api.Account{}
 	err := c.Get(ctx,
@@ -161,7 +153,7 @@ func (c *jsController) natsConfigFromOpts(opts api.ConnectionOpts, ns string) (*
 	}
 
 	if len(account.Spec.Servers) > 0 {
-		natsConfig.ServerURL = strings.Join(account.Spec.Servers, ",")
+		accountOverlay.ServerURL = strings.Join(account.Spec.Servers, ",")
 	}
 
 	if account.Spec.TLS != nil && account.Spec.TLS.Secret != nil {
@@ -182,29 +174,43 @@ func (c *jsController) natsConfigFromOpts(opts api.ConnectionOpts, ns string) (*
 			return nil, err
 		}
 
+		var certData, keyData []byte
+		var certPath, keyPath string
+
 		for k, v := range tlsSecret.Data {
-			filePath := ""
 			switch k {
 			case account.Spec.TLS.ClientCert:
-				filePath = filepath.Join(accDir, account.Spec.TLS.ClientCert)
-				natsConfig.Certificate = filePath
+				certPath = filepath.Join(accDir, k)
+				certData = v
 			case account.Spec.TLS.ClientKey:
-				filePath = filepath.Join(accDir, account.Spec.TLS.ClientKey)
-				natsConfig.Key = filePath
+				keyPath = filepath.Join(accDir, k)
+				keyData = v
 			case account.Spec.TLS.RootCAs:
-				filePath = filepath.Join(accDir, account.Spec.TLS.RootCAs)
-				natsConfig.CAs = append(natsConfig.CAs, filePath)
-			default:
-				return nil, fmt.Errorf("key in TLS secret does not match any of the expected values")
+				rootCAPath := filepath.Join(accDir, k)
+				accountOverlay.CAs = append(accountOverlay.CAs, rootCAPath)
+				if err := os.WriteFile(rootCAPath, v, 0o644); err != nil {
+					return nil, err
+				}
 			}
-			if err := os.WriteFile(filePath, v, 0o600); err != nil {
+		}
+
+		if certData != nil && keyData != nil {
+			accountOverlay.Certificate = certPath
+			accountOverlay.Key = keyPath
+
+			if err := os.WriteFile(certPath, certData, 0o644); err != nil {
+				return nil, err
+			}
+			if err := os.WriteFile(keyPath, keyData, 0o644); err != nil {
 				return nil, err
 			}
 		}
 	} else if account.Spec.TLS != nil {
-		natsConfig.Certificate = account.Spec.TLS.ClientCert
-		natsConfig.Key = account.Spec.TLS.ClientKey
-		natsConfig.CAs = []string{account.Spec.TLS.RootCAs}
+		if account.Spec.TLS.ClientCert != "" && account.Spec.TLS.ClientKey != "" {
+			accountOverlay.Certificate = account.Spec.TLS.ClientCert
+			accountOverlay.Key = account.Spec.TLS.ClientKey
+		}
+		accountOverlay.CAs = []string{account.Spec.TLS.RootCAs}
 	}
 
 	if account.Spec.Creds != nil && account.Spec.Creds.Secret != nil {
@@ -225,28 +231,69 @@ func (c *jsController) natsConfigFromOpts(opts api.ConnectionOpts, ns string) (*
 			return nil, err
 		}
 
-		for k, v := range credsSecret.Data {
-			filePath := ""
-			switch k {
-			case account.Spec.Creds.File:
-				filePath = filepath.Join(accDir, account.Spec.Creds.File)
-				natsConfig.Credentials = filePath
-			default:
-				return nil, fmt.Errorf("key in Creds secret does not match any of the expected values")
-			}
-			if err := os.WriteFile(filePath, v, 0o600); err != nil {
+		if credsBytes, ok := credsSecret.Data[account.Spec.Creds.File]; ok {
+			filePath := filepath.Join(accDir, account.Spec.Creds.File)
+			accountOverlay.Credentials = filePath
+			if err := os.WriteFile(filePath, credsBytes, 0o600); err != nil {
 				return nil, err
 			}
 		}
-	} else if account.Spec.Creds.File != "" {
-		natsConfig.Credentials = account.Spec.Creds.File
+	} else if account.Spec.Creds != nil {
+		accountOverlay.Credentials = account.Spec.Creds.File
 	}
 
-	return applyConnOpts(*natsConfig, opts), nil
+	if account.Spec.User != nil {
+		userSecret := &v1.Secret{}
+		err := c.Get(ctx,
+			types.NamespacedName{
+				Name:      account.Spec.User.Secret.Name,
+				Namespace: ns,
+			},
+			userSecret,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		userName := userSecret.Data[account.Spec.User.User]
+		userPassword := userSecret.Data[account.Spec.User.Password]
+
+		if userName != nil && userPassword != nil {
+			accountOverlay.User = string(userName)
+			accountOverlay.Password = string(userPassword)
+		}
+	}
+
+	if account.Spec.Token != nil {
+		tokenSecret := &v1.Secret{}
+		err := c.Get(ctx,
+			types.NamespacedName{
+				Name:      account.Spec.Token.Secret.Name,
+				Namespace: ns,
+			},
+			tokenSecret,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		if token := tokenSecret.Data[account.Spec.Token.Token]; token != nil {
+			accountOverlay.Token = string(token)
+		}
+	}
+
+	// Overlay Account Config
+	natsConfig.Overlay(accountOverlay)
+
+	// Overlay Spec Config
+	natsConfig.Overlay(natsConfigFromOpts(opts))
+
+	return natsConfig, nil
 }
 
-func applyConnOpts(baseConfig NatsConfig, opts api.ConnectionOpts) *NatsConfig {
-	natsConfig := baseConfig
+func natsConfigFromOpts(opts api.ConnectionOpts) *NatsConfig {
+	natsConfig := &NatsConfig{}
+
 	if len(opts.Servers) > 0 {
 		natsConfig.ServerURL = strings.Join(opts.Servers, ",")
 	}
@@ -261,6 +308,10 @@ func applyConnOpts(baseConfig NatsConfig, opts api.ConnectionOpts) *NatsConfig {
 		natsConfig.Credentials = opts.Creds
 	}
 
+	if opts.Nkey != "" {
+		natsConfig.NKey = opts.Nkey
+	}
+
 	if len(opts.TLS.RootCAs) > 0 {
 		natsConfig.CAs = opts.TLS.RootCAs
 	}
@@ -270,7 +321,7 @@ func applyConnOpts(baseConfig NatsConfig, opts api.ConnectionOpts) *NatsConfig {
 		natsConfig.Key = opts.TLS.ClientKey
 	}
 
-	return &natsConfig
+	return natsConfig
 }
 
 // updateReadyCondition returns the given conditions with an added or updated ready condition.

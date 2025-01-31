@@ -618,6 +618,9 @@ spec:
               maxRequestMaxBytes:
                 description: The maximum max_bytes value that maybe set when dong a pull on a Pull Consumer.
                 type: integer
+              inactiveThreshold:
+                description: The idle time an Ephemeral Consumer allows before it is removed.
+                type: string
               replicas:
                 description: When set do not inherit the replica count from the stream but specifically set it to this amount.
                 type: integer

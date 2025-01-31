@@ -37,6 +37,7 @@ import (
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var (
@@ -94,7 +95,6 @@ func run() error {
 		klog.Warning("Starting jetStream controller in experimental control loop mode")
 
 		natsCfg := &controller.NatsConfig{
-			CRDConnect:  *crdConnect,
 			ClientName:  "jetstream-controller",
 			Credentials: *creds,
 			NKey:        *nkey,
@@ -167,9 +167,11 @@ func runControlLoop(config *rest.Config, natsCfg *controller.NatsConfig, control
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(v1beta2.AddToScheme(scheme))
 
+	log.SetLogger(klog.NewKlogr())
+
 	mgr, err := ctrl.NewManager(config, ctrl.Options{
 		Scheme: scheme,
-		Logger: klog.NewKlogr().WithName("controller-runtime"),
+		Logger: log.Log,
 	})
 	if err != nil {
 		return fmt.Errorf("unable to start manager: %w", err)

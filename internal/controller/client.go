@@ -9,31 +9,93 @@ import (
 )
 
 type NatsConfig struct {
-	CRDConnect  bool
 	ClientName  string
-	Credentials string
-	NKey        string
 	ServerURL   string
-	CAs         []string
 	Certificate string
 	Key         string
 	TLSFirst    bool
+	CAs         []string
+	Credentials string
+	NKey        string
+	Token       string
+	User        string
+	Password    string
+}
+
+func (o *NatsConfig) Overlay(overlay *NatsConfig) {
+	if overlay.ClientName != "" {
+		o.ClientName = overlay.ClientName
+	}
+
+	if overlay.ServerURL != "" {
+		o.ServerURL = overlay.ServerURL
+	}
+
+	if overlay.Certificate != "" && overlay.Key != "" {
+		o.Certificate = overlay.Certificate
+		o.Key = overlay.Key
+	}
+
+	if len(overlay.CAs) > 0 {
+		o.CAs = overlay.CAs
+	}
+
+	if overlay.TLSFirst {
+		o.TLSFirst = overlay.TLSFirst
+	}
+
+	if !overlay.HasAuth() {
+		return
+	}
+
+	o.UnsetAuth()
+
+	if overlay.Credentials != "" {
+		o.Credentials = overlay.Credentials
+	} else if overlay.NKey != "" {
+		o.NKey = overlay.NKey
+	} else if overlay.Token != "" {
+		o.Token = overlay.Token
+	} else if overlay.User != "" && overlay.Password != "" {
+		o.User = overlay.User
+		o.Password = overlay.Password
+	}
+}
+
+func (o *NatsConfig) HasAuth() bool {
+	return o.Credentials != "" || o.NKey != "" || o.Token != "" || (o.User != "" && o.Password != "")
+}
+
+func (o *NatsConfig) UnsetAuth() {
+	o.Credentials = ""
+	o.NKey = ""
+	o.User = ""
+	o.Password = ""
+	o.Token = ""
 }
 
 // buildOptions creates options from the config to be used in nats.Connect.
 func (o *NatsConfig) buildOptions() ([]nats.Option, error) {
 	opts := make([]nats.Option, 0)
 
+	if o.ClientName != "" {
+		opts = append(opts, nats.Name(o.ClientName))
+	}
+
 	if o.ServerURL == "" {
 		return nil, fmt.Errorf("server url is required")
+	}
+
+	if o.Certificate != "" && o.Key != "" {
+		opts = append(opts, nats.ClientCert(o.Certificate, o.Key))
 	}
 
 	if o.TLSFirst {
 		opts = append(opts, nats.TLSHandshakeFirst())
 	}
 
-	if o.ClientName != "" {
-		opts = append(opts, nats.Name(o.ClientName))
+	if len(o.CAs) > 0 {
+		opts = append(opts, nats.RootCAs(o.CAs...))
 	}
 
 	if o.Credentials != "" {
@@ -48,12 +110,12 @@ func (o *NatsConfig) buildOptions() ([]nats.Option, error) {
 		opts = append(opts, opt)
 	}
 
-	if o.Certificate != "" && o.Key != "" {
-		opts = append(opts, nats.ClientCert(o.Certificate, o.Key))
+	if o.Token != "" {
+		opts = append(opts, nats.Token(o.Token))
 	}
 
-	if len(o.CAs) > 0 {
-		opts = append(opts, nats.RootCAs(o.CAs...))
+	if o.User != "" && o.Password != "" {
+		opts = append(opts, nats.UserInfo(o.User, o.Password))
 	}
 
 	return opts, nil

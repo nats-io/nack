@@ -459,40 +459,40 @@ func (c *Controller) getAccountOverrides(account string, ns string) (*accountOve
 			return nil, err
 		}
 
-		filesToWrite := make(map[string]string)
+		var certData, keyData []byte
+		var certPath, keyPath string
 
-		getSecretValue := func(key string) string {
-			value, ok := secret.Data[key]
-			if !ok {
-				return ""
+		for k, v := range secret.Data {
+			switch k {
+			case acc.Spec.TLS.ClientCert:
+				certPath = filepath.Join(accDir, k)
+				certData = v
+			case acc.Spec.TLS.ClientKey:
+				keyPath = filepath.Join(accDir, k)
+				keyData = v
+			case acc.Spec.TLS.RootCAs:
+				overrides.remoteRootCA = filepath.Join(accDir, k)
+				if err := os.WriteFile(overrides.remoteRootCA, v, 0o644); err != nil {
+					return nil, err
+				}
 			}
-			return string(value)
 		}
 
-		remoteClientCertValue := getSecretValue(acc.Spec.TLS.ClientCert)
-		remoteClientKeyValue := getSecretValue(acc.Spec.TLS.ClientKey)
-		if remoteClientCertValue != "" && remoteClientKeyValue != "" {
-			overrides.remoteClientCert = filepath.Join(accDir, acc.Spec.TLS.ClientCert)
-			overrides.remoteClientKey = filepath.Join(accDir, acc.Spec.TLS.ClientKey)
+		if certData != nil && keyData != nil {
+			overrides.remoteClientCert = certPath
+			overrides.remoteClientKey = keyPath
 
-			filesToWrite[acc.Spec.TLS.ClientCert] = remoteClientCertValue
-			filesToWrite[acc.Spec.TLS.ClientKey] = remoteClientKeyValue
-		}
-
-		remoteRootCAValue := getSecretValue(acc.Spec.TLS.RootCAs)
-		if remoteRootCAValue != "" {
-			overrides.remoteRootCA = filepath.Join(accDir, acc.Spec.TLS.RootCAs)
-			filesToWrite[acc.Spec.TLS.RootCAs] = remoteRootCAValue
-		}
-
-		for file, v := range filesToWrite {
-			if err := os.WriteFile(filepath.Join(accDir, file), []byte(v), 0o644); err != nil {
+			if err := os.WriteFile(certPath, certData, 0o644); err != nil {
+				return nil, err
+			}
+			if err := os.WriteFile(keyPath, keyData, 0o644); err != nil {
 				return nil, err
 			}
 		}
 	}
+
 	// Lookup the UserCredentials.
-	if acc.Spec.Creds != nil {
+	if acc.Spec.Creds != nil && acc.Spec.Creds.Secret != nil {
 		secretName := acc.Spec.Creds.Secret.Name
 		secret, err := c.ki.Secrets(ns).Get(c.ctx, secretName, k8smeta.GetOptions{})
 		if err != nil {
@@ -504,12 +504,11 @@ func (c *Controller) getAccountOverrides(account string, ns string) (*accountOve
 		if err := os.MkdirAll(accDir, 0o755); err != nil {
 			return nil, err
 		}
-		for k, v := range secret.Data {
-			if k == acc.Spec.Creds.File {
-				overrides.userCreds = filepath.Join(c.cacheDir, ns, account, k)
-				if err := os.WriteFile(filepath.Join(accDir, k), v, 0o644); err != nil {
-					return nil, err
-				}
+
+		if credsBytes, ok := secret.Data[acc.Spec.Creds.File]; ok {
+			overrides.userCreds = filepath.Join(accDir, acc.Spec.Creds.File)
+			if err := os.WriteFile(overrides.userCreds, credsBytes, 0o644); err != nil {
+				return nil, err
 			}
 		}
 	}
@@ -522,10 +521,8 @@ func (c *Controller) getAccountOverrides(account string, ns string) (*accountOve
 			return nil, err
 		}
 
-		for k, v := range secret.Data {
-			if k == acc.Spec.Token.Token {
-				overrides.token = string(v)
-			}
+		if token, ok := secret.Data[acc.Spec.Token.Token]; ok {
+			overrides.token = string(token)
 		}
 	}
 
@@ -537,13 +534,11 @@ func (c *Controller) getAccountOverrides(account string, ns string) (*accountOve
 			return nil, err
 		}
 
-		for k, v := range secret.Data {
-			if k == acc.Spec.User.User {
-				overrides.user = string(v)
-			}
-			if k == acc.Spec.User.Password {
-				overrides.password = string(v)
-			}
+		userBytes := secret.Data[acc.Spec.User.User]
+		passwordBytes := secret.Data[acc.Spec.User.Password]
+		if userBytes != nil && passwordBytes != nil {
+			overrides.user = string(userBytes)
+			overrides.password = string(passwordBytes)
 		}
 	}
 

@@ -66,7 +66,7 @@ func (r *ConsumerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	consumer := &api.Consumer{}
 	if err := r.Get(ctx, req.NamespacedName, consumer); err != nil {
 		if apierrors.IsNotFound(err) {
-			log.Info("Consumer deleted.", "consumerName", req.NamespacedName.String())
+			log.Info("Consumer resource deleted.", "consumerName", req.NamespacedName.String())
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, fmt.Errorf("get consumer resource '%s': %w", req.NamespacedName.String(), err)
