@@ -1,7 +1,10 @@
 package controller
 
 import (
+	"crypto/sha256"
+	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/nats-io/jsm.go"
 	"github.com/nats-io/nats.go"
@@ -9,17 +12,79 @@ import (
 )
 
 type NatsConfig struct {
-	ClientName  string
-	ServerURL   string
-	Certificate string
-	Key         string
-	TLSFirst    bool
-	CAs         []string
-	Credentials string
-	NKey        string
-	Token       string
-	User        string
-	Password    string
+	ClientName  string   `json:"name,omitempty"`
+	ServerURL   string   `json:"url,omitempty"`
+	Certificate string   `json:"tls_cert,omitempty"`
+	Key         string   `json:"tls_key,omitempty"`
+	TLSFirst    bool     `json:"tls_first,omitempty"`
+	CAs         []string `json:"tls_ca,omitempty"`
+	Credentials string   `json:"credential,omitempty"`
+	NKey        string   `json:"nkey,omitempty"`
+	Token       string   `json:"token,omitempty"`
+	User        string   `json:"username,omitempty"`
+	Password    string   `json:"password,omitempty"`
+}
+
+func (o *NatsConfig) Copy() *NatsConfig {
+	if o == nil {
+		return nil
+	}
+
+	cp := *o
+	return &cp
+}
+
+func (o *NatsConfig) Hash() (string, error) {
+	b, err := json.Marshal(o)
+	if err != nil {
+		return "", fmt.Errorf("error marshaling config to json: %v", err)
+	}
+
+	if o.NKey != "" {
+		fb, err := os.ReadFile(o.NKey)
+		if err != nil {
+			return "", fmt.Errorf("error opening nkey file %s: %v", o.NKey, err)
+		}
+		b = append(b, fb...)
+	}
+
+	if o.Credentials != "" {
+		fb, err := os.ReadFile(o.Credentials)
+		if err != nil {
+			return "", fmt.Errorf("error opening creds file %s: %v", o.Credentials, err)
+		}
+		b = append(b, fb...)
+	}
+
+	if len(o.CAs) > 0 {
+		for _, cert := range o.CAs {
+			fb, err := os.ReadFile(cert)
+			if err != nil {
+				return "", fmt.Errorf("error opening ca file %s: %v", cert, err)
+			}
+			b = append(b, fb...)
+		}
+	}
+
+	if o.Certificate != "" {
+		fb, err := os.ReadFile(o.Certificate)
+		if err != nil {
+			return "", fmt.Errorf("error opening cert file %s: %v", o.Certificate, err)
+		}
+		b = append(b, fb...)
+	}
+
+	if o.Key != "" {
+		fb, err := os.ReadFile(o.Key)
+		if err != nil {
+			return "", fmt.Errorf("error opening key file %s: %v", o.Key, err)
+		}
+		b = append(b, fb...)
+	}
+
+	hash := sha256.New()
+	hash.Write(b)
+	return fmt.Sprintf("%x", hash.Sum(nil)), nil
 }
 
 func (o *NatsConfig) Overlay(overlay *NatsConfig) {
@@ -125,15 +190,10 @@ type Closable interface {
 	Close()
 }
 
-func CreateJSMClient(cfg *NatsConfig, pedantic bool) (*jsm.Manager, Closable, error) {
-	nc, err := createNatsConn(cfg, pedantic)
+func CreateJSMClient(conn *pooledConnection, pedantic bool) (*jsm.Manager, error) {
+	major, minor, _, err := versionComponents(conn.nc.ConnectedServerVersion())
 	if err != nil {
-		return nil, nil, fmt.Errorf("create nats connection: %w", err)
-	}
-
-	major, minor, _, err := versionComponents(nc.ConnectedServerVersion())
-	if err != nil {
-		return nil, nil, fmt.Errorf("parse server version: %w", err)
+		return nil, fmt.Errorf("parse server version: %w", err)
 	}
 
 	// JetStream pedantic mode unsupported prior to NATS Server 2.11
@@ -146,28 +206,23 @@ func CreateJSMClient(cfg *NatsConfig, pedantic bool) (*jsm.Manager, Closable, er
 		jsmOpts = append(jsmOpts, jsm.WithPedanticRequests())
 	}
 
-	jsmClient, err := jsm.New(nc, jsmOpts...)
+	jsmClient, err := jsm.New(conn.nc, jsmOpts...)
 	if err != nil {
-		return nil, nil, fmt.Errorf("new jsm client: %w", err)
+		return nil, fmt.Errorf("new jsm client: %w", err)
 	}
 
-	return jsmClient, nc, nil
+	return jsmClient, nil
 }
 
 // CreateJetStreamClient creates new Jetstream client with a connection based on the given NatsConfig.
 // Returns a jetstream.Jetstream client and the Closable of the underlying connection.
 // Close should be called when the client is no longer used.
-func CreateJetStreamClient(cfg *NatsConfig, pedantic bool) (jetstream.JetStream, Closable, error) {
-	nc, err := createNatsConn(cfg, pedantic)
+func CreateJetStreamClient(conn *pooledConnection, pedantic bool) (jetstream.JetStream, error) {
+	js, err := jetstream.New(conn.nc)
 	if err != nil {
-		return nil, nil, fmt.Errorf("create nats connection: %w", err)
+		return nil, fmt.Errorf("new jetstream: %w", err)
 	}
-
-	js, err := jetstream.New(nc)
-	if err != nil {
-		return nil, nil, fmt.Errorf("new jetstream: %w", err)
-	}
-	return js, nc, nil
+	return js, nil
 }
 
 func createNatsConn(cfg *NatsConfig, pedantic bool) (*nats.Conn, error) {

@@ -1,7 +1,7 @@
 #syntax=docker/dockerfile:1.13
 ARG GO_APP
 
-FROM alpine:3.21.3 as deps
+FROM alpine:3.21.3 AS deps
 
 ARG GO_APP
 ARG GORELEASER_DIST_DIR=/go/src/dist
