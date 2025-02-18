@@ -61,6 +61,7 @@ func NewJSController(k8sClient client.Client, natsConfig *NatsConfig, controller
 		config:           natsConfig,
 		controllerConfig: controllerConfig,
 		cacheDir:         controllerConfig.CacheDir,
+		connPool:         newConnPool(time.Second * 15),
 	}, nil
 }
 
@@ -70,6 +71,7 @@ type jsController struct {
 	controllerConfig *Config
 	cacheDir         string
 	cacheLock        sync.Mutex
+	connPool         *connectionPool
 }
 
 func (c *jsController) RequeueInterval() time.Duration {
@@ -99,28 +101,36 @@ func (c *jsController) WithJSMClient(opts api.ConnectionOpts, ns string, op func
 		return err
 	}
 
-	jsmClient, closer, err := CreateJSMClient(cfg, true)
+	conn, err := c.connPool.Get(cfg, true)
+	if err != nil {
+		return err
+	}
+
+	jsmClient, err := CreateJSMClient(conn, true)
 	if err != nil {
 		return fmt.Errorf("create jsm client: %w", err)
 	}
-	defer closer.Close()
+	defer conn.Close()
 
 	return op(jsmClient)
 }
 
 func (c *jsController) WithJetStreamClient(opts api.ConnectionOpts, ns string, op func(js jetstream.JetStream) error) error {
-	// Build single use client
-	// TODO(future-feature): Use client-pool instead of single use client
 	cfg, err := c.natsConfigFromOpts(opts, ns)
 	if err != nil {
 		return err
 	}
 
-	jsClient, closer, err := CreateJetStreamClient(cfg, true)
+	conn, err := c.connPool.Get(cfg, true)
+	if err != nil {
+		return err
+	}
+
+	jsClient, err := CreateJetStreamClient(conn, true)
 	if err != nil {
 		return fmt.Errorf("create jetstream client: %w", err)
 	}
-	defer closer.Close()
+	defer conn.Close()
 
 	return op(jsClient)
 }

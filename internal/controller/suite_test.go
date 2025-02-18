@@ -96,7 +96,12 @@ var _ = BeforeSuite(func() {
 	testNatsConfig := &NatsConfig{ServerURL: clientUrl}
 	baseController, err = NewJSController(k8sClient, testNatsConfig, &Config{})
 	Expect(err).NotTo(HaveOccurred())
-	jsClient, _, err = CreateJetStreamClient(testNatsConfig, true)
+
+	connPool := newConnPool(0)
+	conn, err := connPool.Get(testNatsConfig, true)
+	Expect(err).NotTo(HaveOccurred())
+
+	jsClient, err = CreateJetStreamClient(conn, true)
 	Expect(err).NotTo(HaveOccurred())
 })
 
