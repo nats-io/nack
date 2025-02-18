@@ -1,4 +1,4 @@
-// Copyright 2020 The NATS Authors
+// Copyright 2025 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -16,10 +16,10 @@
 package v1beta2
 
 import (
-	v1beta2 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	jetstreamv1beta2 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // ConsumerLister helps list Consumers.
@@ -27,7 +27,7 @@ import (
 type ConsumerLister interface {
 	// List lists all Consumers in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1beta2.Consumer, err error)
+	List(selector labels.Selector) (ret []*jetstreamv1beta2.Consumer, err error)
 	// Consumers returns an object that can list and get Consumers.
 	Consumers(namespace string) ConsumerNamespaceLister
 	ConsumerListerExpansion
@@ -35,25 +35,17 @@ type ConsumerLister interface {
 
 // consumerLister implements the ConsumerLister interface.
 type consumerLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*jetstreamv1beta2.Consumer]
 }
 
 // NewConsumerLister returns a new ConsumerLister.
 func NewConsumerLister(indexer cache.Indexer) ConsumerLister {
-	return &consumerLister{indexer: indexer}
-}
-
-// List lists all Consumers in the indexer.
-func (s *consumerLister) List(selector labels.Selector) (ret []*v1beta2.Consumer, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1beta2.Consumer))
-	})
-	return ret, err
+	return &consumerLister{listers.New[*jetstreamv1beta2.Consumer](indexer, jetstreamv1beta2.Resource("consumer"))}
 }
 
 // Consumers returns an object that can list and get Consumers.
 func (s *consumerLister) Consumers(namespace string) ConsumerNamespaceLister {
-	return consumerNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return consumerNamespaceLister{listers.NewNamespaced[*jetstreamv1beta2.Consumer](s.ResourceIndexer, namespace)}
 }
 
 // ConsumerNamespaceLister helps list and get Consumers.
@@ -61,36 +53,15 @@ func (s *consumerLister) Consumers(namespace string) ConsumerNamespaceLister {
 type ConsumerNamespaceLister interface {
 	// List lists all Consumers in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1beta2.Consumer, err error)
+	List(selector labels.Selector) (ret []*jetstreamv1beta2.Consumer, err error)
 	// Get retrieves the Consumer from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1beta2.Consumer, error)
+	Get(name string) (*jetstreamv1beta2.Consumer, error)
 	ConsumerNamespaceListerExpansion
 }
 
 // consumerNamespaceLister implements the ConsumerNamespaceLister
 // interface.
 type consumerNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all Consumers in the indexer for a given namespace.
-func (s consumerNamespaceLister) List(selector labels.Selector) (ret []*v1beta2.Consumer, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1beta2.Consumer))
-	})
-	return ret, err
-}
-
-// Get retrieves the Consumer from the indexer for a given namespace and name.
-func (s consumerNamespaceLister) Get(name string) (*v1beta2.Consumer, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1beta2.Resource("consumer"), name)
-	}
-	return obj.(*v1beta2.Consumer), nil
+	listers.ResourceIndexer[*jetstreamv1beta2.Consumer]
 }

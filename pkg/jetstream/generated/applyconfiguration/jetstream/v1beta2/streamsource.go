@@ -1,4 +1,4 @@
-// Copyright 2020 The NATS Authors
+// Copyright 2025 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -16,22 +16,22 @@
 package v1beta2
 
 import (
-	v1beta2 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
+	jetstreamv1beta2 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 )
 
-// StreamSourceApplyConfiguration represents an declarative configuration of the StreamSource type for use
+// StreamSourceApplyConfiguration represents a declarative configuration of the StreamSource type for use
 // with apply.
 type StreamSourceApplyConfiguration struct {
-	Name                  *string                     `json:"name,omitempty"`
-	OptStartSeq           *int                        `json:"optStartSeq,omitempty"`
-	OptStartTime          *string                     `json:"optStartTime,omitempty"`
-	FilterSubject         *string                     `json:"filterSubject,omitempty"`
-	ExternalAPIPrefix     *string                     `json:"externalApiPrefix,omitempty"`
-	ExternalDeliverPrefix *string                     `json:"externalDeliverPrefix,omitempty"`
-	SubjectTransforms     []*v1beta2.SubjectTransform `json:"subjectTransforms,omitempty"`
+	Name                  *string                              `json:"name,omitempty"`
+	OptStartSeq           *int                                 `json:"optStartSeq,omitempty"`
+	OptStartTime          *string                              `json:"optStartTime,omitempty"`
+	FilterSubject         *string                              `json:"filterSubject,omitempty"`
+	ExternalAPIPrefix     *string                              `json:"externalApiPrefix,omitempty"`
+	ExternalDeliverPrefix *string                              `json:"externalDeliverPrefix,omitempty"`
+	SubjectTransforms     []*jetstreamv1beta2.SubjectTransform `json:"subjectTransforms,omitempty"`
 }
 
-// StreamSourceApplyConfiguration constructs an declarative configuration of the StreamSource type for use with
+// StreamSourceApplyConfiguration constructs a declarative configuration of the StreamSource type for use with
 // apply.
 func StreamSource() *StreamSourceApplyConfiguration {
 	return &StreamSourceApplyConfiguration{}
@@ -88,7 +88,7 @@ func (b *StreamSourceApplyConfiguration) WithExternalDeliverPrefix(value string)
 // WithSubjectTransforms adds the given value to the SubjectTransforms field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the SubjectTransforms field.
-func (b *StreamSourceApplyConfiguration) WithSubjectTransforms(values ...**v1beta2.SubjectTransform) *StreamSourceApplyConfiguration {
+func (b *StreamSourceApplyConfiguration) WithSubjectTransforms(values ...**jetstreamv1beta2.SubjectTransform) *StreamSourceApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithSubjectTransforms")

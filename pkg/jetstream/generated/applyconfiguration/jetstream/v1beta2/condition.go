@@ -1,4 +1,4 @@
-// Copyright 2020 The NATS Authors
+// Copyright 2025 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -19,7 +19,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// ConditionApplyConfiguration represents an declarative configuration of the Condition type for use
+// ConditionApplyConfiguration represents a declarative configuration of the Condition type for use
 // with apply.
 type ConditionApplyConfiguration struct {
 	Type               *string             `json:"type,omitempty"`
@@ -29,7 +29,7 @@ type ConditionApplyConfiguration struct {
 	LastTransitionTime *string             `json:"lastTransitionTime,omitempty"`
 }
 
-// ConditionApplyConfiguration constructs an declarative configuration of the Condition type for use with
+// ConditionApplyConfiguration constructs a declarative configuration of the Condition type for use with
 // apply.
 func Condition() *ConditionApplyConfiguration {
 	return &ConditionApplyConfiguration{}

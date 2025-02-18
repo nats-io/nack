@@ -1,4 +1,4 @@
-// Copyright 2020 The NATS Authors
+// Copyright 2025 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -17,8 +17,11 @@ package applyconfiguration
 
 import (
 	v1beta2 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
+	internal "github.com/nats-io/nack/pkg/jetstream/generated/applyconfiguration/internal"
 	jetstreamv1beta2 "github.com/nats-io/nack/pkg/jetstream/generated/applyconfiguration/jetstream/v1beta2"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	testing "k8s.io/client-go/testing"
 )
 
 // ForKind returns an apply configuration type for the given GroupVersionKind, or nil if no
@@ -30,14 +33,28 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &jetstreamv1beta2.AccountApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("AccountSpec"):
 		return &jetstreamv1beta2.AccountSpecApplyConfiguration{}
+	case v1beta2.SchemeGroupVersion.WithKind("BaseStreamConfig"):
+		return &jetstreamv1beta2.BaseStreamConfigApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("Condition"):
 		return &jetstreamv1beta2.ConditionApplyConfiguration{}
+	case v1beta2.SchemeGroupVersion.WithKind("ConnectionOpts"):
+		return &jetstreamv1beta2.ConnectionOptsApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("Consumer"):
 		return &jetstreamv1beta2.ConsumerApplyConfiguration{}
+	case v1beta2.SchemeGroupVersion.WithKind("ConsumerLimits"):
+		return &jetstreamv1beta2.ConsumerLimitsApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("ConsumerSpec"):
 		return &jetstreamv1beta2.ConsumerSpecApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("CredsSecret"):
 		return &jetstreamv1beta2.CredsSecretApplyConfiguration{}
+	case v1beta2.SchemeGroupVersion.WithKind("KeyValue"):
+		return &jetstreamv1beta2.KeyValueApplyConfiguration{}
+	case v1beta2.SchemeGroupVersion.WithKind("KeyValueSpec"):
+		return &jetstreamv1beta2.KeyValueSpecApplyConfiguration{}
+	case v1beta2.SchemeGroupVersion.WithKind("ObjectStore"):
+		return &jetstreamv1beta2.ObjectStoreApplyConfiguration{}
+	case v1beta2.SchemeGroupVersion.WithKind("ObjectStoreSpec"):
+		return &jetstreamv1beta2.ObjectStoreSpecApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("RePublish"):
 		return &jetstreamv1beta2.RePublishApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("SecretRef"):
@@ -65,4 +82,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 
 	}
 	return nil
+}
+
+func NewTypeConverter(scheme *runtime.Scheme) *testing.TypeConverter {
+	return &testing.TypeConverter{Scheme: scheme, TypeResolver: internal.Parser()}
 }

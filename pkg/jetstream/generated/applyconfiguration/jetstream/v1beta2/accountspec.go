@@ -1,4 +1,4 @@
-// Copyright 2020 The NATS Authors
+// Copyright 2025 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -15,7 +15,7 @@
 
 package v1beta2
 
-// AccountSpecApplyConfiguration represents an declarative configuration of the AccountSpec type for use
+// AccountSpecApplyConfiguration represents a declarative configuration of the AccountSpec type for use
 // with apply.
 type AccountSpecApplyConfiguration struct {
 	Servers []string                       `json:"servers,omitempty"`
@@ -25,7 +25,7 @@ type AccountSpecApplyConfiguration struct {
 	User    *UserApplyConfiguration        `json:"user,omitempty"`
 }
 
-// AccountSpecApplyConfiguration constructs an declarative configuration of the AccountSpec type for use with
+// AccountSpecApplyConfiguration constructs a declarative configuration of the AccountSpec type for use with
 // apply.
 func AccountSpec() *AccountSpecApplyConfiguration {
 	return &AccountSpecApplyConfiguration{}

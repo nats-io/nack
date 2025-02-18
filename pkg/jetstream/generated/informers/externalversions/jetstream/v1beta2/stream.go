@@ -1,4 +1,4 @@
-// Copyright 2020 The NATS Authors
+// Copyright 2025 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -16,13 +16,13 @@
 package v1beta2
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	jetstreamv1beta2 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
+	apisjetstreamv1beta2 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 	versioned "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned"
 	internalinterfaces "github.com/nats-io/nack/pkg/jetstream/generated/informers/externalversions/internalinterfaces"
-	v1beta2 "github.com/nats-io/nack/pkg/jetstream/generated/listers/jetstream/v1beta2"
+	jetstreamv1beta2 "github.com/nats-io/nack/pkg/jetstream/generated/listers/jetstream/v1beta2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -33,7 +33,7 @@ import (
 // Streams.
 type StreamInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1beta2.StreamLister
+	Lister() jetstreamv1beta2.StreamLister
 }
 
 type streamInformer struct {
@@ -68,7 +68,7 @@ func NewFilteredStreamInformer(client versioned.Interface, namespace string, res
 				return client.JetstreamV1beta2().Streams(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&jetstreamv1beta2.Stream{},
+		&apisjetstreamv1beta2.Stream{},
 		resyncPeriod,
 		indexers,
 	)
@@ -79,9 +79,9 @@ func (f *streamInformer) defaultInformer(client versioned.Interface, resyncPerio
 }
 
 func (f *streamInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&jetstreamv1beta2.Stream{}, f.defaultInformer)
+	return f.factory.InformerFor(&apisjetstreamv1beta2.Stream{}, f.defaultInformer)
 }
 
-func (f *streamInformer) Lister() v1beta2.StreamLister {
-	return v1beta2.NewStreamLister(f.Informer().GetIndexer())
+func (f *streamInformer) Lister() jetstreamv1beta2.StreamLister {
+	return jetstreamv1beta2.NewStreamLister(f.Informer().GetIndexer())
 }

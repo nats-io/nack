@@ -1,4 +1,4 @@
-// Copyright 2020 The NATS Authors
+// Copyright 2025 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -16,171 +16,33 @@
 package fake
 
 import (
-	"context"
-	json "encoding/json"
-	"fmt"
-
 	v1beta2 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 	jetstreamv1beta2 "github.com/nats-io/nack/pkg/jetstream/generated/applyconfiguration/jetstream/v1beta2"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	testing "k8s.io/client-go/testing"
+	typedjetstreamv1beta2 "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/typed/jetstream/v1beta2"
+	gentype "k8s.io/client-go/gentype"
 )
 
-// FakeAccounts implements AccountInterface
-type FakeAccounts struct {
+// fakeAccounts implements AccountInterface
+type fakeAccounts struct {
+	*gentype.FakeClientWithListAndApply[*v1beta2.Account, *v1beta2.AccountList, *jetstreamv1beta2.AccountApplyConfiguration]
 	Fake *FakeJetstreamV1beta2
-	ns   string
 }
 
-var accountsResource = v1beta2.SchemeGroupVersion.WithResource("accounts")
-
-var accountsKind = v1beta2.SchemeGroupVersion.WithKind("Account")
-
-// Get takes name of the account, and returns the corresponding account object, and an error if there is any.
-func (c *FakeAccounts) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta2.Account, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(accountsResource, c.ns, name), &v1beta2.Account{})
-
-	if obj == nil {
-		return nil, err
+func newFakeAccounts(fake *FakeJetstreamV1beta2, namespace string) typedjetstreamv1beta2.AccountInterface {
+	return &fakeAccounts{
+		gentype.NewFakeClientWithListAndApply[*v1beta2.Account, *v1beta2.AccountList, *jetstreamv1beta2.AccountApplyConfiguration](
+			fake.Fake,
+			namespace,
+			v1beta2.SchemeGroupVersion.WithResource("accounts"),
+			v1beta2.SchemeGroupVersion.WithKind("Account"),
+			func() *v1beta2.Account { return &v1beta2.Account{} },
+			func() *v1beta2.AccountList { return &v1beta2.AccountList{} },
+			func(dst, src *v1beta2.AccountList) { dst.ListMeta = src.ListMeta },
+			func(list *v1beta2.AccountList) []*v1beta2.Account { return gentype.ToPointerSlice(list.Items) },
+			func(list *v1beta2.AccountList, items []*v1beta2.Account) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v1beta2.Account), err
-}
-
-// List takes label and field selectors, and returns the list of Accounts that match those selectors.
-func (c *FakeAccounts) List(ctx context.Context, opts v1.ListOptions) (result *v1beta2.AccountList, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewListAction(accountsResource, accountsKind, c.ns, opts), &v1beta2.AccountList{})
-
-	if obj == nil {
-		return nil, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1beta2.AccountList{ListMeta: obj.(*v1beta2.AccountList).ListMeta}
-	for _, item := range obj.(*v1beta2.AccountList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested accounts.
-func (c *FakeAccounts) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(accountsResource, c.ns, opts))
-
-}
-
-// Create takes the representation of a account and creates it.  Returns the server's representation of the account, and an error, if there is any.
-func (c *FakeAccounts) Create(ctx context.Context, account *v1beta2.Account, opts v1.CreateOptions) (result *v1beta2.Account, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(accountsResource, c.ns, account), &v1beta2.Account{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1beta2.Account), err
-}
-
-// Update takes the representation of a account and updates it. Returns the server's representation of the account, and an error, if there is any.
-func (c *FakeAccounts) Update(ctx context.Context, account *v1beta2.Account, opts v1.UpdateOptions) (result *v1beta2.Account, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(accountsResource, c.ns, account), &v1beta2.Account{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1beta2.Account), err
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeAccounts) UpdateStatus(ctx context.Context, account *v1beta2.Account, opts v1.UpdateOptions) (*v1beta2.Account, error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(accountsResource, "status", c.ns, account), &v1beta2.Account{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1beta2.Account), err
-}
-
-// Delete takes name of the account and deletes it. Returns an error if one occurs.
-func (c *FakeAccounts) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(accountsResource, c.ns, name, opts), &v1beta2.Account{})
-
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeAccounts) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(accountsResource, c.ns, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v1beta2.AccountList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched account.
-func (c *FakeAccounts) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta2.Account, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(accountsResource, c.ns, name, pt, data, subresources...), &v1beta2.Account{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1beta2.Account), err
-}
-
-// Apply takes the given apply declarative configuration, applies it and returns the applied account.
-func (c *FakeAccounts) Apply(ctx context.Context, account *jetstreamv1beta2.AccountApplyConfiguration, opts v1.ApplyOptions) (result *v1beta2.Account, err error) {
-	if account == nil {
-		return nil, fmt.Errorf("account provided to Apply must not be nil")
-	}
-	data, err := json.Marshal(account)
-	if err != nil {
-		return nil, err
-	}
-	name := account.Name
-	if name == nil {
-		return nil, fmt.Errorf("account.Name must be provided to Apply")
-	}
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(accountsResource, c.ns, *name, types.ApplyPatchType, data), &v1beta2.Account{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1beta2.Account), err
-}
-
-// ApplyStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-func (c *FakeAccounts) ApplyStatus(ctx context.Context, account *jetstreamv1beta2.AccountApplyConfiguration, opts v1.ApplyOptions) (result *v1beta2.Account, err error) {
-	if account == nil {
-		return nil, fmt.Errorf("account provided to Apply must not be nil")
-	}
-	data, err := json.Marshal(account)
-	if err != nil {
-		return nil, err
-	}
-	name := account.Name
-	if name == nil {
-		return nil, fmt.Errorf("account.Name must be provided to Apply")
-	}
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(accountsResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1beta2.Account{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1beta2.Account), err
 }

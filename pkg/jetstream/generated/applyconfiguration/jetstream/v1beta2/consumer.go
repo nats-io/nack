@@ -1,4 +1,4 @@
-// Copyright 2020 The NATS Authors
+// Copyright 2025 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -21,7 +21,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ConsumerApplyConfiguration represents an declarative configuration of the Consumer type for use
+// ConsumerApplyConfiguration represents a declarative configuration of the Consumer type for use
 // with apply.
 type ConsumerApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -30,7 +30,7 @@ type ConsumerApplyConfiguration struct {
 	Status                           *StatusApplyConfiguration       `json:"status,omitempty"`
 }
 
-// Consumer constructs an declarative configuration of the Consumer type for use with
+// Consumer constructs a declarative configuration of the Consumer type for use with
 // apply.
 func Consumer(name, namespace string) *ConsumerApplyConfiguration {
 	b := &ConsumerApplyConfiguration{}
@@ -45,7 +45,7 @@ func Consumer(name, namespace string) *ConsumerApplyConfiguration {
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Kind field is set to the value of the last call.
 func (b *ConsumerApplyConfiguration) WithKind(value string) *ConsumerApplyConfiguration {
-	b.Kind = &value
+	b.TypeMetaApplyConfiguration.Kind = &value
 	return b
 }
 
@@ -53,7 +53,7 @@ func (b *ConsumerApplyConfiguration) WithKind(value string) *ConsumerApplyConfig
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the APIVersion field is set to the value of the last call.
 func (b *ConsumerApplyConfiguration) WithAPIVersion(value string) *ConsumerApplyConfiguration {
-	b.APIVersion = &value
+	b.TypeMetaApplyConfiguration.APIVersion = &value
 	return b
 }
 
@@ -62,7 +62,7 @@ func (b *ConsumerApplyConfiguration) WithAPIVersion(value string) *ConsumerApply
 // If called multiple times, the Name field is set to the value of the last call.
 func (b *ConsumerApplyConfiguration) WithName(value string) *ConsumerApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Name = &value
+	b.ObjectMetaApplyConfiguration.Name = &value
 	return b
 }
 
@@ -71,7 +71,7 @@ func (b *ConsumerApplyConfiguration) WithName(value string) *ConsumerApplyConfig
 // If called multiple times, the GenerateName field is set to the value of the last call.
 func (b *ConsumerApplyConfiguration) WithGenerateName(value string) *ConsumerApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.GenerateName = &value
+	b.ObjectMetaApplyConfiguration.GenerateName = &value
 	return b
 }
 
@@ -80,7 +80,7 @@ func (b *ConsumerApplyConfiguration) WithGenerateName(value string) *ConsumerApp
 // If called multiple times, the Namespace field is set to the value of the last call.
 func (b *ConsumerApplyConfiguration) WithNamespace(value string) *ConsumerApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Namespace = &value
+	b.ObjectMetaApplyConfiguration.Namespace = &value
 	return b
 }
 
@@ -89,7 +89,7 @@ func (b *ConsumerApplyConfiguration) WithNamespace(value string) *ConsumerApplyC
 // If called multiple times, the UID field is set to the value of the last call.
 func (b *ConsumerApplyConfiguration) WithUID(value types.UID) *ConsumerApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.UID = &value
+	b.ObjectMetaApplyConfiguration.UID = &value
 	return b
 }
 
@@ -98,7 +98,7 @@ func (b *ConsumerApplyConfiguration) WithUID(value types.UID) *ConsumerApplyConf
 // If called multiple times, the ResourceVersion field is set to the value of the last call.
 func (b *ConsumerApplyConfiguration) WithResourceVersion(value string) *ConsumerApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.ResourceVersion = &value
+	b.ObjectMetaApplyConfiguration.ResourceVersion = &value
 	return b
 }
 
@@ -107,7 +107,7 @@ func (b *ConsumerApplyConfiguration) WithResourceVersion(value string) *Consumer
 // If called multiple times, the Generation field is set to the value of the last call.
 func (b *ConsumerApplyConfiguration) WithGeneration(value int64) *ConsumerApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Generation = &value
+	b.ObjectMetaApplyConfiguration.Generation = &value
 	return b
 }
 
@@ -116,7 +116,7 @@ func (b *ConsumerApplyConfiguration) WithGeneration(value int64) *ConsumerApplyC
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
 func (b *ConsumerApplyConfiguration) WithCreationTimestamp(value metav1.Time) *ConsumerApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.CreationTimestamp = &value
+	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
 }
 
@@ -125,7 +125,7 @@ func (b *ConsumerApplyConfiguration) WithCreationTimestamp(value metav1.Time) *C
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
 func (b *ConsumerApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *ConsumerApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionTimestamp = &value
+	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
 }
 
@@ -134,7 +134,7 @@ func (b *ConsumerApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *C
 // If called multiple times, the DeletionGracePeriodSeconds field is set to the value of the last call.
 func (b *ConsumerApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) *ConsumerApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionGracePeriodSeconds = &value
+	b.ObjectMetaApplyConfiguration.DeletionGracePeriodSeconds = &value
 	return b
 }
 
@@ -144,11 +144,11 @@ func (b *ConsumerApplyConfiguration) WithDeletionGracePeriodSeconds(value int64)
 // overwriting an existing map entries in Labels field with the same key.
 func (b *ConsumerApplyConfiguration) WithLabels(entries map[string]string) *ConsumerApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Labels == nil && len(entries) > 0 {
-		b.Labels = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Labels == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Labels = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Labels[k] = v
+		b.ObjectMetaApplyConfiguration.Labels[k] = v
 	}
 	return b
 }
@@ -159,11 +159,11 @@ func (b *ConsumerApplyConfiguration) WithLabels(entries map[string]string) *Cons
 // overwriting an existing map entries in Annotations field with the same key.
 func (b *ConsumerApplyConfiguration) WithAnnotations(entries map[string]string) *ConsumerApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Annotations == nil && len(entries) > 0 {
-		b.Annotations = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Annotations == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Annotations = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Annotations[k] = v
+		b.ObjectMetaApplyConfiguration.Annotations[k] = v
 	}
 	return b
 }
@@ -177,7 +177,7 @@ func (b *ConsumerApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerRefe
 		if values[i] == nil {
 			panic("nil value passed to WithOwnerReferences")
 		}
-		b.OwnerReferences = append(b.OwnerReferences, *values[i])
+		b.ObjectMetaApplyConfiguration.OwnerReferences = append(b.ObjectMetaApplyConfiguration.OwnerReferences, *values[i])
 	}
 	return b
 }
@@ -188,7 +188,7 @@ func (b *ConsumerApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerRefe
 func (b *ConsumerApplyConfiguration) WithFinalizers(values ...string) *ConsumerApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
-		b.Finalizers = append(b.Finalizers, values[i])
+		b.ObjectMetaApplyConfiguration.Finalizers = append(b.ObjectMetaApplyConfiguration.Finalizers, values[i])
 	}
 	return b
 }
@@ -213,4 +213,10 @@ func (b *ConsumerApplyConfiguration) WithSpec(value *ConsumerSpecApplyConfigurat
 func (b *ConsumerApplyConfiguration) WithStatus(value *StatusApplyConfiguration) *ConsumerApplyConfiguration {
 	b.Status = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *ConsumerApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Name
 }

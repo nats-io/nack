@@ -1,4 +1,4 @@
-// Copyright 2020 The NATS Authors
+// Copyright 2025 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -21,7 +21,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// AccountApplyConfiguration represents an declarative configuration of the Account type for use
+// AccountApplyConfiguration represents a declarative configuration of the Account type for use
 // with apply.
 type AccountApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -30,7 +30,7 @@ type AccountApplyConfiguration struct {
 	Status                           *StatusApplyConfiguration      `json:"status,omitempty"`
 }
 
-// Account constructs an declarative configuration of the Account type for use with
+// Account constructs a declarative configuration of the Account type for use with
 // apply.
 func Account(name, namespace string) *AccountApplyConfiguration {
 	b := &AccountApplyConfiguration{}
@@ -45,7 +45,7 @@ func Account(name, namespace string) *AccountApplyConfiguration {
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Kind field is set to the value of the last call.
 func (b *AccountApplyConfiguration) WithKind(value string) *AccountApplyConfiguration {
-	b.Kind = &value
+	b.TypeMetaApplyConfiguration.Kind = &value
 	return b
 }
 
@@ -53,7 +53,7 @@ func (b *AccountApplyConfiguration) WithKind(value string) *AccountApplyConfigur
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the APIVersion field is set to the value of the last call.
 func (b *AccountApplyConfiguration) WithAPIVersion(value string) *AccountApplyConfiguration {
-	b.APIVersion = &value
+	b.TypeMetaApplyConfiguration.APIVersion = &value
 	return b
 }
 
@@ -62,7 +62,7 @@ func (b *AccountApplyConfiguration) WithAPIVersion(value string) *AccountApplyCo
 // If called multiple times, the Name field is set to the value of the last call.
 func (b *AccountApplyConfiguration) WithName(value string) *AccountApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Name = &value
+	b.ObjectMetaApplyConfiguration.Name = &value
 	return b
 }
 
@@ -71,7 +71,7 @@ func (b *AccountApplyConfiguration) WithName(value string) *AccountApplyConfigur
 // If called multiple times, the GenerateName field is set to the value of the last call.
 func (b *AccountApplyConfiguration) WithGenerateName(value string) *AccountApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.GenerateName = &value
+	b.ObjectMetaApplyConfiguration.GenerateName = &value
 	return b
 }
 
@@ -80,7 +80,7 @@ func (b *AccountApplyConfiguration) WithGenerateName(value string) *AccountApply
 // If called multiple times, the Namespace field is set to the value of the last call.
 func (b *AccountApplyConfiguration) WithNamespace(value string) *AccountApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Namespace = &value
+	b.ObjectMetaApplyConfiguration.Namespace = &value
 	return b
 }
 
@@ -89,7 +89,7 @@ func (b *AccountApplyConfiguration) WithNamespace(value string) *AccountApplyCon
 // If called multiple times, the UID field is set to the value of the last call.
 func (b *AccountApplyConfiguration) WithUID(value types.UID) *AccountApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.UID = &value
+	b.ObjectMetaApplyConfiguration.UID = &value
 	return b
 }
 
@@ -98,7 +98,7 @@ func (b *AccountApplyConfiguration) WithUID(value types.UID) *AccountApplyConfig
 // If called multiple times, the ResourceVersion field is set to the value of the last call.
 func (b *AccountApplyConfiguration) WithResourceVersion(value string) *AccountApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.ResourceVersion = &value
+	b.ObjectMetaApplyConfiguration.ResourceVersion = &value
 	return b
 }
 
@@ -107,7 +107,7 @@ func (b *AccountApplyConfiguration) WithResourceVersion(value string) *AccountAp
 // If called multiple times, the Generation field is set to the value of the last call.
 func (b *AccountApplyConfiguration) WithGeneration(value int64) *AccountApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Generation = &value
+	b.ObjectMetaApplyConfiguration.Generation = &value
 	return b
 }
 
@@ -116,7 +116,7 @@ func (b *AccountApplyConfiguration) WithGeneration(value int64) *AccountApplyCon
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
 func (b *AccountApplyConfiguration) WithCreationTimestamp(value metav1.Time) *AccountApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.CreationTimestamp = &value
+	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
 }
 
@@ -125,7 +125,7 @@ func (b *AccountApplyConfiguration) WithCreationTimestamp(value metav1.Time) *Ac
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
 func (b *AccountApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *AccountApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionTimestamp = &value
+	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
 }
 
@@ -134,7 +134,7 @@ func (b *AccountApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *Ac
 // If called multiple times, the DeletionGracePeriodSeconds field is set to the value of the last call.
 func (b *AccountApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) *AccountApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionGracePeriodSeconds = &value
+	b.ObjectMetaApplyConfiguration.DeletionGracePeriodSeconds = &value
 	return b
 }
 
@@ -144,11 +144,11 @@ func (b *AccountApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) 
 // overwriting an existing map entries in Labels field with the same key.
 func (b *AccountApplyConfiguration) WithLabels(entries map[string]string) *AccountApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Labels == nil && len(entries) > 0 {
-		b.Labels = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Labels == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Labels = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Labels[k] = v
+		b.ObjectMetaApplyConfiguration.Labels[k] = v
 	}
 	return b
 }
@@ -159,11 +159,11 @@ func (b *AccountApplyConfiguration) WithLabels(entries map[string]string) *Accou
 // overwriting an existing map entries in Annotations field with the same key.
 func (b *AccountApplyConfiguration) WithAnnotations(entries map[string]string) *AccountApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Annotations == nil && len(entries) > 0 {
-		b.Annotations = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Annotations == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Annotations = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Annotations[k] = v
+		b.ObjectMetaApplyConfiguration.Annotations[k] = v
 	}
 	return b
 }
@@ -177,7 +177,7 @@ func (b *AccountApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerRefer
 		if values[i] == nil {
 			panic("nil value passed to WithOwnerReferences")
 		}
-		b.OwnerReferences = append(b.OwnerReferences, *values[i])
+		b.ObjectMetaApplyConfiguration.OwnerReferences = append(b.ObjectMetaApplyConfiguration.OwnerReferences, *values[i])
 	}
 	return b
 }
@@ -188,7 +188,7 @@ func (b *AccountApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerRefer
 func (b *AccountApplyConfiguration) WithFinalizers(values ...string) *AccountApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
-		b.Finalizers = append(b.Finalizers, values[i])
+		b.ObjectMetaApplyConfiguration.Finalizers = append(b.ObjectMetaApplyConfiguration.Finalizers, values[i])
 	}
 	return b
 }
@@ -213,4 +213,10 @@ func (b *AccountApplyConfiguration) WithSpec(value *AccountSpecApplyConfiguratio
 func (b *AccountApplyConfiguration) WithStatus(value *StatusApplyConfiguration) *AccountApplyConfiguration {
 	b.Status = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *AccountApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Name
 }

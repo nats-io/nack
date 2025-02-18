@@ -1,4 +1,4 @@
-// Copyright 2020 The NATS Authors
+// Copyright 2025 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -15,14 +15,14 @@
 
 package v1beta2
 
-// StatusApplyConfiguration represents an declarative configuration of the Status type for use
+// StatusApplyConfiguration represents a declarative configuration of the Status type for use
 // with apply.
 type StatusApplyConfiguration struct {
 	ObservedGeneration *int64                        `json:"observedGeneration,omitempty"`
 	Conditions         []ConditionApplyConfiguration `json:"conditions,omitempty"`
 }
 
-// StatusApplyConfiguration constructs an declarative configuration of the Status type for use with
+// StatusApplyConfiguration constructs a declarative configuration of the Status type for use with
 // apply.
 func Status() *StatusApplyConfiguration {
 	return &StatusApplyConfiguration{}

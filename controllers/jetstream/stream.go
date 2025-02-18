@@ -20,7 +20,6 @@ import (
 	"time"
 
 	jsm "github.com/nats-io/jsm.go"
-	"github.com/nats-io/jsm.go/api"
 	jsmapi "github.com/nats-io/jsm.go/api"
 	apis "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 	typed "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/typed/jetstream/v1beta2"
@@ -223,9 +222,9 @@ func createStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 
 	switch spec.Compression {
 	case "s2":
-		opts = append(opts, jsm.Compression(api.S2Compression))
+		opts = append(opts, jsm.Compression(jsmapi.S2Compression))
 	case "none":
-		opts = append(opts, jsm.Compression(api.NoCompression))
+		opts = append(opts, jsm.Compression(jsmapi.NoCompression))
 	}
 
 	if spec.NoAck {
@@ -281,15 +280,15 @@ func createStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 		return nil
 	})
 
-	if spec.Republish != nil {
+	if spec.RePublish != nil {
 		opts = append(opts, jsm.Republish(&jsmapi.RePublish{
-			Source:      spec.Republish.Source,
-			Destination: spec.Republish.Destination,
+			Source:      spec.RePublish.Source,
+			Destination: spec.RePublish.Destination,
 		}))
 	}
 
 	if spec.SubjectTransform != nil {
-		opts = append(opts, func(o *api.StreamConfig) error {
+		opts = append(opts, func(o *jsmapi.StreamConfig) error {
 			o.SubjectTransform = &jsmapi.SubjectTransformConfig{
 				Source:      spec.SubjectTransform.Source,
 				Destination: spec.SubjectTransform.Dest,
@@ -388,11 +387,11 @@ func updateStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 		FirstSeq:         spec.FirstSequence,
 		SubjectTransform: subjectTransform,
 	}
-	if spec.Republish != nil {
+	if spec.RePublish != nil {
 		config.RePublish = &jsmapi.RePublish{
-			Source:      spec.Republish.Source,
-			Destination: spec.Republish.Destination,
-			HeadersOnly: spec.Republish.HeadersOnly,
+			Source:      spec.RePublish.Source,
+			Destination: spec.RePublish.Destination,
+			HeadersOnly: spec.RePublish.HeadersOnly,
 		}
 	}
 	if spec.Mirror != nil {
@@ -425,9 +424,9 @@ func updateStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 
 	switch spec.Compression {
 	case "s2":
-		config.Compression = api.S2Compression
+		config.Compression = jsmapi.S2Compression
 	case "none":
-		config.Compression = api.NoCompression
+		config.Compression = jsmapi.NoCompression
 	}
 
 	return js.UpdateConfiguration(config)
@@ -463,7 +462,7 @@ func setStreamErrored(ctx context.Context, s *apis.Stream, sif typed.StreamInter
 	}
 
 	sc := s.DeepCopy()
-	sc.Status.Conditions = upsertCondition(sc.Status.Conditions, apis.Condition{
+	sc.Status.Conditions = UpsertCondition(sc.Status.Conditions, apis.Condition{
 		Type:               readyCondType,
 		Status:             k8sapi.ConditionFalse,
 		LastTransitionTime: time.Now().UTC().Format(time.RFC3339Nano),
@@ -492,7 +491,7 @@ func setStreamOK(ctx context.Context, s *apis.Stream, i typed.StreamInterface) (
 	sc := s.DeepCopy()
 
 	sc.Status.ObservedGeneration = s.Generation
-	sc.Status.Conditions = upsertCondition(sc.Status.Conditions, apis.Condition{
+	sc.Status.Conditions = UpsertCondition(sc.Status.Conditions, apis.Condition{
 		Type:               readyCondType,
 		Status:             k8sapi.ConditionTrue,
 		LastTransitionTime: time.Now().UTC().Format(time.RFC3339Nano),

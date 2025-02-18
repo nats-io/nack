@@ -1,5 +1,9 @@
 export GO111MODULE := on
 
+SHELL=/usr/bin/env bash
+
+ENVTEST_K8S_VERSION = 1.31.0
+
 now := $(shell date -u +%Y-%m-%dT%H:%M:%S%z)
 gitBranch := $(shell git rev-parse --abbrev-ref HEAD)
 gitCommit := $(shell git rev-parse --short HEAD)
@@ -9,8 +13,7 @@ VERSION ?= version-not-set
 linkerVars := -X main.BuildTime=$(now) -X main.GitInfo=$(gitBranch)-$(gitCommit)$(repoDirty) -X main.Version=$(VERSION)
 drepo ?= natsio
 
-jetstreamGenIn:= $(shell grep -l -R -F "// +k8s:" pkg/jetstream/apis)
-jetstreamSrc := $(shell find cmd/jetstream-controller pkg/jetstream controllers/jetstream -name "*.go") pkg/jetstream/apis/jetstream/v1beta2/zz_generated.deepcopy.go
+jetstreamSrc := $(shell find cmd/jetstream-controller pkg/jetstream internal/controller controllers/jetstream -name "*.go") pkg/jetstream/apis/jetstream/v1beta2/zz_generated.deepcopy.go
 
 configReloaderSrc := $(shell find cmd/nats-server-config-reloader/ pkg/natsreloader/ -name "*.go")
 
@@ -27,20 +30,21 @@ default:
 	#   make nats-server-config-reloader
 	#   make nats-boot-config
 
-pkg/jetstream/generated pkg/jetstream/apis/jetstream/v1beta2/zz_generated.deepcopy.go: fetch-modules $(jetstreamGenIn) pkg/k8scodegen/file-header.txt
+generate: fetch-modules pkg/k8scodegen/file-header.txt
 	rm -rf pkg/jetstream/generated
-	# Temporary chmod fix until we migrate to kube_codegen.sh
 	D="$(codeGeneratorDir)"; : "$${D:=`go list -m -f '{{.Dir}}' k8s.io/code-generator`}"; \
-	chmod u+x "$$D/generate-internal-groups.sh"; \
-	GOFLAGS='' bash "$$D/generate-groups.sh" all \
-		github.com/nats-io/nack/pkg/jetstream/generated \
-		github.com/nats-io/nack/pkg/jetstream/apis \
-		"jetstream:v1beta2" \
-		--output-base . \
-		--go-header-file pkg/k8scodegen/file-header.txt
-	mv github.com/nats-io/nack/pkg/jetstream/generated pkg/jetstream/generated
-	mv github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2/zz_generated.deepcopy.go pkg/jetstream/apis/jetstream/v1beta2/zz_generated.deepcopy.go
-	rm -rf github.com
+	source "$$D/kube_codegen.sh" ; \
+	kube::codegen::gen_helpers \
+	  --boilerplate pkg/k8scodegen/file-header.txt \
+	  pkg/jetstream/apis; \
+	kube::codegen::gen_client \
+		--with-watch \
+		--with-applyconfig \
+		--boilerplate pkg/k8scodegen/file-header.txt \
+		--output-dir pkg/jetstream/generated \
+		--output-pkg github.com/nats-io/nack/pkg/jetstream/generated \
+		--one-input-api jetstream/v1beta2 \
+		pkg/jetstream/apis
 
 jetstream-controller: $(jetstreamSrc)
 	go build -race -o $@ \
@@ -173,10 +177,39 @@ fetch-modules:
 .PHONY: build
 build: jetstream-controller nats-server-config-reloader nats-boot-config
 
+# Setup envtest tools based on a operator-sdk project makefile
+LOCALBIN ?= $(shell pwd)/bin
+$(LOCALBIN):
+	mkdir -p $(LOCALBIN)
+
+# go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
+# $1 - target path with name of binary (ideally with version)
+# $2 - package url which can be installed
+# $3 - specific version of package
+define go-install-tool
+@[ -f $(1) ] || { \
+set -e; \
+package=$(2)@$(3) ;\
+echo "Downloading $${package}" ;\
+GOBIN=$(LOCALBIN) go install $${package} ;\
+mv "$$(echo "$(1)" | sed "s/-$(3)$$//")" $(1) ;\
+}
+endef
+
+ENVTEST ?= $(LOCALBIN)/setup-envtest-$(ENVTEST_VERSION)
+ENVTEST_VERSION ?= release-0.19
+
+.PHONY: envtest
+envtest: $(ENVTEST) ## Download setup-envtest locally if necessary.
+$(ENVTEST): $(LOCALBIN)
+	$(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest,$(ENVTEST_VERSION))
+
+
 .PHONY: test
-test:
-	go vet ./controllers/... ./pkg/natsreloader/...
-	go test -race -cover -count=1 -timeout 10s ./controllers/... ./pkg/natsreloader/...
+test: envtest
+	go vet ./controllers/... ./pkg/natsreloader/... ./internal/controller/...
+	$(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path ## Get k8s binaries
+	go test -race -cover -count=1 -timeout 10s ./controllers/... ./pkg/natsreloader/... ./internal/controller/...
 
 .PHONY: clean
 clean:

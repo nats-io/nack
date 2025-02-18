@@ -98,11 +98,11 @@ type Controller struct {
 
 	strLister listers.StreamLister
 	strSynced cache.InformerSynced
-	strQueue  workqueue.RateLimitingInterface
+	strQueue  workqueue.TypedRateLimitingInterface[any]
 
 	cnsLister listers.ConsumerLister
 	cnsSynced cache.InformerSynced
-	cnsQueue  workqueue.RateLimitingInterface
+	cnsQueue  workqueue.TypedRateLimitingInterface[any]
 
 	accLister listers.AccountLister
 
@@ -137,23 +137,26 @@ func NewController(opt Options) *Controller {
 	}
 
 	ji := opt.JetstreamIface.JetstreamV1beta2()
-	streamQueue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Streams")
-	consumerQueue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Consumers")
+	streamQueue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[any](), "Streams")
+	consumerQueue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[any](), "Consumers")
 
-	streamInformer.Informer().AddEventHandler(eventHandlers(
-		opt.Ctx,
-		streamQueue,
-	))
+	streamInformer.Informer().AddEventHandler(
+		eventHandlers(
+			streamQueue,
+		),
+	)
 
-	consumerInformer.Informer().AddEventHandler(eventHandlers(
-		opt.Ctx,
-		consumerQueue,
-	))
+	consumerInformer.Informer().AddEventHandler(
+		eventHandlers(
+			consumerQueue,
+		),
+	)
 
 	cacheDir, err := os.MkdirTemp(".", "nack")
 	if err != nil {
 		panic(err)
 	}
+	defer os.RemoveAll(cacheDir)
 
 	return &Controller{
 		ctx:  opt.Ctx,
@@ -178,7 +181,6 @@ func NewController(opt Options) *Controller {
 }
 
 func (c *Controller) Run() error {
-
 	// Connect to NATS.
 	opts := make([]nats.Option, 0)
 	// Always attempt to have a connection to NATS.
@@ -457,40 +459,40 @@ func (c *Controller) getAccountOverrides(account string, ns string) (*accountOve
 			return nil, err
 		}
 
-		filesToWrite := make(map[string]string)
+		var certData, keyData []byte
+		var certPath, keyPath string
 
-		getSecretValue := func(key string) string {
-			value, ok := secret.Data[key]
-			if !ok {
-				return ""
+		for k, v := range secret.Data {
+			switch k {
+			case acc.Spec.TLS.ClientCert:
+				certPath = filepath.Join(accDir, k)
+				certData = v
+			case acc.Spec.TLS.ClientKey:
+				keyPath = filepath.Join(accDir, k)
+				keyData = v
+			case acc.Spec.TLS.RootCAs:
+				overrides.remoteRootCA = filepath.Join(accDir, k)
+				if err := os.WriteFile(overrides.remoteRootCA, v, 0o644); err != nil {
+					return nil, err
+				}
 			}
-			return string(value)
 		}
 
-		remoteClientCertValue := getSecretValue(acc.Spec.TLS.ClientCert)
-		remoteClientKeyValue := getSecretValue(acc.Spec.TLS.ClientKey)
-		if remoteClientCertValue != "" && remoteClientKeyValue != "" {
-			overrides.remoteClientCert = filepath.Join(accDir, acc.Spec.TLS.ClientCert)
-			overrides.remoteClientKey = filepath.Join(accDir, acc.Spec.TLS.ClientKey)
+		if certData != nil && keyData != nil {
+			overrides.remoteClientCert = certPath
+			overrides.remoteClientKey = keyPath
 
-			filesToWrite[acc.Spec.TLS.ClientCert] = remoteClientCertValue
-			filesToWrite[acc.Spec.TLS.ClientKey] = remoteClientKeyValue
-		}
-
-		remoteRootCAValue := getSecretValue(acc.Spec.TLS.RootCAs)
-		if remoteRootCAValue != "" {
-			overrides.remoteRootCA = filepath.Join(accDir, acc.Spec.TLS.RootCAs)
-			filesToWrite[acc.Spec.TLS.RootCAs] = remoteRootCAValue
-		}
-
-		for file, v := range filesToWrite {
-			if err := os.WriteFile(filepath.Join(accDir, file), []byte(v), 0o644); err != nil {
+			if err := os.WriteFile(certPath, certData, 0o644); err != nil {
+				return nil, err
+			}
+			if err := os.WriteFile(keyPath, keyData, 0o644); err != nil {
 				return nil, err
 			}
 		}
 	}
+
 	// Lookup the UserCredentials.
-	if acc.Spec.Creds != nil {
+	if acc.Spec.Creds != nil && acc.Spec.Creds.Secret != nil {
 		secretName := acc.Spec.Creds.Secret.Name
 		secret, err := c.ki.Secrets(ns).Get(c.ctx, secretName, k8smeta.GetOptions{})
 		if err != nil {
@@ -502,12 +504,11 @@ func (c *Controller) getAccountOverrides(account string, ns string) (*accountOve
 		if err := os.MkdirAll(accDir, 0o755); err != nil {
 			return nil, err
 		}
-		for k, v := range secret.Data {
-			if k == acc.Spec.Creds.File {
-				overrides.userCreds = filepath.Join(c.cacheDir, ns, account, k)
-				if err := os.WriteFile(filepath.Join(accDir, k), v, 0o644); err != nil {
-					return nil, err
-				}
+
+		if credsBytes, ok := secret.Data[acc.Spec.Creds.File]; ok {
+			overrides.userCreds = filepath.Join(accDir, acc.Spec.Creds.File)
+			if err := os.WriteFile(overrides.userCreds, credsBytes, 0o644); err != nil {
+				return nil, err
 			}
 		}
 	}
@@ -520,10 +521,8 @@ func (c *Controller) getAccountOverrides(account string, ns string) (*accountOve
 			return nil, err
 		}
 
-		for k, v := range secret.Data {
-			if k == acc.Spec.Token.Token {
-				overrides.token = string(v)
-			}
+		if token, ok := secret.Data[acc.Spec.Token.Token]; ok {
+			overrides.token = string(token)
 		}
 	}
 
@@ -535,13 +534,11 @@ func (c *Controller) getAccountOverrides(account string, ns string) (*accountOve
 			return nil, err
 		}
 
-		for k, v := range secret.Data {
-			if k == acc.Spec.User.User {
-				overrides.user = string(v)
-			}
-			if k == acc.Spec.User.Password {
-				overrides.password = string(v)
-			}
+		userBytes := secret.Data[acc.Spec.User.User]
+		passwordBytes := secret.Data[acc.Spec.User.Password]
+		if userBytes != nil && passwordBytes != nil {
+			overrides.user = string(userBytes)
+			overrides.password = string(passwordBytes)
 		}
 	}
 
@@ -645,7 +642,7 @@ func getStorageType(s string) (jsmapi.StorageType, error) {
 	}
 }
 
-func enqueueWork(q workqueue.RateLimitingInterface, item interface{}) (err error) {
+func enqueueWork(q workqueue.TypedRateLimitingInterface[any], item interface{}) (err error) {
 	key, err := cache.MetaNamespaceKeyFunc(item)
 	if err != nil {
 		return fmt.Errorf("failed to enqueue work: %w", err)
@@ -655,10 +652,12 @@ func enqueueWork(q workqueue.RateLimitingInterface, item interface{}) (err error
 	return nil
 }
 
-type jsmClientFunc func(*natsContext) (jsmClient, error)
-type processorFunc func(ns, name string, jmsClient jsmClientFunc) error
+type (
+	jsmClientFunc func(*natsContext) (jsmClient, error)
+	processorFunc func(ns, name string, jmsClient jsmClientFunc) error
+)
 
-func processQueueNext(q workqueue.RateLimitingInterface, jmsClient jsmClientFunc, process processorFunc) {
+func processQueueNext(q workqueue.TypedRateLimitingInterface[any], jmsClient jsmClientFunc, process processorFunc) {
 	item, shutdown := q.Get()
 	if shutdown {
 		return
@@ -693,7 +692,7 @@ func processQueueNext(q workqueue.RateLimitingInterface, jmsClient jsmClientFunc
 	q.Forget(item)
 }
 
-func upsertCondition(cs []apis.Condition, next apis.Condition) []apis.Condition {
+func UpsertCondition(cs []apis.Condition, next apis.Condition) []apis.Condition {
 	for i := 0; i < len(cs); i++ {
 		if cs[i].Type != next.Type {
 			continue
@@ -728,7 +727,7 @@ func shouldEnqueue(prevObj, nextObj interface{}) bool {
 	return markedDelete || specChanged
 }
 
-func eventHandlers(ctx context.Context, q workqueue.RateLimitingInterface) cache.ResourceEventHandlerFuncs {
+func eventHandlers(q workqueue.TypedRateLimitingInterface[any]) cache.ResourceEventHandlerFuncs {
 	return cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			if err := enqueueWork(q, obj); err != nil {

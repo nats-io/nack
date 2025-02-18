@@ -1,4 +1,4 @@
-// Copyright 2020 The NATS Authors
+// Copyright 2025 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -16,10 +16,10 @@
 package v1beta2
 
 import (
-	v1beta2 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	jetstreamv1beta2 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // StreamLister helps list Streams.
@@ -27,7 +27,7 @@ import (
 type StreamLister interface {
 	// List lists all Streams in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1beta2.Stream, err error)
+	List(selector labels.Selector) (ret []*jetstreamv1beta2.Stream, err error)
 	// Streams returns an object that can list and get Streams.
 	Streams(namespace string) StreamNamespaceLister
 	StreamListerExpansion
@@ -35,25 +35,17 @@ type StreamLister interface {
 
 // streamLister implements the StreamLister interface.
 type streamLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*jetstreamv1beta2.Stream]
 }
 
 // NewStreamLister returns a new StreamLister.
 func NewStreamLister(indexer cache.Indexer) StreamLister {
-	return &streamLister{indexer: indexer}
-}
-
-// List lists all Streams in the indexer.
-func (s *streamLister) List(selector labels.Selector) (ret []*v1beta2.Stream, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1beta2.Stream))
-	})
-	return ret, err
+	return &streamLister{listers.New[*jetstreamv1beta2.Stream](indexer, jetstreamv1beta2.Resource("stream"))}
 }
 
 // Streams returns an object that can list and get Streams.
 func (s *streamLister) Streams(namespace string) StreamNamespaceLister {
-	return streamNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return streamNamespaceLister{listers.NewNamespaced[*jetstreamv1beta2.Stream](s.ResourceIndexer, namespace)}
 }
 
 // StreamNamespaceLister helps list and get Streams.
@@ -61,36 +53,15 @@ func (s *streamLister) Streams(namespace string) StreamNamespaceLister {
 type StreamNamespaceLister interface {
 	// List lists all Streams in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1beta2.Stream, err error)
+	List(selector labels.Selector) (ret []*jetstreamv1beta2.Stream, err error)
 	// Get retrieves the Stream from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1beta2.Stream, error)
+	Get(name string) (*jetstreamv1beta2.Stream, error)
 	StreamNamespaceListerExpansion
 }
 
 // streamNamespaceLister implements the StreamNamespaceLister
 // interface.
 type streamNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all Streams in the indexer for a given namespace.
-func (s streamNamespaceLister) List(selector labels.Selector) (ret []*v1beta2.Stream, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1beta2.Stream))
-	})
-	return ret, err
-}
-
-// Get retrieves the Stream from the indexer for a given namespace and name.
-func (s streamNamespaceLister) Get(name string) (*v1beta2.Stream, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1beta2.Resource("stream"), name)
-	}
-	return obj.(*v1beta2.Stream), nil
+	listers.ResourceIndexer[*jetstreamv1beta2.Stream]
 }

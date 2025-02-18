@@ -1,6 +1,7 @@
 package jetstream
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"testing"
@@ -17,8 +18,8 @@ import (
 
 func TestMain(m *testing.M) {
 	// Disable error logs.
-	utilruntime.ErrorHandlers = []func(error){
-		func(err error) {},
+	utilruntime.ErrorHandlers = []utilruntime.ErrorHandler{
+		func(ctx context.Context, err error, msg string, args ...any) {},
 	}
 
 	os.Exit(m.Run())
@@ -62,7 +63,7 @@ func TestGetStorageType(t *testing.T) {
 func TestEnqueueWork(t *testing.T) {
 	t.Parallel()
 
-	limiter := workqueue.DefaultControllerRateLimiter()
+	limiter := workqueue.DefaultTypedControllerRateLimiter[any]()
 	q := workqueue.NewNamedRateLimitingQueue(limiter, "StreamsTest")
 	defer q.ShutDown()
 
@@ -96,7 +97,7 @@ func TestProcessQueueNext(t *testing.T) {
 	t.Run("bad item key", func(t *testing.T) {
 		t.Parallel()
 
-		limiter := workqueue.DefaultControllerRateLimiter()
+		limiter := workqueue.DefaultTypedControllerRateLimiter[any]()
 		q := workqueue.NewNamedRateLimitingQueue(limiter, "StreamsTest")
 		defer q.ShutDown()
 
@@ -121,7 +122,7 @@ func TestProcessQueueNext(t *testing.T) {
 	t.Run("process error", func(t *testing.T) {
 		t.Parallel()
 
-		limiter := workqueue.DefaultControllerRateLimiter()
+		limiter := workqueue.DefaultTypedControllerRateLimiter[any]()
 		q := workqueue.NewNamedRateLimitingQueue(limiter, "StreamsTest")
 		defer q.ShutDown()
 
@@ -155,7 +156,7 @@ func TestProcessQueueNext(t *testing.T) {
 	t.Run("process ok", func(t *testing.T) {
 		t.Parallel()
 
-		limiter := workqueue.DefaultControllerRateLimiter()
+		limiter := workqueue.DefaultTypedControllerRateLimiter[any]()
 		q := workqueue.NewNamedRateLimitingQueue(limiter, "StreamsTest")
 		defer q.ShutDown()
 
@@ -185,7 +186,7 @@ func TestUpsertCondition(t *testing.T) {
 
 	var cs []apis.Condition
 
-	cs = upsertCondition(cs, apis.Condition{
+	cs = UpsertCondition(cs, apis.Condition{
 		Type:               readyCondType,
 		Status:             k8sapis.ConditionTrue,
 		LastTransitionTime: time.Now().UTC().Format(time.RFC3339Nano),
@@ -201,7 +202,7 @@ func TestUpsertCondition(t *testing.T) {
 		t.Fatalf("got=%s; want=%s", got, want)
 	}
 
-	cs = upsertCondition(cs, apis.Condition{
+	cs = UpsertCondition(cs, apis.Condition{
 		Type:               readyCondType,
 		Status:             k8sapis.ConditionFalse,
 		LastTransitionTime: time.Now().UTC().Format(time.RFC3339Nano),
@@ -217,7 +218,7 @@ func TestUpsertCondition(t *testing.T) {
 		t.Fatalf("got=%s; want=%s", got, want)
 	}
 
-	cs = upsertCondition(cs, apis.Condition{
+	cs = UpsertCondition(cs, apis.Condition{
 		Type:               "Foo",
 		Status:             k8sapis.ConditionTrue,
 		LastTransitionTime: time.Now().UTC().Format(time.RFC3339Nano),

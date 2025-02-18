@@ -1,4 +1,4 @@
-// Copyright 2020 The NATS Authors
+// Copyright 2025 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -15,14 +15,14 @@
 
 package v1beta2
 
-// StreamPlacementApplyConfiguration represents an declarative configuration of the StreamPlacement type for use
+// StreamPlacementApplyConfiguration represents a declarative configuration of the StreamPlacement type for use
 // with apply.
 type StreamPlacementApplyConfiguration struct {
 	Cluster *string  `json:"cluster,omitempty"`
 	Tags    []string `json:"tags,omitempty"`
 }
 
-// StreamPlacementApplyConfiguration constructs an declarative configuration of the StreamPlacement type for use with
+// StreamPlacementApplyConfiguration constructs a declarative configuration of the StreamPlacement type for use with
 // apply.
 func StreamPlacement() *StreamPlacementApplyConfiguration {
 	return &StreamPlacementApplyConfiguration{}
