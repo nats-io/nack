@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
@@ -67,6 +69,7 @@ type jsController struct {
 	config           *NatsConfig
 	controllerConfig *Config
 	cacheDir         string
+	cacheLock        sync.Mutex
 }
 
 func (c *jsController) RequeueInterval() time.Duration {
@@ -156,6 +159,9 @@ func (c *jsController) natsConfigFromOpts(opts api.ConnectionOpts, ns string) (*
 		accountOverlay.ServerURL = strings.Join(account.Spec.Servers, ",")
 	}
 
+	c.cacheLock.Lock()
+	defer c.cacheLock.Unlock()
+
 	if account.Spec.TLS != nil && account.Spec.TLS.Secret != nil {
 		tlsSecret := &v1.Secret{}
 		err := c.Get(ctx,
@@ -188,6 +194,15 @@ func (c *jsController) natsConfigFromOpts(opts api.ConnectionOpts, ns string) (*
 			case account.Spec.TLS.RootCAs:
 				rootCAPath := filepath.Join(accDir, k)
 				accountOverlay.CAs = append(accountOverlay.CAs, rootCAPath)
+
+				if _, err := os.Stat(rootCAPath); err == nil {
+					caBytes, err := os.ReadFile(rootCAPath)
+					// Skip file write if data is unchanged
+					if err == nil && bytes.Equal(caBytes, v) {
+						continue
+					}
+				}
+
 				if err := os.WriteFile(rootCAPath, v, 0o644); err != nil {
 					return nil, err
 				}
@@ -198,11 +213,34 @@ func (c *jsController) natsConfigFromOpts(opts api.ConnectionOpts, ns string) (*
 			accountOverlay.Certificate = certPath
 			accountOverlay.Key = keyPath
 
-			if err := os.WriteFile(certPath, certData, 0o644); err != nil {
-				return nil, err
+			writeCert := true
+			if _, err := os.Stat(certPath); err == nil {
+				fileBytes, err := os.ReadFile(certPath)
+				// Skip disk write if data is unchanged
+				if err == nil && bytes.Equal(fileBytes, certData) {
+					writeCert = false
+				}
 			}
-			if err := os.WriteFile(keyPath, keyData, 0o644); err != nil {
-				return nil, err
+
+			if writeCert {
+				if err := os.WriteFile(certPath, certData, 0o644); err != nil {
+					return nil, err
+				}
+			}
+
+			writeKey := true
+			if _, err := os.Stat(keyPath); err == nil {
+				fileBytes, err := os.ReadFile(keyPath)
+				// Skip disk write if data is unchanged
+				if err == nil && bytes.Equal(fileBytes, keyData) {
+					writeKey = false
+				}
+			}
+
+			if writeKey {
+				if err := os.WriteFile(keyPath, keyData, 0o600); err != nil {
+					return nil, err
+				}
 			}
 		}
 	} else if account.Spec.TLS != nil {
@@ -234,8 +272,20 @@ func (c *jsController) natsConfigFromOpts(opts api.ConnectionOpts, ns string) (*
 		if credsBytes, ok := credsSecret.Data[account.Spec.Creds.File]; ok {
 			filePath := filepath.Join(accDir, account.Spec.Creds.File)
 			accountOverlay.Credentials = filePath
-			if err := os.WriteFile(filePath, credsBytes, 0o600); err != nil {
-				return nil, err
+
+			writeCreds := true
+			if _, err := os.Stat(filePath); err == nil {
+				fileBytes, err := os.ReadFile(filePath)
+				// Skip disk write if data is unchanged
+				if err == nil && bytes.Equal(fileBytes, credsBytes) {
+					writeCreds = false
+				}
+			}
+
+			if writeCreds {
+				if err := os.WriteFile(filePath, credsBytes, 0o600); err != nil {
+					return nil, err
+				}
 			}
 		}
 	} else if account.Spec.Creds != nil {

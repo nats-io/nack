@@ -9,7 +9,7 @@
 
 ## JetStream Controller
 
-The JetStream controllers allows you to manage [NATS JetStream](https://github.com/nats-io/jetstream) [Streams](https://docs.nats.io/nats-concepts/jetstream/streams), [Consumers](https://docs.nats.io/nats-concepts/jetstream/consumers), [Key/Value Stores](https://docs.nats.io/nats-concepts/jetstream/key-value-store), and [Object Stores](https://docs.nats.io/nats-concepts/jetstream/obj_store) via Kubernetes CRDs.
+The JetStream controllers allows you to manage [NATS JetStream](https://docs.nats.io/nats-concepts/jetstream) [Streams](https://docs.nats.io/nats-concepts/jetstream/streams), [Consumers](https://docs.nats.io/nats-concepts/jetstream/consumers), [Key/Value Stores](https://docs.nats.io/nats-concepts/jetstream/key-value-store), and [Object Stores](https://docs.nats.io/nats-concepts/jetstream/obj_store) via Kubernetes CRDs.
 
 Resources managed by NACK controllers are expected to _exclusively_ be managed by NACK, and configuration state will be enforced if mutated by an external client.
 
@@ -21,20 +21,18 @@ Install with Helm:
 
 ```
 helm repo add nats https://nats-io.github.io/k8s/helm/charts/
-helm upgrade --install nats nats/nats --set config.jetstream.enabled=true
+helm upgrade --install nats nats/nats --set config.jetstream.enabled=true --set config.cluster.enabled=true
 helm upgrade --install nack nats/nack --set jetstream.nats.url=nats://nats.default.svc.cluster.local:4222
 ```
 
 #### (Optional) Enable Experimental `controller-runtime` Controllers
 
-> **Note**: If migrating an existing install to the `controller-runtime` architecture, it is advisable to first enable with the `-read-only` flag.
+> **Note**: The updated controllers will more reliably enforce resource state. If migrating from an older version of NACK, as long as all NATS resources are in-sync with NACK resources no modifications are expected.
 >
-> The `jetstream-controller` logs will preview any changes that would be made to existing resources.
->
-> The updated architecture will more reliably enforce state. If all resources are in-sync with NACK, no changes are expected.
+> The `jetstream-controller` logs will contain a diff of any changes the controller has made.
 
 ```
-helm upgrade -n nack nack nats/nack --set jetstream.additionalArgs={-control-loop=true}
+helm upgrade nack nats/nack --set jetstream.additionalArgs={--control-loop=true}
 ```
 
 #### Creating Streams and Consumers
@@ -107,7 +105,7 @@ $ kubectl apply -f https://raw.githubusercontent.com/nats-io/nack/main/deploy/ex
 # Check if it was successfully created.
 $ kubectl get streams
 NAME       STATE     STREAM NAME   SUBJECTS
-mystream   Created   mystream      [orders.*]
+mystream   Ready     mystream      [orders.*]
 
 # Create a push-based consumer
 $ kubectl apply -f https://raw.githubusercontent.com/nats-io/nack/main/deploy/examples/consumer_push.yml
@@ -118,8 +116,8 @@ $ kubectl apply -f https://raw.githubusercontent.com/nats-io/nack/main/deploy/ex
 # Check if they were successfully created.
 $ kubectl get consumers
 NAME               STATE     STREAM     CONSUMER           ACK POLICY
-my-pull-consumer   Created   mystream   my-pull-consumer   explicit
-my-push-consumer   Created   mystream   my-push-consumer   none
+my-pull-consumer   Ready     mystream   my-pull-consumer   explicit
+my-push-consumer   Ready     mystream   my-push-consumer   none
 
 # If you end up in an Errored state, run kubectl describe for more info.
 #     kubectl describe streams mystream
@@ -384,7 +382,7 @@ For more information see the
 
 ```
 helm repo add nats https://nats-io.github.io/k8s/helm/charts/
-helm upgrade --install --create-namespace --namespace nats nats nats/nats
+helm upgrade --install nats nats/nats
 ```
 
 ### Configuring
@@ -410,5 +408,3 @@ Build Docker image
 ```sh
 make nats-boot-config-docker ver=1.2.3
 ```
-
-## API Reference

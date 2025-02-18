@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -73,7 +74,7 @@ func run() error {
 	readOnly := flag.Bool("read-only", false, "Starts the controller without causing changes to the NATS resources")
 	cacheDir := flag.String("cache-dir", "", "Directory to store cached credential and TLS files")
 	controlLoop := flag.Bool("control-loop", false, "Experimental: Run controller with a full reconciliation control loop.")
-	controlLoopSyncInterval := flag.Duration("sync-interval", 5*time.Minute, "Interval to perform scheduled reconcile")
+	controlLoopSyncInterval := flag.Duration("sync-interval", time.Minute, "Interval to perform scheduled reconcile")
 
 	flag.Parse()
 
@@ -183,6 +184,10 @@ func runControlLoop(config *rest.Config, natsCfg *controller.NatsConfig, control
 			return fmt.Errorf("create cache dir: %w", err)
 		}
 		defer os.RemoveAll(cacheDir)
+		cacheDir, err = filepath.Abs(cacheDir)
+		if err != nil {
+			return fmt.Errorf("get absolute cache dir: %w", err)
+		}
 		controllerCfg.CacheDir = cacheDir
 	} else {
 		if _, err := os.Stat(controllerCfg.CacheDir); os.IsNotExist(err) {
