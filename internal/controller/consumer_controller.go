@@ -116,15 +116,6 @@ func (r *ConsumerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, nil
 	}
 
-	if consumer.Spec.FlowControl || consumer.Spec.DeliverSubject != "" || consumer.Spec.DeliverGroup != "" || consumer.Spec.HeartbeatInterval != "" {
-		log.Info("FlowControl, DeliverSubject, DeliverGroup, and HeartbeatInterval are Push Consumer options, which are not supported. Skipping consumer creation or update.")
-		consumer.Status.Conditions = updateReadyCondition(consumer.Status.Conditions, v1.ConditionFalse, stateErrored, "Push Consumer options are not supported.")
-		if err := r.Status().Update(ctx, consumer); err != nil {
-			log.Error(err, "Failed to update ready condition to Errored.")
-		}
-		return ctrl.Result{}, nil
-	}
-
 	// Create or update stream
 	if err := r.createOrUpdate(ctx, log, consumer); err != nil {
 		if err := r.Get(ctx, client.ObjectKeyFromObject(consumer), consumer); err != nil {

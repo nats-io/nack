@@ -31,6 +31,8 @@ rules:
   resources:
   - streams
   - streams/status
+  - objectstores
+  - objectstores/status
   - keyvalues
   - keyvalues/status
   - consumers
@@ -38,6 +40,7 @@ rules:
   - streamtemplates
   - streamtemplates/status
   - accounts
+  - accounts/status
   verbs:
   - create
   - get
@@ -51,6 +54,7 @@ rules:
   resources:
   - streams/finalizers
   - keyvalues/finalizers
+  - objectstores/finalizers
   - consumers/finalizers
   - accounts/finalizers
   verbs:

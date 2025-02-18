@@ -69,7 +69,7 @@ spec:
                 - new
                 default: old
               discardPerSubject:
-                description: Allows to discard messages on a subject basis.
+                description: Applies discard policy on a per-subject basis. Requires discard policy 'new' and 'maxMsgs' to be set.
                 type: boolean
                 default: false
               maxAge:
@@ -77,7 +77,7 @@ spec:
                 type: string
                 default: ''
               maxMsgsPerSubject:
-                description: The maximum of messages per subject.
+                description: The maximum number of messages per subject.
                 type: integer
                 default: 0
               maxMsgSize:
@@ -177,7 +177,7 @@ spec:
                             description: Destination subject.
                             type: string
               sealed:
-                description: Seal an existing stream so no new messages can be added.
+                description: Seal an existing stream so no new messages may be added.
                 type: boolean
                 default: false
               denyDelete:
@@ -205,31 +205,31 @@ spec:
                 type: number
                 default: 0
               subjectTransform:
-                description: SubjectTransform is for applying a subject transform (to matching messages) when a new message is received
+                description: SubjectTransform is for applying a subject transform (to matching messages) when a new message is received.
                 type: object
                 properties:
                   source:
                     type: string
-                    description: Source subject
+                    description: Source subject.
                   dest:
                     type: string
-                    description: Destination subject to transform into
+                    description: Destination subject to transform into.
               republish:
                 description: Republish configuration of the stream.
                 type: object
                 properties:
                   destination:
                     type: string
-                    description: Messages will be additionally published to that subject.
+                    description: Messages will be additionally published to this subject.
                   source:
                     type: string
-                    description: Messages will be published from that subject to the destination subject.
+                    description: Messages will be published from this subject to the destination subject.
               allowDirect:
-                description: When true, allow higher performance, direct access to get individual messages
+                description: When true, allow higher performance, direct access to get individual messages.
                 type: boolean
                 default: false
               mirrorDirect:
-                description: When true, enables direct access to messages from the origin stream
+                description: When true, enables direct access to messages from the origin stream.
                 type: boolean
                 default: false
               consumerLimits:
@@ -251,7 +251,7 @@ spec:
                 type: string
                 pattern: '^[^.*>]*$'
               creds:
-                description: NATS user credentials for connecting to servers. Please make sure your controller has mounted the creds on its path.
+                description: NATS user credentials for connecting to servers. Please make sure your controller has mounted the creds on this path.
                 type: string
                 default: ''
               nkey:
@@ -259,15 +259,15 @@ spec:
                 type: string
                 default: ''
               preventDelete:
-                description: When true, the managed Stream will not be deleted when the resource is deleted
+                description: When true, the managed Stream will not be deleted when the resource is deleted.
                 type: boolean
                 default: false
               preventUpdate:
-                description: When true, the managed Stream will not be updated when the resource is updated
+                description: When true, the managed Stream will not be updated when the resource is updated.
                 type: boolean
                 default: false
               servers:
-                description: A list of servers for creating stream
+                description: A list of servers for creating stream.
                 type: array
                 items:
                   type: string
@@ -288,7 +288,7 @@ spec:
                     items:
                       type: string
               tlsFirst:
-                description: When true, the KV Store will iniate TLS before server INFO.
+                description: When true, the KV Store will initiate TLS before server INFO.
                 type: boolean
                 default: false
           status:
@@ -410,7 +410,7 @@ spec:
                 description: The description of the stream.
                 type: string
               maxMsgsPerSubject:
-                description: The maximum of messages per subject.
+                description: The maximum number of messages per subject.
                 type: integer
                 default: 0
               mirror:
@@ -561,7 +561,7 @@ spec:
                 type: integer
                 minimum: -1
               backoff:
-                description: List of durations representing a retry time scale for NaK'd or retried messages
+                description: List of durations representing a retry time scale for NaK'd or retried messages.
                 type: array
                 items:
                   type: string
@@ -587,7 +587,7 @@ spec:
                 description: The number of pulls that can be outstanding on a pull consumer, pulls received after this is reached are ignored.
                 type: integer
               rateLimitBps:
-                description: rate at which messages will be delivered to clients, expressed in bit per second.
+                description: Rate at which messages will be delivered to clients, expressed in bit per second.
                 type: integer
               maxAckPending:
                 description: Maximum pending Acks before consumers are paused.
@@ -603,7 +603,7 @@ spec:
                 type: boolean
                 default: false
               headersOnly:
-                description: When set, only the headers of messages in the stream are delivered, and not the bodies. Additionally, Nats-Msg-Size header is added to indicate the size of the removed payload
+                description: When set, only the headers of messages in the stream are delivered, and not the bodies. Additionally, Nats-Msg-Size header is added to indicate the size of the removed payload.
                 type: boolean
                 default: false
               heartbeatInterval:
@@ -646,15 +646,15 @@ spec:
                 type: string
                 default: ''
               preventDelete:
-                description: When true, the managed Consumer will not be deleted when the resource is deleted
+                description: When true, the managed Consumer will not be deleted when the resource is deleted.
                 type: boolean
                 default: false
               preventUpdate:
-                description: When true, the managed Consumer will not be updated when the resource is updated
+                description: When true, the managed Consumer will not be updated when the resource is updated.
                 type: boolean
                 default: false
               servers:
-                description: A list of servers for creating consumer
+                description: A list of servers for creating consumer.
                 type: array
                 items:
                   type: string
@@ -675,7 +675,7 @@ spec:
                     items:
                       type: string
               tlsFirst:
-                description: When true, the KV Store will iniate TLS before server INFO.
+                description: When true, the KV Store will initiate TLS before server INFO.
                 type: boolean
                 default: false
           status:
@@ -784,7 +784,7 @@ spec:
                 description: What percentage of acknowledgements should be samples for observability.
                 type: string
               rateLimitBps:
-                description: rate at which messages will be delivered to clients, expressed in bit per second.
+                description: Rate at which messages will be delivered to clients, expressed in bit per second.
                 type: integer
               maxAckPending:
                 description: Maximum pending Acks before consumers are paused.
@@ -1071,7 +1071,7 @@ spec:
                     description: Key in the secret that contains the password.
                     type: string
               tlsFirst:
-                description: When true, the KV Store will iniate TLS before server INFO.
+                description: When true, the KV Store will initiate TLS before server INFO.
                 type: boolean
                 default: false
           status:
@@ -1150,6 +1150,7 @@ spec:
                 type: integer
                 minimum: 1
                 maximum: 5
+                default: 1
               placement:
                 description: The KV Store placement via tags or cluster name.
                 type: object
@@ -1248,15 +1249,15 @@ spec:
                 type: string
                 default: ''
               preventDelete:
-                description: When true, the managed KV Store will not be deleted when the resource is deleted
+                description: When true, the managed KV Store will not be deleted when the resource is deleted.
                 type: boolean
                 default: false
               preventUpdate:
-                description: When true, the managed KV Store will not be updated when the resource is updated
+                description: When true, the managed KV Store will not be updated when the resource is updated.
                 type: boolean
                 default: false
               servers:
-                description: A list of servers for creating the KV Store
+                description: A list of servers for creating the KV Store.
                 type: array
                 items:
                   type: string
@@ -1277,7 +1278,7 @@ spec:
                     items:
                       type: string
               tlsFirst:
-                description: When true, the KV Store will iniate TLS before server INFO.
+                description: When true, the KV Store will initiate TLS before server INFO.
                 type: boolean
                 default: false
           status:
@@ -1357,6 +1358,7 @@ spec:
                 type: integer
                 minimum: 1
                 maximum: 5
+                default: 1
               placement:
                 description: The Object Store placement via tags or cluster name.
                 type: object
@@ -1388,15 +1390,15 @@ spec:
                 type: string
                 default: ''
               preventDelete:
-                description: When true, the managed Object Store will not be deleted when the resource is deleted
+                description: When true, the managed Object Store will not be deleted when the resource is deleted.
                 type: boolean
                 default: false
               preventUpdate:
-                description: When true, the managed Object Store will not be updated when the resource is updated
+                description: When true, the managed Object Store will not be updated when the resource is updated.
                 type: boolean
                 default: false
               servers:
-                description: A list of servers for creating the Object Store
+                description: A list of servers for creating the Object Store.
                 type: array
                 items:
                   type: string
@@ -1417,7 +1419,7 @@ spec:
                     items:
                       type: string
               tlsFirst:
-                description: When true, the KV Store will iniate TLS before server INFO.
+                description: When true, the KV Store will initiate TLS before server INFO.
                 type: boolean
                 default: false
           status:
