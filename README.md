@@ -21,8 +21,15 @@ Install with Helm:
 
 ```
 helm repo add nats https://nats-io.github.io/k8s/helm/charts/
-helm upgrade --install nats nats/nats --set config.jetstream.enabled=true --set config.cluster.enabled=true
-helm upgrade --install nack nats/nack --set jetstream.nats.url=nats://nats.default.svc.cluster.local:4222
+helm repo update
+
+helm upgrade --install nats nats/nats \
+  --set config.jetstream.enabled=true \
+  --set config.jetstream.memoryStore.enabled=true \
+  --set config.cluster.enabled=true --wait
+
+helm upgrade --install nack nats/nack \
+  --set jetstream.nats.url=nats://nats.default.svc.cluster.local:4222 --wait
 ```
 
 #### (Optional) Enable Experimental `controller-runtime` Controllers
@@ -32,7 +39,9 @@ helm upgrade --install nack nats/nack --set jetstream.nats.url=nats://nats.defau
 > The `jetstream-controller` logs will contain a diff of any changes the controller has made.
 
 ```
-helm upgrade nack nats/nack --set jetstream.additionalArgs={--control-loop=true}
+helm upgrade nack nats/nack \
+  --set jetstream.nats.url=nats://nats.default.svc.cluster.local:4222 \
+  --set jetstream.additionalArgs={--control-loop} --wait
 ```
 
 #### Creating Streams and Consumers
@@ -129,13 +138,9 @@ data into `mystream`.
 
 ```sh
 # Run nats-box that includes the NATS management utilities, and exec into it.
-$ kubectl apply -f https://nats-io.github.io/k8s/tools/nats-box.yml
-$ kubectl exec -it nats-box -- /bin/sh -l
+$ kubectl exec -it deployment/nats-box -- /bin/sh -l
 
 # Publish a couple of messages from nats-box
-nats-box:~$ nats context save jetstream -s nats://nats:4222
-nats-box:~$ nats context select jetstream
-
 nats-box:~$ nats pub orders.received "order 1"
 nats-box:~$ nats pub orders.received "order 2"
 ```
@@ -283,7 +288,7 @@ container to run the management CLI.
 
 ```sh
 # Get container shell
-kubectl exec -it deployment/nats-box -- /bin/sh
+kubectl exec -it deployment/nats-box -- /bin/sh -l
 ```
 
 There should now be some Streams available, verify with `nats` command.
