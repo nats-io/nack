@@ -90,7 +90,7 @@ Resource Types:
         <td><b>allowDirect</b></td>
         <td>boolean</td>
         <td>
-          When true, allow higher performance, direct access to get individual messages.<br/>
+          If true, and the stream has more than one replica, each replica will respond to direct get requests for individual messages, not only the leader.<br/>
           <br/>
             <i>Default</i>: false<br/>
         </td>

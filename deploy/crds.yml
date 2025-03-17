@@ -225,7 +225,7 @@ spec:
                     type: string
                     description: Messages will be published from this subject to the destination subject.
               allowDirect:
-                description: When true, allow higher performance, direct access to get individual messages.
+                description: If true, and the stream has more than one replica, each replica will respond to direct get requests for individual messages, not only the leader.
                 type: boolean
                 default: false
               mirrorDirect:
