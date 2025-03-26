@@ -3,6 +3,7 @@ package controller
 import (
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 
@@ -191,6 +192,10 @@ type Closable interface {
 }
 
 func CreateJSMClient(conn *pooledConnection, pedantic bool) (*jsm.Manager, error) {
+	if !conn.nc.IsConnected() {
+		return nil, errors.New("not connected")
+	}
+
 	major, minor, _, err := versionComponents(conn.nc.ConnectedServerVersion())
 	if err != nil {
 		return nil, fmt.Errorf("parse server version: %w", err)
