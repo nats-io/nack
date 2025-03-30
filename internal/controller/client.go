@@ -22,6 +22,7 @@ type NatsConfig struct {
 	Credentials string   `json:"credential,omitempty"`
 	NKey        string   `json:"nkey,omitempty"`
 	Token       string   `json:"token,omitempty"`
+	TokenFile   string   `json:"token_file,omitempty"`
 	User        string   `json:"username,omitempty"`
 	Password    string   `json:"password,omitempty"`
 	JsDomain    string   `json:"js_domain,omitempty"`
@@ -80,6 +81,14 @@ func (o *NatsConfig) Hash() (string, error) {
 		fb, err := os.ReadFile(o.Key)
 		if err != nil {
 			return "", fmt.Errorf("error opening key file %s: %v", o.Key, err)
+		}
+		b = append(b, fb...)
+	}
+
+	if o.TokenFile != "" {
+		fb, err := os.ReadFile(o.TokenFile)
+		if err != nil {
+			return "", fmt.Errorf("error opening token file %s: %v", o.TokenFile, err)
 		}
 		b = append(b, fb...)
 	}
@@ -181,7 +190,13 @@ func (o *NatsConfig) buildOptions() ([]nats.Option, error) {
 		opts = append(opts, opt)
 	}
 
-	if o.Token != "" {
+	if o.TokenFile != "" {
+		token, err := os.ReadFile(o.TokenFile)
+		if err != nil {
+			return nil, fmt.Errorf("read token file %s: %w", o.TokenFile, err)
+		}
+		opts = append(opts, nats.Token(string(token)))
+	} else if o.Token != "" {
 		opts = append(opts, nats.Token(o.Token))
 	}
 
