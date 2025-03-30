@@ -10,6 +10,7 @@ import (
 	"github.com/nats-io/jsm.go"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
+	"k8s.io/klog/v2"
 )
 
 type NatsConfig struct {
@@ -134,6 +135,8 @@ func (o *NatsConfig) Overlay(overlay *NatsConfig) {
 		o.Credentials = overlay.Credentials
 	} else if overlay.NKey != "" {
 		o.NKey = overlay.NKey
+	} else if overlay.TokenFile != "" {
+		o.TokenFile = overlay.TokenFile
 	} else if overlay.Token != "" {
 		o.Token = overlay.Token
 	} else if overlay.User != "" && overlay.Password != "" {
@@ -143,7 +146,7 @@ func (o *NatsConfig) Overlay(overlay *NatsConfig) {
 }
 
 func (o *NatsConfig) HasAuth() bool {
-	return o.Credentials != "" || o.NKey != "" || o.Token != "" || (o.User != "" && o.Password != "")
+	return o.Credentials != "" || o.NKey != "" || o.Token != "" || (o.User != "" && o.Password != "" || o.TokenFile != "")
 }
 
 func (o *NatsConfig) UnsetAuth() {
@@ -152,6 +155,7 @@ func (o *NatsConfig) UnsetAuth() {
 	o.User = ""
 	o.Password = ""
 	o.Token = ""
+	o.TokenFile = ""
 }
 
 // buildOptions creates options from the config to be used in nats.Connect.
@@ -191,6 +195,7 @@ func (o *NatsConfig) buildOptions() ([]nats.Option, error) {
 	}
 
 	if o.TokenFile != "" {
+		klog.Infof("reading token from: %v", o.TokenFile)
 		token, err := os.ReadFile(o.TokenFile)
 		if err != nil {
 			return nil, fmt.Errorf("read token file %s: %w", o.TokenFile, err)
@@ -203,6 +208,8 @@ func (o *NatsConfig) buildOptions() ([]nats.Option, error) {
 	if o.User != "" && o.Password != "" {
 		opts = append(opts, nats.UserInfo(o.User, o.Password))
 	}
+
+	klog.Infof("NATS client options: %v", opts)
 
 	return opts, nil
 }
