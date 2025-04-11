@@ -44,6 +44,93 @@ helm upgrade nack nats/nack \
   --set jetstream.additionalArgs={--control-loop} --wait
 ```
 
+#### (Optional) Manage multiple NATS
+
+There are a few options to use the controller with multiple JetStream clusters in the same Kubernetes cluster:
+1. Use namespaced controler by setting `--set namespaced=true` and specifying namespace either via helm options or via `--set namespaceOverride=true`. In this case controller only reconsile resources in the namespace it's installed into.
+
+```sh
+# Install and use in namespace dev-ns
+helm upgrade --install nack nats/nack \
+  --create-namespace --namespace dev-ns \
+  --set jetstream.nats.url=nats://nats.dev-ns.svc.cluster.local:4222 --wait \
+  --set namespaced=true
+
+# Install and use in namespace test-ns
+helm upgrade --install nack nats/nack \
+  --create-namespace --namespace test-ns \
+  --set jetstream.nats.url=nats://nats.test-ns.svc.cluster.local:4222 --wait \
+  --set namespaced=true
+```
+
+2. Do not specify NATS URL, so the controller fallbacks to `-crd-connect` option (where NATS urls are defined in custom resources, i.e. Stream's `spec.servers` or Account's `spec.servers`.
+> **Note** In this case the controller will fail to reconcile resources without explicit server URLs defined.
+
+**Install**
+
+```sh
+helm upgrade nack nats/nack \
+  --set jetstream.nats.url=""
+```
+
+**Define a resource with server URL**
+
+```yaml
+apiVersion: jetstream.nats.io/v1beta2
+kind: Stream
+metadata:
+  name: bar
+spec:
+  name: bar
+  subjects: ["bar", "bar.>"]
+  storage: file
+  replicas: 3
+  maxAge: 1h
+  servers:
+    - nats://nats.nats-test.svc.cluster.local:4222
+```
+
+3. If the controller is installed with enabled control loop (see above), then a default URL specified in helm can be overwritten in a resource definition:
+
+**Install**
+
+```sh
+helm upgrade nack nats/nack \
+  --set jetstream.nats.url="nats://nats.nats-dev.svc.cluster.local:4222" \
+  --set jetstream.additionalArgs={--control-loop} --wait
+```
+
+**Define a resource with server URL**
+
+```yaml
+---
+# Create resource in the default cluster `nats.nats-dev.svc.cluster.local`
+apiVersion: jetstream.nats.io/v1beta2
+kind: Stream
+metadata:
+  name: foo
+spec:
+  name: foo
+  subjects: ["foo", "foo.>"]
+  storage: file
+  replicas: 3
+  maxAge: 1h
+---
+# Create resource in different cluster `nats.nats-test.svc.cluster.local`
+apiVersion: jetstream.nats.io/v1beta2
+kind: Stream
+metadata:
+  name: bar
+spec:
+  name: bar
+  subjects: ["bar", "bar.>"]
+  storage: file
+  replicas: 3
+  maxAge: 1h
+  servers:
+    - nats://nats.nats-test.svc.cluster.local:4222
+```
+
 #### Creating Streams and Consumers
 
 Let's create a a stream and a couple of consumers:
@@ -203,6 +290,8 @@ order 2
 
 You can create an Account resource with the following CRD. The Account resource
 can be used to specify server and TLS information.
+
+> **Note** NACK's account resource doesn't create or manage accounts on server side (use [nsc tool](https://docs.nats.io/using-nats/nats-tools/nsc/basics#creating-an-operator-account-and-user) and [JWT](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/jwt) for that), it's only a client's side configuration that allows to simplify credential and connection management. 
 
 ```yaml
 ---
