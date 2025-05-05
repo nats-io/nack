@@ -35,6 +35,7 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	klog "k8s.io/klog/v2"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
@@ -170,10 +171,20 @@ func runControlLoop(config *rest.Config, natsCfg *controller.NatsConfig, control
 
 	log.SetLogger(klog.NewKlogr())
 
-	mgr, err := ctrl.NewManager(config, ctrl.Options{
+	ctrlOpts := ctrl.Options{
 		Scheme: scheme,
 		Logger: log.Log,
-	})
+	}
+
+	if controllerCfg.Namespace != "" {
+		ctrlOpts.Cache = cache.Options{
+			DefaultNamespaces: map[string]cache.Config{
+				controllerCfg.Namespace: {},
+			},
+		}
+	}
+
+	mgr, err := ctrl.NewManager(config, ctrlOpts)
 	if err != nil {
 		return fmt.Errorf("unable to start manager: %w", err)
 	}

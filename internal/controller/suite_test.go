@@ -94,7 +94,9 @@ var _ = BeforeSuite(func() {
 
 	clientUrl = testServer.ClientURL()
 	testNatsConfig := &NatsConfig{ServerURL: clientUrl}
-	baseController, err = NewJSController(k8sClient, testNatsConfig, &Config{})
+	baseController, err = NewJSController(k8sClient, testNatsConfig, &Config{
+		Namespace: "default",
+	})
 	Expect(err).NotTo(HaveOccurred())
 
 	connPool := newConnPool(0)
