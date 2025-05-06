@@ -39,10 +39,13 @@ import (
 
 var _ = Describe("Consumer Controller", func() {
 	Context("When reconciling a resource", func() {
-		const resourceName = "test-resource"
+		const resourceName = "test-consumer"
 
 		const streamName = "orders"
 		const consumerName = "test-consumer"
+
+		const alternateResource = "alternate-consumer"
+		const alternateNamespace = "alternate-namespace"
 
 		typeNamespacedName := types.NamespacedName{
 			Name:      resourceName,
@@ -173,6 +176,111 @@ var _ = Describe("Consumer Controller", func() {
 				Expect(consumer.Status.Conditions).To(HaveLen(1))
 
 				assertReadyStateMatches(consumer.Status.Conditions[0], v1.ConditionUnknown, stateReconciling, "Starting reconciliation", time.Now())
+			})
+		})
+
+		When("reconciling a resource in a different namespace", func() {
+			BeforeEach(func(ctx SpecContext) {
+				By("creating a consumer resource in an alternate namespace while namespaced")
+				alternateNamespaceResource := &api.Consumer{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      alternateResource,
+						Namespace: alternateNamespace,
+					},
+					Spec: api.ConsumerSpec{
+						AckPolicy:     "explicit",
+						DeliverPolicy: "all",
+						DurableName:   alternateResource,
+						Description:   "consumer in alternate namespace",
+						StreamName:    streamName,
+						ReplayPolicy:  "instant",
+					},
+				}
+
+				ns := &v1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: alternateNamespace,
+					},
+				}
+				err := k8sClient.Create(ctx, ns)
+				if err != nil && !k8serrors.IsAlreadyExists(err) {
+					Expect(err).NotTo(HaveOccurred())
+				}
+
+				Expect(k8sClient.Create(ctx, alternateNamespaceResource)).To(Succeed())
+			})
+
+			AfterEach(func(ctx SpecContext) {
+				By("cleaning up the resource in alternate namespace")
+				alternateConsumer := &api.Consumer{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      alternateResource,
+						Namespace: alternateNamespace,
+					},
+				}
+				err := k8sClient.Delete(ctx, alternateConsumer)
+				if err != nil && !k8serrors.IsNotFound(err) {
+					Expect(err).NotTo(HaveOccurred())
+				}
+			})
+
+			It("should not watch the resource in alternate namespace", func(ctx SpecContext) {
+				By("reconciling with no explicit namespace restriction")
+				alternateNamespacedName := types.NamespacedName{
+					Namespace: alternateNamespace,
+					Name:      alternateResource,
+				}
+
+				By("running reconciliation for the resource in alternate namespace")
+				result, err := controller.Reconcile(ctx, reconcile.Request{
+					NamespacedName: alternateNamespacedName,
+				})
+
+				By("verifying reconciliation completes without error")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result).To(Equal(ctrl.Result{}))
+
+				By("checking the consumer doesn't exist in NATS")
+				_, err = jsClient.Consumer(ctx, streamName, alternateResource)
+				Expect(err).To(MatchError(jetstream.ErrConsumerNotFound))
+
+				By("verifying the resource still exists in the alternate namespace")
+				alternateConsumer := &api.Consumer{}
+				Expect(k8sClient.Get(ctx, alternateNamespacedName, alternateConsumer)).To(Succeed())
+
+				By("checking no conditions were set on the resource")
+				Expect(alternateConsumer.Status.Conditions).To(BeEmpty())
+			})
+
+			It("should watch the resource in alternate namespace when not namespaced", func(ctx SpecContext) {
+				By("reconciling with a non-namespaced controller")
+				testNatsConfig := &NatsConfig{ServerURL: clientUrl}
+				alternateBaseController, err := NewJSController(k8sClient, testNatsConfig, &Config{})
+				Expect(err).NotTo(HaveOccurred())
+
+				alternateController := &ConsumerReconciler{
+					Scheme:              k8sClient.Scheme(),
+					JetStreamController: alternateBaseController,
+				}
+
+				resourceNames := []types.NamespacedName{
+					typeNamespacedName,
+					{
+						Namespace: alternateNamespace,
+						Name:      alternateResource,
+					},
+				}
+
+				By("running reconciliation for the resources in all namespaces")
+				for _, n := range resourceNames {
+					result, err := alternateController.Reconcile(ctx, reconcile.Request{
+						NamespacedName: n,
+					})
+
+					By("verifying reconciliation completes without error")
+					Expect(err).NotTo(HaveOccurred())
+					Expect(result).NotTo(Equal(ctrl.Result{}))
+				}
 			})
 		})
 
@@ -360,7 +468,7 @@ var _ = Describe("Consumer Controller", func() {
 			When("namespace restriction is enabled", func() {
 				BeforeEach(func(ctx SpecContext) {
 					By("setting a namespace on the resource")
-					namespaced, err := NewJSController(k8sClient, &NatsConfig{ServerURL: clientUrl}, &Config{Namespace: "other-namespace"})
+					namespaced, err := NewJSController(k8sClient, &NatsConfig{ServerURL: clientUrl}, &Config{Namespace: alternateNamespace})
 					Expect(err).NotTo(HaveOccurred())
 					controller = &ConsumerReconciler{
 						Scheme:              k8sClient.Scheme(),
@@ -512,7 +620,7 @@ var _ = Describe("Consumer Controller", func() {
 
 					When("controller is restricted to different namespace", func() {
 						BeforeEach(func(ctx SpecContext) {
-							namespaced, err := NewJSController(k8sClient, &NatsConfig{ServerURL: testServer.ClientURL()}, &Config{Namespace: "other-namespace"})
+							namespaced, err := NewJSController(k8sClient, &NatsConfig{ServerURL: testServer.ClientURL()}, &Config{Namespace: alternateNamespace})
 							Expect(err).NotTo(HaveOccurred())
 							controller = &ConsumerReconciler{
 								Scheme:              k8sClient.Scheme(),

@@ -40,6 +40,10 @@ var _ = Describe("KeyValue Controller", func() {
 	// The test keyValue resource
 	const resourceName = "test-kv"
 	const keyValueName = "orders"
+
+	const alternateResource = "alternate-kv"
+	const alternateNamespace = "alternate-namespace"
+
 	typeNamespacedName := types.NamespacedName{
 		Name:      resourceName,
 		Namespace: "default",
@@ -156,6 +160,112 @@ var _ = Describe("KeyValue Controller", func() {
 			Expect(keyValue.Status.Conditions).To(HaveLen(1))
 
 			assertReadyStateMatches(keyValue.Status.Conditions[0], v1.ConditionUnknown, stateReconciling, "Starting reconciliation", time.Now())
+		})
+	})
+
+	When("reconciling a resource in a different namespace", func() {
+		BeforeEach(func(ctx SpecContext) {
+			By("creating a keyvalue resource in an alternate namespace while namespaced")
+			alternateNamespaceResource := &api.KeyValue{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      alternateResource,
+					Namespace: alternateNamespace,
+				},
+				Spec: api.KeyValueSpec{
+					Bucket:      alternateResource,
+					Replicas:    1,
+					History:     10,
+					TTL:         "5m",
+					Compression: true,
+					Description: "keyvalue in alternate namespace",
+					Storage:     "file",
+				},
+			}
+
+			ns := &v1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: alternateNamespace,
+				},
+			}
+			err := k8sClient.Create(ctx, ns)
+			if err != nil && !k8serrors.IsAlreadyExists(err) {
+				Expect(err).NotTo(HaveOccurred())
+			}
+
+			Expect(k8sClient.Create(ctx, alternateNamespaceResource)).To(Succeed())
+		})
+
+		AfterEach(func(ctx SpecContext) {
+			By("cleaning up the resource in alternate namespace")
+			alternateKeyValue := &api.KeyValue{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      alternateResource,
+					Namespace: alternateNamespace,
+				},
+			}
+			err := k8sClient.Delete(ctx, alternateKeyValue)
+			if err != nil && !k8serrors.IsNotFound(err) {
+				Expect(err).NotTo(HaveOccurred())
+			}
+		})
+
+		It("should not watch the resource in alternate namespace", func(ctx SpecContext) {
+			By("reconciling with no explicit namespace restriction")
+			alternateNamespacedName := types.NamespacedName{
+				Namespace: alternateNamespace,
+				Name:      alternateResource,
+			}
+
+			By("running reconciliation for the resource in alternate namespace")
+			result, err := controller.Reconcile(ctx, reconcile.Request{
+				NamespacedName: alternateNamespacedName,
+			})
+
+			By("verifying reconciliation completes without error")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			By("checking the keyvalue doesn't exist in NATS")
+			_, err = jsClient.KeyValue(ctx, alternateResource)
+			Expect(err).To(MatchError(jetstream.ErrBucketNotFound))
+
+			By("verifying the resource still exists in the alternate namespace")
+			alternateKeyValue := &api.KeyValue{}
+			Expect(k8sClient.Get(ctx, alternateNamespacedName, alternateKeyValue)).To(Succeed())
+
+			By("checking no conditions were set on the resource")
+			Expect(alternateKeyValue.Status.Conditions).To(BeEmpty())
+		})
+
+		It("should watch the resource in alternate namespace when not namespaced", func(ctx SpecContext) {
+			By("reconciling with a non-namespaced controller")
+			testNatsConfig := &NatsConfig{ServerURL: clientUrl}
+			alternateBaseController, err := NewJSController(k8sClient, testNatsConfig, &Config{})
+			Expect(err).NotTo(HaveOccurred())
+
+			alternateController := &KeyValueReconciler{
+				Scheme:              k8sClient.Scheme(),
+				JetStreamController: alternateBaseController,
+			}
+
+			resourceNames := []types.NamespacedName{
+				typeNamespacedName,
+				{
+					Namespace: alternateNamespace,
+					Name:      alternateResource,
+				},
+			}
+
+			By("running reconciliation for the resources in all namespaces")
+			for _, n := range resourceNames {
+				result, err := alternateController.Reconcile(ctx, reconcile.Request{
+					NamespacedName: n,
+				})
+
+				By("verifying reconciliation completes without error")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result).NotTo(Equal(ctrl.Result{}))
+			}
 		})
 	})
 
@@ -285,7 +395,7 @@ var _ = Describe("KeyValue Controller", func() {
 		When("namespace restriction is enabled", func() {
 			BeforeEach(func(ctx SpecContext) {
 				By("setting a namespace on the resource")
-				namespaced, err := NewJSController(k8sClient, &NatsConfig{ServerURL: clientUrl}, &Config{Namespace: "other-namespace"})
+				namespaced, err := NewJSController(k8sClient, &NatsConfig{ServerURL: clientUrl}, &Config{Namespace: alternateNamespace})
 				Expect(err).NotTo(HaveOccurred())
 				controller = &KeyValueReconciler{
 					Scheme:              k8sClient.Scheme(),
@@ -506,7 +616,7 @@ var _ = Describe("KeyValue Controller", func() {
 
 				When("controller is restricted to different namespace", func() {
 					BeforeEach(func(ctx SpecContext) {
-						namespaced, err := NewJSController(k8sClient, &NatsConfig{ServerURL: clientUrl}, &Config{Namespace: "other-namespace"})
+						namespaced, err := NewJSController(k8sClient, &NatsConfig{ServerURL: clientUrl}, &Config{Namespace: alternateNamespace})
 						Expect(err).NotTo(HaveOccurred())
 						controller = &KeyValueReconciler{
 							Scheme:              k8sClient.Scheme(),
