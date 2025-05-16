@@ -24,6 +24,7 @@ type NatsConfig struct {
 	Token       string   `json:"token,omitempty"`
 	User        string   `json:"username,omitempty"`
 	Password    string   `json:"password,omitempty"`
+	JsDomain    string   `json:"js_domain,omitempty"`
 }
 
 func (o *NatsConfig) Copy() *NatsConfig {
@@ -191,7 +192,7 @@ type Closable interface {
 	Close()
 }
 
-func CreateJSMClient(conn *pooledConnection, pedantic bool) (*jsm.Manager, error) {
+func CreateJSMClient(conn *pooledConnection, pedantic bool, domain string) (*jsm.Manager, error) {
 	if !conn.nc.IsConnected() {
 		return nil, errors.New("not connected")
 	}
@@ -210,6 +211,9 @@ func CreateJSMClient(conn *pooledConnection, pedantic bool) (*jsm.Manager, error
 	if pedantic {
 		jsmOpts = append(jsmOpts, jsm.WithPedanticRequests())
 	}
+	if domain != "" {
+		jsmOpts = append(jsmOpts, jsm.WithDomain(domain))
+	}
 
 	jsmClient, err := jsm.New(conn.nc, jsmOpts...)
 	if err != nil {
@@ -222,8 +226,18 @@ func CreateJSMClient(conn *pooledConnection, pedantic bool) (*jsm.Manager, error
 // CreateJetStreamClient creates new Jetstream client with a connection based on the given NatsConfig.
 // Returns a jetstream.Jetstream client and the Closable of the underlying connection.
 // Close should be called when the client is no longer used.
-func CreateJetStreamClient(conn *pooledConnection, pedantic bool) (jetstream.JetStream, error) {
-	js, err := jetstream.New(conn.nc)
+func CreateJetStreamClient(conn *pooledConnection, pedantic bool, domain string) (jetstream.JetStream, error) {
+	var (
+		err error
+		js  jetstream.JetStream
+	)
+
+	if domain != "" {
+		js, err = jetstream.NewWithDomain(conn.nc, domain)
+	} else {
+		js, err = jetstream.New(conn.nc)
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("new jetstream: %w", err)
 	}

@@ -653,9 +653,10 @@ var _ = Describe("Consumer Controller", func() {
 				connPool := newConnPool(0)
 				conn, err := connPool.Get(&NatsConfig{ServerURL: altServer.ClientURL()}, true)
 				Expect(err).NotTo(HaveOccurred())
+				domain := ""
 
 				// Setup altClient for alternate server
-				altClient, err := CreateJetStreamClient(conn, true)
+				altClient, err := CreateJetStreamClient(conn, true, domain)
 				defer conn.Close()
 				Expect(err).NotTo(HaveOccurred())
 
