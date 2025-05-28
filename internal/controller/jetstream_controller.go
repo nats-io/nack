@@ -106,7 +106,7 @@ func (c *jsController) WithJSMClient(opts api.ConnectionOpts, ns string, op func
 		return err
 	}
 
-	jsmClient, err := CreateJSMClient(conn, true)
+	jsmClient, err := CreateJSMClient(conn, true, cfg.JsDomain)
 	if err != nil {
 		return fmt.Errorf("create jsm client: %w", err)
 	}
@@ -126,7 +126,7 @@ func (c *jsController) WithJetStreamClient(opts api.ConnectionOpts, ns string, o
 		return err
 	}
 
-	jsClient, err := CreateJetStreamClient(conn, true)
+	jsClient, err := CreateJetStreamClient(conn, true, cfg.JsDomain)
 	if err != nil {
 		return fmt.Errorf("create jetstream client: %w", err)
 	}
@@ -379,6 +379,10 @@ func natsConfigFromOpts(opts api.ConnectionOpts) *NatsConfig {
 	if opts.TLS.ClientCert != "" && opts.TLS.ClientKey != "" {
 		natsConfig.Certificate = opts.TLS.ClientCert
 		natsConfig.Key = opts.TLS.ClientKey
+	}
+
+	if opts.JsDomain != "" {
+		natsConfig.JsDomain = opts.JsDomain
 	}
 
 	return natsConfig

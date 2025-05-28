@@ -291,6 +291,9 @@ spec:
                 description: When true, the KV Store will initiate TLS before server INFO.
                 type: boolean
                 default: false
+              jsDomain:
+                description: The Jetstream domain to use for the stream.
+                type: string
           status:
             type: object
             properties:
@@ -524,6 +527,9 @@ spec:
                 minLength: 1
               streamName:
                 description: The name of the Stream to create the Consumer in.
+                type: string
+              jsDomain:
+                description: The Jetstream domain to use for the consumer.
                 type: string
               deliverPolicy:
                 type: string
@@ -1281,6 +1287,9 @@ spec:
                 description: When true, the KV Store will initiate TLS before server INFO.
                 type: boolean
                 default: false
+              jsDomain:
+                description: The Jetstream domain to use for the KV store.
+                type: string
           status:
             type: object
             properties:
@@ -1419,9 +1428,12 @@ spec:
                     items:
                       type: string
               tlsFirst:
-                description: When true, the KV Store will initiate TLS before server INFO.
+                description: When true, the Object Store will initiate TLS before server INFO.
                 type: boolean
                 default: false
+              jsDomain:
+                description: The Jetstream domain to use for the Object Store.
+                type: string
           status:
             type: object
             properties:
