@@ -84,6 +84,7 @@ var _ = Describe("Consumer Controller", func() {
 						Description:   "test consumer",
 						StreamName:    streamName,
 						ReplayPolicy:  "instant",
+						FilterSubject: "test.wildcard.>",
 					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
