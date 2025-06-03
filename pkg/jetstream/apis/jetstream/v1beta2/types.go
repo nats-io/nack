@@ -35,6 +35,7 @@ type ConnectionOpts struct {
 	Servers  []string `json:"servers"`
 	TLS      TLS      `json:"tls"`
 	TLSFirst bool     `json:"tlsFirst"`
+	JsDomain string   `json:"jsDomain"`
 }
 
 type ConsumerLimits struct {

@@ -24,6 +24,7 @@ type ConnectionOptsApplyConfiguration struct {
 	Servers  []string               `json:"servers,omitempty"`
 	TLS      *TLSApplyConfiguration `json:"tls,omitempty"`
 	TLSFirst *bool                  `json:"tlsFirst,omitempty"`
+	JsDomain *string                `json:"jsDomain,omitempty"`
 }
 
 // ConnectionOptsApplyConfiguration constructs a declarative configuration of the ConnectionOpts type for use with
@@ -79,5 +80,13 @@ func (b *ConnectionOptsApplyConfiguration) WithTLS(value *TLSApplyConfiguration)
 // If called multiple times, the TLSFirst field is set to the value of the last call.
 func (b *ConnectionOptsApplyConfiguration) WithTLSFirst(value bool) *ConnectionOptsApplyConfiguration {
 	b.TLSFirst = &value
+	return b
+}
+
+// WithJsDomain sets the JsDomain field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the JsDomain field is set to the value of the last call.
+func (b *ConnectionOptsApplyConfiguration) WithJsDomain(value string) *ConnectionOptsApplyConfiguration {
+	b.JsDomain = &value
 	return b
 }

@@ -672,9 +672,10 @@ var _ = Describe("Stream Controller", func() {
 			connPool := newConnPool(0)
 			conn, err := connPool.Get(&NatsConfig{ServerURL: altServer.ClientURL()}, true)
 			Expect(err).NotTo(HaveOccurred())
+			domain := ""
 
 			By("checking if the stream was created on the alternative server")
-			altClient, err := CreateJetStreamClient(conn, true)
+			altClient, err := CreateJetStreamClient(conn, true, domain)
 			defer conn.Close()
 			Expect(err).NotTo(HaveOccurred())
 

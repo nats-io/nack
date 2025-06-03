@@ -102,8 +102,9 @@ var _ = BeforeSuite(func() {
 	connPool := newConnPool(0)
 	conn, err := connPool.Get(testNatsConfig, true)
 	Expect(err).NotTo(HaveOccurred())
+	domain := ""
 
-	jsClient, err = CreateJetStreamClient(conn, true)
+	jsClient, err = CreateJetStreamClient(conn, true, domain)
 	Expect(err).NotTo(HaveOccurred())
 })
 
