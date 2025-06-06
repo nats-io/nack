@@ -42,7 +42,7 @@ func (p *connectionPool) Get(c *NatsConfig, pedantic bool) (*pooledConnection, e
 	hash, err := c.Hash()
 	if err != nil {
 		// If hash fails, create a new non-pooled connection
-		nc, err := createNatsConn(c, pedantic)
+		nc, err := createNatsConn(c)
 		if err != nil {
 			return nil, err
 		}
@@ -54,7 +54,7 @@ func (p *connectionPool) Get(c *NatsConfig, pedantic bool) (*pooledConnection, e
 		return pc, nil
 	}
 
-	nc, err := createNatsConn(c, pedantic)
+	nc, err := createNatsConn(c)
 	if err != nil {
 		return nil, err
 	}

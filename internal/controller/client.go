@@ -248,18 +248,10 @@ func CreateJetStreamClient(conn *pooledConnection, pedantic bool, domain string)
 	return js, nil
 }
 
-func createNatsConn(cfg *NatsConfig, pedantic bool) (*nats.Conn, error) {
+func createNatsConn(cfg *NatsConfig) (*nats.Conn, error) {
 	opts, err := cfg.buildOptions()
 	if err != nil {
 		return nil, err
-	}
-
-	// Set pedantic option
-	if pedantic {
-		opts = append(opts, func(options *nats.Options) error {
-			options.Pedantic = true
-			return nil
-		})
 	}
 
 	// client should always attempt to reconnect
