@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/nats-io/nack/pkg/natsreloader"
 )
@@ -46,6 +47,9 @@ func main() {
 		showVersion  bool
 		fileSet      StringSet
 		customSignal int
+		forcePoll    bool
+		pollInterval time.Duration
+		maxWatcherRetries int
 	)
 
 	nconfig := &natsreloader.Config{}
@@ -61,6 +65,9 @@ func main() {
 	fs.IntVar(&nconfig.MaxRetries, "max-retries", 30, "Max attempts to trigger reload")
 	fs.IntVar(&nconfig.RetryWaitSecs, "retry-wait-secs", 4, "Time to back off when reloading fails before retrying")
 	fs.IntVar(&customSignal, "signal", 1, "Signal to send to the NATS Server process (default SIGHUP 1)")
+	fs.BoolVar(&forcePoll, "force-poll", false, "Force polling mode instead of inotify file watching")
+	fs.DurationVar(&pollInterval, "poll-interval", 5*time.Second, "Polling interval when using polling mode (default 5s)")
+	fs.IntVar(&maxWatcherRetries, "max-watcher-retries", 3, "Max retries for creating inotify watcher on transient failures")
 
 	fs.Parse(os.Args[1:])
 
@@ -69,6 +76,9 @@ func main() {
 		nconfig.WatchedFiles = []string{"/etc/nats-config/nats.conf"}
 	}
 	nconfig.Signal = syscall.Signal(customSignal)
+	nconfig.ForcePoll = forcePoll
+	nconfig.PollInterval = pollInterval
+	nconfig.MaxWatcherRetries = maxWatcherRetries
 
 	switch {
 	case showHelp:

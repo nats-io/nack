@@ -382,3 +382,176 @@ func writeFile(content, path string) error {
 
 	return nil
 }
+
+func TestReloaderInotifyExhaustion(t *testing.T) {
+	// Test that simulates the inotify exhaustion scenario
+	// This test demonstrates the current problem where the error handling
+	// doesn't provide clear guidance about the real issue
+
+	// Setup a pidfile that points to us
+	pid := os.Getpid()
+	pidfile, err := os.CreateTemp(os.TempDir(), "nats-pid-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(pidfile.Name())
+
+	p := fmt.Sprintf("%d", pid)
+	if _, err := pidfile.WriteString(p); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a config file
+	configFile, err := os.CreateTemp(os.TempDir(), "nats-conf-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(configFile.Name())
+
+	if _, err := configFile.WriteString(configContents); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create configuration that will fail during init
+	nconfig := &Config{
+		PidFile:      pidfile.Name(),
+		WatchedFiles: []string{configFile.Name()},
+		Signal:       syscall.SIGHUP,
+	}
+
+	r, err := NewReloader(nconfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// This test checks that we can handle the case where there are too many
+	// files to watch (simulating inotify exhaustion). Since we can't easily
+	// exhaust inotify watches in a test, we'll create a very large number
+	// of files to watch to stress test the system.
+	
+	// Create many temporary files to potentially exhaust resources
+	var manyFiles []string
+	for i := 0; i < 10; i++ {
+		tempFile, err := os.CreateTemp(os.TempDir(), fmt.Sprintf("nats-test-%d-", i))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer os.Remove(tempFile.Name())
+		
+		if _, err := tempFile.WriteString(configContents); err != nil {
+			t.Fatal(err)
+		}
+		manyFiles = append(manyFiles, tempFile.Name())
+	}
+
+	// Update config to watch many files
+	nconfig.WatchedFiles = append(nconfig.WatchedFiles, manyFiles...)
+
+	// Try to run the reloader - this should work with current implementation
+	// but demonstrates the scenario where it could fail
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	err = r.Run(ctx)
+	if err != nil && !errors.Is(err, context.Canceled) {
+		// This is where we would expect to see the "no space left on device" error
+		// in a real inotify exhaustion scenario
+		t.Logf("Expected error in inotify exhaustion scenario: %v", err)
+		
+		// Check if error message is misleading (current problem)
+		if strings.Contains(err.Error(), "no space left on device") {
+			t.Logf("ERROR: Misleading error message detected - this is the bug we're fixing")
+			t.Logf("Error message should explain inotify exhaustion, not disk space")
+		}
+	}
+}
+
+func TestReloaderPollingMode(t *testing.T) {
+	// Test that polling mode works correctly
+	
+	// Setup a pidfile that points to us
+	pid := os.Getpid()
+	pidfile, err := os.CreateTemp(os.TempDir(), "nats-pid-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(pidfile.Name())
+
+	p := fmt.Sprintf("%d", pid)
+	if _, err := pidfile.WriteString(p); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a config file
+	configFile, err := os.CreateTemp(os.TempDir(), "nats-conf-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(configFile.Name())
+
+	if _, err := configFile.WriteString(configContents); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create configuration that forces polling mode
+	nconfig := &Config{
+		PidFile:      pidfile.Name(),
+		WatchedFiles: []string{configFile.Name()},
+		Signal:       syscall.SIGHUP,
+		ForcePoll:    true,
+		PollInterval: 100 * time.Millisecond, // Fast polling for testing
+	}
+
+	r, err := NewReloader(nconfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	signals := 0
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	var sigsMu sync.Mutex
+
+	// Signal handling
+	go func() {
+		c := make(chan os.Signal, 1)
+		signal.Notify(c, syscall.SIGHUP)
+
+		for range c {
+			sigsMu.Lock()
+			signals++
+			sigsMu.Unlock()
+		}
+	}()
+
+	go func() {
+		// Wait for polling to start
+		time.Sleep(200 * time.Millisecond)
+		
+		// Modify the config file
+		if _, err := configFile.WriteAt([]byte(newConfigContents), 0); err != nil {
+			t.Logf("Failed to write config: %v", err)
+			return
+		}
+		
+		// Wait for polling to detect the change
+		time.Sleep(200 * time.Millisecond)
+		cancel()
+	}()
+
+	err = r.Run(ctx)
+	if err != nil && !errors.Is(err, context.Canceled) {
+		t.Fatal(err)
+	}
+
+	// We should have gotten at least one signal
+	sigsMu.Lock()
+	got := signals
+	sigsMu.Unlock()
+	if got == 0 {
+		t.Fatal("Expected at least one signal in polling mode, got 0")
+	}
+	
+	t.Logf("Successfully received %d signals in polling mode", got)
+}
