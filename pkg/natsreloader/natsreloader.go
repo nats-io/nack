@@ -35,13 +35,53 @@ import (
 
 const errorFmt = "Error: %s\n"
 
+func isInotifyExhausted(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	errStr := strings.ToLower(err.Error())
+	return strings.Contains(errStr, "no space left on device") ||
+		strings.Contains(errStr, "too many open files") ||
+		strings.Contains(errStr, "inotify") ||
+		strings.Contains(errStr, "watch limit")
+}
+
+func createInotifyExhaustedError(originalErr error, watchedFileCount int) error {
+	return fmt.Errorf(`inotify file watching system is exhausted (original error: %v)
+
+This typically occurs on high-density Kubernetes nodes where many pods are using file watchers.
+
+DIAGNOSIS:
+  - Trying to watch %d files
+  - System may have exhausted inotify watches or instances
+  - Check current limits: cat /proc/sys/fs/inotify/max_user_watches
+  - Check current usage: find /proc/*/fd -lname anon_inode:inotify 2>/dev/null | wc -l
+
+SOLUTIONS:
+  1. Increase inotify limits (cluster admin):
+     echo 'fs.inotify.max_user_watches=1048576' >> /etc/sysctl.conf
+     sysctl -p
+
+  2. Use polling fallback mode:
+     Add --force-poll flag to use polling instead of inotify
+
+  3. Reduce file watching:
+     Minimize the number of configuration files being watched
+
+For more information, see: https://github.com/nats-io/nack/issues/264`, originalErr, watchedFileCount)
+}
+
 // Config represents the configuration of the reloader.
 type Config struct {
-	PidFile       string
-	WatchedFiles  []string
-	MaxRetries    int
-	RetryWaitSecs int
-	Signal        os.Signal
+	PidFile           string
+	WatchedFiles      []string
+	MaxRetries        int
+	RetryWaitSecs     int
+	Signal            os.Signal
+	ForcePoll         bool
+	PollInterval      time.Duration
+	MaxWatcherRetries int
 }
 
 // Reloader monitors the state from a single server config file
@@ -204,13 +244,57 @@ func handleDeletedFiles(deletedFiles []string, configWatcher *fsnotify.Watcher, 
 	return removeDuplicateStrings(updated), newDeletedFiles
 }
 
+func (r *Reloader) createWatcherWithRetry() (*fsnotify.Watcher, error) {
+	maxRetries := r.MaxWatcherRetries
+	if maxRetries == 0 {
+		maxRetries = 3
+	}
+
+	var lastErr error
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if attempt > 0 {
+			waitTime := time.Duration(r.RetryWaitSecs) * time.Second
+			if waitTime == 0 {
+				waitTime = 4 * time.Second
+			}
+
+			waitTime = retryJitter(waitTime)
+			log.Printf("Retrying watcher creation in %.2fs (attempt %d/%d)", waitTime.Seconds(), attempt+1, maxRetries+1)
+			time.Sleep(waitTime)
+		}
+
+		watcher, err := fsnotify.NewWatcher()
+		if err == nil {
+			if attempt > 0 {
+				log.Printf("Successfully created watcher after %d retries", attempt)
+			}
+			return watcher, nil
+		}
+
+		lastErr = err
+		log.Printf("Failed to create watcher (attempt %d/%d): %v", attempt+1, maxRetries+1, err)
+
+		if isInotifyExhausted(err) {
+			return nil, createInotifyExhaustedError(err, len(r.WatchedFiles))
+		}
+	}
+
+	// All retries failed
+	return nil, fmt.Errorf("failed to create watcher after %d attempts, last error: %v", maxRetries+1, lastErr)
+}
+
 func (r *Reloader) init() (*fsnotify.Watcher, map[string][]byte, error) {
 	err := r.waitForProcess()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	configWatcher, err := fsnotify.NewWatcher()
+	if r.ForcePoll {
+		log.Printf("Using polling mode (forced)")
+		return nil, nil, nil
+	}
+
+	configWatcher, err := r.createWatcherWithRetry()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -218,7 +302,6 @@ func (r *Reloader) init() (*fsnotify.Watcher, map[string][]byte, error) {
 	watchedFiles := make([]string, 0)
 
 	for _, c := range r.WatchedFiles {
-		// Only try to parse config files
 		if !strings.HasSuffix(c, ".conf") {
 			continue
 		}
@@ -246,6 +329,11 @@ func (r *Reloader) init() (*fsnotify.Watcher, map[string][]byte, error) {
 		// Watch files individually for https://github.com/kubernetes/kubernetes/issues/112677
 		if err := configWatcher.Add(r.WatchedFiles[i]); err != nil {
 			_ = configWatcher.Close()
+
+			// Check if this is an inotify exhaustion error
+			if isInotifyExhausted(err) {
+				return nil, nil, createInotifyExhaustedError(err, len(r.WatchedFiles))
+			}
 			return nil, nil, err
 		}
 		log.Printf("Watching file: %v", r.WatchedFiles[i])
@@ -312,8 +400,18 @@ func (r *Reloader) Run(ctx context.Context) error {
 
 	configWatcher, lastConfigAppliedCache, err := r.init()
 	if err != nil {
+		if isInotifyExhausted(err) {
+			log.Printf("inotify unavailable, falling back to polling mode")
+			r.ForcePoll = true
+			return r.runPollingMode(ctx)
+		}
 		return err
 	}
+
+	if r.ForcePoll || configWatcher == nil {
+		return r.runPollingMode(ctx)
+	}
+
 	defer configWatcher.Close()
 
 	// We use a ticker to re-add deleted files to the watcher
@@ -394,6 +492,106 @@ func retryJitter(base time.Duration) time.Duration {
 	return time.Duration(b + offset)
 }
 
+func (r *Reloader) pollForChanges(lastConfigAppliedCache map[string][]byte) ([]string, error) {
+	var updatedFiles []string
+
+	for _, configFile := range r.WatchedFiles {
+		// Check if file still exists
+		if _, err := os.Stat(configFile); os.IsNotExist(err) {
+			// File was deleted, remove from cache and treat as an update
+			// to trigger a reload with the remaining configuration files
+			if _, exists := lastConfigAppliedCache[configFile]; exists {
+				log.Printf("Detected deleted config file (polling); file=%q", configFile)
+				delete(lastConfigAppliedCache, configFile)
+				updatedFiles = append(updatedFiles, configFile)
+			}
+			continue
+		}
+
+		digest, err := getFileDigest(configFile)
+		if err != nil {
+			log.Printf("Error reading file %s: %v", configFile, err)
+			continue
+		}
+
+		// Check if file has changed
+		lastDigest, exists := lastConfigAppliedCache[configFile]
+		if !exists || !bytes.Equal(lastDigest, digest) {
+			log.Printf("Changed config (polling); file=%q existing=%v", configFile, exists)
+			lastConfigAppliedCache[configFile] = digest
+			updatedFiles = append(updatedFiles, configFile)
+		}
+	}
+
+	return updatedFiles, nil
+}
+
+func (r *Reloader) runPollingMode(ctx context.Context) error {
+	lastConfigAppliedCache := make(map[string][]byte)
+
+	watchedFiles := make([]string, 0)
+	for _, c := range r.WatchedFiles {
+		// Only try to parse config files
+		if !strings.HasSuffix(c, ".conf") {
+			continue
+		}
+		childFiles, err := getServerFiles(c)
+		if err != nil {
+			return err
+		}
+		watchedFiles = append(watchedFiles, childFiles...)
+	}
+
+	r.WatchedFiles = append(r.WatchedFiles, watchedFiles...)
+
+	// Ensure our paths are canonical
+	for i := range r.WatchedFiles {
+		r.WatchedFiles[i], _ = filepath.Abs(r.WatchedFiles[i])
+	}
+	r.WatchedFiles = removeDuplicateStrings(r.WatchedFiles)
+
+	for _, configFile := range r.WatchedFiles {
+		digest, err := getFileDigest(configFile)
+		if err != nil {
+			return err
+		}
+		lastConfigAppliedCache[configFile] = digest
+		log.Printf("Polling file: %v", configFile)
+	}
+
+	log.Printf("Live, ready to kick pid %v on config changes (files=%d, polling mode)",
+		r.proc.Pid, len(lastConfigAppliedCache))
+
+	pollInterval := r.PollInterval
+	if pollInterval == 0 {
+		pollInterval = 5 * time.Second
+	}
+
+	ticker := time.NewTicker(pollInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-ticker.C:
+			updatedFiles, err := r.pollForChanges(lastConfigAppliedCache)
+			if err != nil {
+				log.Printf("Error polling for changes: %v", err)
+				continue
+			}
+
+			if len(updatedFiles) > 0 {
+				log.Printf("Updated files (polling): %v", updatedFiles)
+				err := r.reload(updatedFiles)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+}
+
 func getServerFiles(configFile string) ([]string, error) {
 	filePaths, err := getIncludePaths(configFile, make(map[string]interface{}))
 	if err != nil {
@@ -421,7 +619,6 @@ func getIncludePaths(configFile string, checked map[string]interface{}) ([]strin
 		return nil, err
 	}
 
-	// Add the current config file to the list and mark it as checked
 	filePaths := []string{configFile}
 	checked[configFile] = nil
 
