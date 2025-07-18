@@ -204,7 +204,7 @@ func (r *ConsumerReconciler) createOrUpdate(ctx context.Context, log klog.Logger
 
 		serverState, err := getServerConsumerState(js, consumer)
 		if err != nil {
-			return err
+			return fmt.Errorf("fetching consumer current state: %w", err)
 		}
 
 		// Check against known state. Skip Update if converged.
@@ -234,23 +234,23 @@ func (r *ConsumerReconciler) createOrUpdate(ctx context.Context, log klog.Logger
 			log.Info("Creating Consumer.")
 			updatedConsumer, err = js.NewConsumer(consumer.Spec.StreamName, targetConfig...)
 			if err != nil {
-				return err
+				return fmt.Errorf("creating consumer: %w", err)
 			}
 		} else if !consumer.Spec.PreventUpdate {
 			log.Info("Updating Consumer.")
 			c, err := js.LoadConsumer(consumer.Spec.StreamName, consumer.Spec.DurableName)
 			if err != nil {
-				return err
+				return fmt.Errorf("loading consumer: %w", err)
 			}
 
 			err = c.UpdateConfiguration(targetConfig...)
 			if err != nil {
-				return err
+				return fmt.Errorf("updating the consumer configuration: %w", err)
 			}
 
 			updatedConsumer, err = js.LoadConsumer(consumer.Spec.StreamName, consumer.Spec.DurableName)
 			if err != nil {
-				return err
+				return fmt.Errorf("loading updated consumer: %w", err)
 			}
 
 			diff := compareConfigState(updatedConsumer.Configuration(), *serverState)
@@ -265,7 +265,7 @@ func (r *ConsumerReconciler) createOrUpdate(ctx context.Context, log klog.Logger
 			// Store known state in annotation
 			updatedState, err := json.Marshal(updatedConsumer.Configuration())
 			if err != nil {
-				return err
+				return fmt.Errorf("marshaling JSON: %w", err)
 			}
 
 			if consumer.Annotations == nil {
