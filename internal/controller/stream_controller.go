@@ -512,6 +512,20 @@ func streamSpecToConfig(spec *api.StreamSpec) ([]jsm.StreamOption, error) {
 		opts = append(opts, jsm.ConsumerLimits(cl))
 	}
 
+	// allowMsgTtl
+	if spec.AllowMsgTTL {
+		opts = append(opts, jsm.AllowMsgTTL())
+	}
+
+	// subjectDeleteMarkerTtl
+	if spec.SubjectDeleteMarkerTTL != "" {
+		d, err := time.ParseDuration(spec.SubjectDeleteMarkerTTL)
+		if err != nil {
+			return nil, fmt.Errorf("parse subject delete marker TTL: %w", err)
+		}
+		opts = append(opts, jsm.SubjectDeleteMarkerTTL(d))
+	}
+
 	return opts, nil
 }
 

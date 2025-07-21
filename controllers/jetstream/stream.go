@@ -176,7 +176,7 @@ func createStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 		}
 	}()
 
-	maxAge, err := getMaxAge(spec.MaxAge)
+	maxAge, err := getDurationFromString(spec.MaxAge)
 	if err != nil {
 		return err
 	}
@@ -325,6 +325,18 @@ func createStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 		opts = append(opts, jsm.StreamMetadata(spec.Metadata))
 	}
 
+	if spec.AllowMsgTTL {
+		opts = append(opts, jsm.AllowMsgTTL())
+	}
+
+	if spec.SubjectDeleteMarkerTTL != "" {
+		d, err := time.ParseDuration(spec.SubjectDeleteMarkerTTL)
+		if err != nil {
+			return fmt.Errorf("parse subject delete marker TTL: %w", err)
+		}
+		opts = append(opts, jsm.SubjectDeleteMarkerTTL(d))
+	}
+
 	_, err = c.NewStream(ctx, spec.Name, opts)
 	return err
 }
@@ -341,7 +353,12 @@ func updateStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 		return err
 	}
 
-	maxAge, err := getMaxAge(spec.MaxAge)
+	maxAge, err := getDurationFromString(spec.MaxAge)
+	if err != nil {
+		return err
+	}
+
+	subjectDeleteMarkerTTL, err := getDurationFromString(spec.SubjectDeleteMarkerTTL)
 	if err != nil {
 		return err
 	}
@@ -364,28 +381,30 @@ func updateStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 	}
 
 	config := jsmapi.StreamConfig{
-		Name:             spec.Name,
-		Description:      spec.Description,
-		Retention:        retention,
-		Subjects:         spec.Subjects,
-		MaxConsumers:     spec.MaxConsumers,
-		MaxMsgs:          int64(spec.MaxMsgs),
-		MaxBytes:         int64(spec.MaxBytes),
-		MaxMsgsPer:       int64(spec.MaxMsgsPerSubject),
-		MaxAge:           maxAge,
-		MaxMsgSize:       int32(spec.MaxMsgSize),
-		Storage:          storage,
-		Discard:          discard,
-		DiscardNewPer:    spec.DiscardPerSubject,
-		Replicas:         spec.Replicas,
-		NoAck:            spec.NoAck,
-		Duplicates:       duplicates,
-		AllowDirect:      spec.AllowDirect,
-		DenyDelete:       spec.DenyDelete,
-		DenyPurge:        spec.DenyPurge,
-		RollupAllowed:    spec.AllowRollup,
-		FirstSeq:         spec.FirstSequence,
-		SubjectTransform: subjectTransform,
+		Name:                   spec.Name,
+		Description:            spec.Description,
+		Retention:              retention,
+		Subjects:               spec.Subjects,
+		MaxConsumers:           spec.MaxConsumers,
+		MaxMsgs:                int64(spec.MaxMsgs),
+		MaxBytes:               int64(spec.MaxBytes),
+		MaxMsgsPer:             int64(spec.MaxMsgsPerSubject),
+		MaxAge:                 maxAge,
+		MaxMsgSize:             int32(spec.MaxMsgSize),
+		Storage:                storage,
+		Discard:                discard,
+		DiscardNewPer:          spec.DiscardPerSubject,
+		Replicas:               spec.Replicas,
+		NoAck:                  spec.NoAck,
+		Duplicates:             duplicates,
+		AllowDirect:            spec.AllowDirect,
+		DenyDelete:             spec.DenyDelete,
+		DenyPurge:              spec.DenyPurge,
+		RollupAllowed:          spec.AllowRollup,
+		FirstSeq:               spec.FirstSequence,
+		SubjectTransform:       subjectTransform,
+		AllowMsgTTL:            spec.AllowMsgTTL,
+		SubjectDeleteMarkerTTL: subjectDeleteMarkerTTL,
 	}
 	if spec.RePublish != nil {
 		config.RePublish = &jsmapi.RePublish{
@@ -516,7 +535,7 @@ func setStreamOK(ctx context.Context, s *apis.Stream, i typed.StreamInterface) (
 	return res, err
 }
 
-func getMaxAge(v string) (time.Duration, error) {
+func getDurationFromString(v string) (time.Duration, error) {
 	if v == "" {
 		return time.Duration(0), nil
 	}

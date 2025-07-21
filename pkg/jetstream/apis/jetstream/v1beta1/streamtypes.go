@@ -22,24 +22,26 @@ func (s *Stream) GetSpec() interface{} {
 
 // StreamSpec is the spec for a Stream resource
 type StreamSpec struct {
-	Description       string           `json:"description"`
-	Discard           string           `json:"discard"`
-	DuplicateWindow   string           `json:"duplicateWindow"`
-	MaxAge            string           `json:"maxAge"`
-	MaxBytes          int              `json:"maxBytes"`
-	MaxConsumers      int              `json:"maxConsumers"`
-	MaxMsgs           int              `json:"maxMsgs"`
-	MaxMsgSize        int              `json:"maxMsgSize"`
-	MaxMsgsPerSubject int              `json:"maxMsgsPerSubject"`
-	Mirror            *StreamSource    `json:"mirror"`
-	Name              string           `json:"name"`
-	NoAck             bool             `json:"noAck"`
-	Placement         *StreamPlacement `json:"placement"`
-	Replicas          int              `json:"replicas"`
-	Retention         string           `json:"retention"`
-	Sources           []*StreamSource  `json:"sources"`
-	Storage           string           `json:"storage"`
-	Subjects          []string         `json:"subjects"`
+	Description            string           `json:"description"`
+	Discard                string           `json:"discard"`
+	DuplicateWindow        string           `json:"duplicateWindow"`
+	MaxAge                 string           `json:"maxAge"`
+	MaxBytes               int              `json:"maxBytes"`
+	MaxConsumers           int              `json:"maxConsumers"`
+	MaxMsgs                int              `json:"maxMsgs"`
+	MaxMsgSize             int              `json:"maxMsgSize"`
+	MaxMsgsPerSubject      int              `json:"maxMsgsPerSubject"`
+	Mirror                 *StreamSource    `json:"mirror"`
+	Name                   string           `json:"name"`
+	NoAck                  bool             `json:"noAck"`
+	Placement              *StreamPlacement `json:"placement"`
+	Replicas               int              `json:"replicas"`
+	Retention              string           `json:"retention"`
+	Sources                []*StreamSource  `json:"sources"`
+	Storage                string           `json:"storage"`
+	Subjects               []string         `json:"subjects"`
+	AllowMsgTTL            bool             `json:"allowMsgTtl"`
+	SubjectDeleteMarkerTTL string           `json:"subjectDeleteMarkerTtl"`
 }
 
 type StreamPlacement struct {
