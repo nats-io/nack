@@ -22,37 +22,39 @@ import (
 // StreamSpecApplyConfiguration represents a declarative configuration of the StreamSpec type for use
 // with apply.
 type StreamSpecApplyConfiguration struct {
-	Name              *string                             `json:"name,omitempty"`
-	Description       *string                             `json:"description,omitempty"`
-	Subjects          []string                            `json:"subjects,omitempty"`
-	Retention         *string                             `json:"retention,omitempty"`
-	MaxConsumers      *int                                `json:"maxConsumers,omitempty"`
-	MaxMsgsPerSubject *int                                `json:"maxMsgsPerSubject,omitempty"`
-	MaxMsgs           *int                                `json:"maxMsgs,omitempty"`
-	MaxBytes          *int                                `json:"maxBytes,omitempty"`
-	MaxAge            *string                             `json:"maxAge,omitempty"`
-	MaxMsgSize        *int                                `json:"maxMsgSize,omitempty"`
-	Storage           *string                             `json:"storage,omitempty"`
-	Discard           *string                             `json:"discard,omitempty"`
-	Replicas          *int                                `json:"replicas,omitempty"`
-	NoAck             *bool                               `json:"noAck,omitempty"`
-	DuplicateWindow   *string                             `json:"duplicateWindow,omitempty"`
-	Placement         *StreamPlacementApplyConfiguration  `json:"placement,omitempty"`
-	Mirror            *StreamSourceApplyConfiguration     `json:"mirror,omitempty"`
-	Sources           []*jetstreamv1beta2.StreamSource    `json:"sources,omitempty"`
-	Compression       *string                             `json:"compression,omitempty"`
-	SubjectTransform  *SubjectTransformApplyConfiguration `json:"subjectTransform,omitempty"`
-	RePublish         *RePublishApplyConfiguration        `json:"republish,omitempty"`
-	Sealed            *bool                               `json:"sealed,omitempty"`
-	DenyDelete        *bool                               `json:"denyDelete,omitempty"`
-	DenyPurge         *bool                               `json:"denyPurge,omitempty"`
-	AllowDirect       *bool                               `json:"allowDirect,omitempty"`
-	AllowRollup       *bool                               `json:"allowRollup,omitempty"`
-	MirrorDirect      *bool                               `json:"mirrorDirect,omitempty"`
-	DiscardPerSubject *bool                               `json:"discardPerSubject,omitempty"`
-	FirstSequence     *uint64                             `json:"firstSequence,omitempty"`
-	Metadata          map[string]string                   `json:"metadata,omitempty"`
-	ConsumerLimits    *ConsumerLimitsApplyConfiguration   `json:"consumerLimits,omitempty"`
+	Name                   *string                             `json:"name,omitempty"`
+	Description            *string                             `json:"description,omitempty"`
+	Subjects               []string                            `json:"subjects,omitempty"`
+	Retention              *string                             `json:"retention,omitempty"`
+	MaxConsumers           *int                                `json:"maxConsumers,omitempty"`
+	MaxMsgsPerSubject      *int                                `json:"maxMsgsPerSubject,omitempty"`
+	MaxMsgs                *int                                `json:"maxMsgs,omitempty"`
+	MaxBytes               *int                                `json:"maxBytes,omitempty"`
+	MaxAge                 *string                             `json:"maxAge,omitempty"`
+	MaxMsgSize             *int                                `json:"maxMsgSize,omitempty"`
+	Storage                *string                             `json:"storage,omitempty"`
+	Discard                *string                             `json:"discard,omitempty"`
+	Replicas               *int                                `json:"replicas,omitempty"`
+	NoAck                  *bool                               `json:"noAck,omitempty"`
+	DuplicateWindow        *string                             `json:"duplicateWindow,omitempty"`
+	Placement              *StreamPlacementApplyConfiguration  `json:"placement,omitempty"`
+	Mirror                 *StreamSourceApplyConfiguration     `json:"mirror,omitempty"`
+	Sources                []*jetstreamv1beta2.StreamSource    `json:"sources,omitempty"`
+	Compression            *string                             `json:"compression,omitempty"`
+	SubjectTransform       *SubjectTransformApplyConfiguration `json:"subjectTransform,omitempty"`
+	RePublish              *RePublishApplyConfiguration        `json:"republish,omitempty"`
+	Sealed                 *bool                               `json:"sealed,omitempty"`
+	DenyDelete             *bool                               `json:"denyDelete,omitempty"`
+	DenyPurge              *bool                               `json:"denyPurge,omitempty"`
+	AllowDirect            *bool                               `json:"allowDirect,omitempty"`
+	AllowRollup            *bool                               `json:"allowRollup,omitempty"`
+	MirrorDirect           *bool                               `json:"mirrorDirect,omitempty"`
+	DiscardPerSubject      *bool                               `json:"discardPerSubject,omitempty"`
+	FirstSequence          *uint64                             `json:"firstSequence,omitempty"`
+	Metadata               map[string]string                   `json:"metadata,omitempty"`
+	ConsumerLimits         *ConsumerLimitsApplyConfiguration   `json:"consumerLimits,omitempty"`
+	AllowMsgTTL            *bool                               `json:"allowMsgTtl,omitempty"`
+	SubjectDeleteMarkerTTL *string                             `json:"subjectDeleteMarkerTtl,omitempty"`
 }
 
 // StreamSpecApplyConfiguration constructs a declarative configuration of the StreamSpec type for use with
@@ -319,5 +321,21 @@ func (b *StreamSpecApplyConfiguration) WithMetadata(entries map[string]string) *
 // If called multiple times, the ConsumerLimits field is set to the value of the last call.
 func (b *StreamSpecApplyConfiguration) WithConsumerLimits(value *ConsumerLimitsApplyConfiguration) *StreamSpecApplyConfiguration {
 	b.ConsumerLimits = value
+	return b
+}
+
+// WithAllowMsgTTL sets the AllowMsgTTL field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the AllowMsgTTL field is set to the value of the last call.
+func (b *StreamSpecApplyConfiguration) WithAllowMsgTTL(value bool) *StreamSpecApplyConfiguration {
+	b.AllowMsgTTL = &value
+	return b
+}
+
+// WithSubjectDeleteMarkerTTL sets the SubjectDeleteMarkerTTL field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the SubjectDeleteMarkerTTL field is set to the value of the last call.
+func (b *StreamSpecApplyConfiguration) WithSubjectDeleteMarkerTTL(value string) *StreamSpecApplyConfiguration {
+	b.SubjectDeleteMarkerTTL = &value
 	return b
 }

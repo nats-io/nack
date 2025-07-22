@@ -4,6 +4,7 @@ metadata:
   name: rides
 spec:
   allowDirect: false
+  allowMsgTtl: false
   allowRollup: false
   compression: ""
   creds: ""
@@ -26,5 +27,6 @@ spec:
   retention: limits
   servers: []
   storage: memory
+  subjectDeleteMarkerTtl: ""
   subjects:
     - rides.>

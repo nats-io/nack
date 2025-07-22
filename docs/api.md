@@ -249,6 +249,22 @@ Resource Types:
         </td>
         <td>false</td>
       </tr><tr>
+        <td><b>allowMsgTtl</b></td>
+        <td>boolean</td>
+        <td>
+          When true, allows header initiated per-message TTLs. If disabled, then the `NATS-TTL` header will be ignored.<br/>
+          <br/>
+            <i>Default</i>: false<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>subjectDeleteMarkerTtl</b></td>
+        <td>string</td>
+        <td>
+          Enables and sets a duration for adding server markers for delete, purge and max age limits, expressed in Go's time.Duration format.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
         <td><b>metadata</b></td>
         <td>map[string]string</td>
         <td>
