@@ -230,9 +230,11 @@ func consumerSpecToOpts(spec apis.ConsumerSpec) ([]jsm.ConsumerOption, error) {
 			return nil, err
 		}
 		opts = append(opts, jsm.StartAtTime(t))
+	case "lastPerSubject":
+		opts = append(opts, jsm.DeliverLastPerSubject())
 	case "":
 	default:
-		return nil, fmt.Errorf("invalid value for 'deliverPolicy': '%s'. Must be one of 'all', 'last', 'new', 'byStartSequence', 'byStartTime'", spec.DeliverPolicy)
+		return nil, fmt.Errorf("invalid value for 'deliverPolicy': '%s'. Must be one of 'all', 'last', 'new', 'lastPerSubject', 'byStartSequence', 'byStartTime'", spec.DeliverPolicy)
 	}
 
 	switch spec.AckPolicy {
