@@ -395,6 +395,16 @@ func TestConsumerSpecToOpts(t *testing.T) {
 				require.Contains(t, err.Error(), "'optStartTime' is required for deliver policy 'byStartTime'")
 			},
 		},
+		"deliver policy lastPerSubject": {
+			given: apis.ConsumerSpec{
+				DurableName:   "my-consumer",
+				DeliverPolicy: "lastPerSubject",
+			},
+			expected: jsmapi.ConsumerConfig{
+				Durable: "my-consumer",
+				DeliverPolicy: jsmapi.DeliverLastPerSubject,
+			},
+		},
 		"invalid ack policy": {
 			given: apis.ConsumerSpec{
 				DurableName: "my-consumer",
