@@ -174,15 +174,8 @@ func (r *StreamReconciler) deleteStream(ctx context.Context, log logr.Logger, st
 }
 
 func (r *StreamReconciler) createOrUpdate(ctx context.Context, log logr.Logger, stream *api.Stream) error {
-	// Create or Update the stream based on the spec
-	// Map spec to stream targetConfig
-	targetConfig, err := streamSpecToConfig(&stream.Spec)
-	if err != nil {
-		return fmt.Errorf("map spec to stream targetConfig: %w", err)
-	}
-
 	// CreateOrUpdateStream is called on every reconciliation when the stream is not to be deleted.
-	err = r.WithJSMClient(stream.Spec.ConnectionOpts, stream.Namespace, func(js *jsm.Manager) error {
+	err := r.WithJSMClient(stream.Spec.ConnectionOpts, stream.Namespace, func(js *jsm.Manager) error {
 		storedState, err := getStoredStreamState(stream)
 		if err != nil {
 			log.Error(err, "Failed to fetch stored stream state")
@@ -191,6 +184,12 @@ func (r *StreamReconciler) createOrUpdate(ctx context.Context, log logr.Logger, 
 		serverState, err := getServerStreamState(js, stream)
 		if err != nil {
 			return err
+		}
+
+		// Map spec to stream targetConfig, passing current server state for context
+		targetConfig, err := streamSpecToConfig(&stream.Spec, serverState)
+		if err != nil {
+			return fmt.Errorf("map spec to stream targetConfig: %w", err)
 		}
 
 		// Check against known state. Skip Update if converged.
@@ -316,8 +315,7 @@ func getServerStreamState(jsm *jsm.Manager, stream *api.Stream) (*jsmapi.StreamC
 	return &streamCfg, nil
 }
 
-// streamSpecToConfig creates a jetstream.StreamConfig matching the given stream resource spec
-func streamSpecToConfig(spec *api.StreamSpec) ([]jsm.StreamOption, error) {
+func streamSpecToConfig(spec *api.StreamSpec, currentConfig *jsmapi.StreamConfig) ([]jsm.StreamOption, error) {
 	opts := []jsm.StreamOption{
 		jsm.StreamDescription(spec.Description),
 		jsm.Subjects(spec.Subjects...),
@@ -396,11 +394,14 @@ func streamSpecToConfig(spec *api.StreamSpec) ([]jsm.StreamOption, error) {
 		if spec.Placement.Tags != nil {
 			opts = append(opts, jsm.PlacementTags(spec.Placement.Tags...))
 		}
-	} else {
-		// This will set Placement to its zero value.
-		// Without this, Placement set externally would not be undone by the controller.
+	} else if currentConfig != nil && currentConfig.Placement != nil {
+		// Only clear placement if the current config has placement set.
+		// This avoids triggering NATS error 10123: "can not move and scale a stream in a single update"
+		// when we're only trying to change replicas.
 		opts = append(opts, jsm.PlacementCluster(""))
 	}
+	// If spec.Placement is nil and currentConfig.Placement is also nil/empty,
+	// we don't set any placement option, avoiding unnecessary placement changes.
 
 	// mirror
 	if spec.Mirror != nil {
