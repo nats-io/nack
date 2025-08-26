@@ -106,6 +106,14 @@ type Controller struct {
 
 	accLister listers.AccountLister
 
+	// Informers for unsupported resources (KeyValue and ObjectStore)
+	// These are only used to emit warnings in legacy mode
+	kvLister listers.KeyValueLister
+	kvSynced cache.InformerSynced
+
+	osLister listers.ObjectStoreLister
+	osSynced cache.InformerSynced
+
 	// cacheDir is where the downloaded TLS certs from the server
 	// will be stored temporarily.
 	cacheDir string
@@ -118,6 +126,8 @@ func NewController(opt Options) *Controller {
 	streamInformer := informerFactory.Jetstream().V1beta2().Streams()
 	consumerInformer := informerFactory.Jetstream().V1beta2().Consumers()
 	accountInformer := informerFactory.Jetstream().V1beta2().Accounts()
+	keyValueInformer := informerFactory.Jetstream().V1beta2().KeyValues()
+	objectStoreInformer := informerFactory.Jetstream().V1beta2().ObjectStores()
 
 	if opt.Recorder == nil {
 		utilruntime.Must(scheme.AddToScheme(k8sscheme.Scheme))
@@ -152,6 +162,41 @@ func NewController(opt Options) *Controller {
 		),
 	)
 
+	// Add warning handlers for unsupported resources in legacy mode
+	keyValueInformer.Informer().AddEventHandler(
+		cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				if kv, ok := obj.(*apis.KeyValue); ok {
+					klog.Warningf("KeyValue resource %s/%s detected but not supported in legacy mode. The NATS KV bucket will NOT be created. Enable --control-loop mode to use KeyValue resources.", kv.Namespace, kv.Name)
+					opt.Recorder.Event(kv, k8sapi.EventTypeWarning, "NotSupported", "KeyValue resources require --control-loop mode. The NATS KV bucket will NOT be created.")
+				}
+			},
+			UpdateFunc: func(oldObj, newObj interface{}) {
+				if kv, ok := newObj.(*apis.KeyValue); ok {
+					klog.Warningf("KeyValue resource %s/%s updated but not supported in legacy mode. Changes will NOT be applied to NATS. Enable --control-loop mode to use KeyValue resources.", kv.Namespace, kv.Name)
+					opt.Recorder.Event(kv, k8sapi.EventTypeWarning, "NotSupported", "KeyValue resources require --control-loop mode. Updates will NOT be applied.")
+				}
+			},
+		},
+	)
+
+	objectStoreInformer.Informer().AddEventHandler(
+		cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				if os, ok := obj.(*apis.ObjectStore); ok {
+					klog.Warningf("ObjectStore resource %s/%s detected but not supported in legacy mode. The NATS object store will NOT be created. Enable --control-loop mode to use ObjectStore resources.", os.Namespace, os.Name)
+					opt.Recorder.Event(os, k8sapi.EventTypeWarning, "NotSupported", "ObjectStore resources require --control-loop mode. The NATS object store will NOT be created.")
+				}
+			},
+			UpdateFunc: func(oldObj, newObj interface{}) {
+				if os, ok := newObj.(*apis.ObjectStore); ok {
+					klog.Warningf("ObjectStore resource %s/%s updated but not supported in legacy mode. Changes will NOT be applied to NATS. Enable --control-loop mode to use ObjectStore resources.", os.Namespace, os.Name)
+					opt.Recorder.Event(os, k8sapi.EventTypeWarning, "NotSupported", "ObjectStore resources require --control-loop mode. Updates will NOT be applied.")
+				}
+			},
+		},
+	)
+
 	cacheDir, err := os.MkdirTemp(".", "nack")
 	if err != nil {
 		panic(err)
@@ -176,7 +221,14 @@ func NewController(opt Options) *Controller {
 		cnsQueue:  consumerQueue,
 
 		accLister: accountInformer.Lister(),
-		cacheDir:  cacheDir,
+
+		kvLister: keyValueInformer.Lister(),
+		kvSynced: keyValueInformer.Informer().HasSynced,
+
+		osLister: objectStoreInformer.Lister(),
+		osSynced: objectStoreInformer.Informer().HasSynced,
+
+		cacheDir: cacheDir,
 	}
 }
 
@@ -233,6 +285,13 @@ func (c *Controller) Run() error {
 	}
 	if !cache.WaitForCacheSync(c.ctx.Done(), c.cnsSynced) {
 		return fmt.Errorf("failed to wait for consumer cache sync")
+	}
+	// Also wait for KeyValue and ObjectStore caches to sync so we can emit warnings
+	if !cache.WaitForCacheSync(c.ctx.Done(), c.kvSynced) {
+		return fmt.Errorf("failed to wait for keyvalue cache sync")
+	}
+	if !cache.WaitForCacheSync(c.ctx.Done(), c.osSynced) {
+		return fmt.Errorf("failed to wait for objectstore cache sync")
 	}
 
 	go wait.Until(c.runStreamQueue, time.Second, c.ctx.Done())
