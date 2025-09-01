@@ -857,6 +857,18 @@ func Test_consumerSpecToConfig(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "deliver policy lastPerSubject",
+			spec: &api.ConsumerSpec{
+				DurableName:   "test-consumer",
+				DeliverPolicy: "lastPerSubject",
+			},
+			want: &jsmapi.ConsumerConfig{
+				Durable:       "test-consumer",
+				DeliverPolicy: jsmapi.DeliverLastPerSubject,
+			},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
