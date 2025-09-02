@@ -401,7 +401,7 @@ func TestConsumerSpecToOpts(t *testing.T) {
 				DeliverPolicy: "lastPerSubject",
 			},
 			expected: jsmapi.ConsumerConfig{
-				Durable: "my-consumer",
+				Durable:       "my-consumer",
 				DeliverPolicy: jsmapi.DeliverLastPerSubject,
 			},
 		},

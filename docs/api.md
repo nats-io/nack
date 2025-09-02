@@ -1781,6 +1781,8 @@ The user and password to be used to connect to the NATS Service.
 
 ## KeyValue
 
+> **⚠️ Important**: KeyValue resources require the JetStream controller to be running in **control-loop mode** (`--control-loop` flag). They are not supported in the default legacy mode.
+
 <sup><sup>[↩ Parent](#jetstreamnatsiov1beta2)</sup></sup>
 
 <table>
@@ -2388,6 +2390,8 @@ A client's TLS certs and keys.
 </table>
 
 ## ObjectStore
+
+> **⚠️ Important**: ObjectStore resources require the JetStream controller to be running in **control-loop mode** (`--control-loop` flag). They are not supported in the default legacy mode.
 
 <sup><sup>[↩ Parent](#jetstreamnatsiov1beta2)</sup></sup>
 
