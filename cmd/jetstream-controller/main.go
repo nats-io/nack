@@ -156,6 +156,7 @@ func run() error {
 	})
 
 	klog.Infof("Starting %s v%s...", os.Args[0], Version)
+	klog.Infof("Running in LEGACY mode")
 	if *readOnly {
 		klog.Infof("Running in read-only mode: JetStream state in server will not be changed")
 	}
@@ -222,6 +223,10 @@ func runControlLoop(config *rest.Config, natsCfg *controller.NatsConfig, control
 	}
 
 	klog.Info("starting manager")
+	klog.Infof("Running in CONTROL-LOOP mode")
+	if controllerCfg.ReadOnly {
+		klog.Infof("Running in read-only mode: JetStream state in server will not be changed")
+	}
 	return mgr.Start(ctrl.SetupSignalHandler())
 }
 

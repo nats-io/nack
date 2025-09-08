@@ -9,7 +9,18 @@
 
 ## JetStream Controller
 
-The JetStream controllers allows you to manage [NATS JetStream](https://docs.nats.io/nats-concepts/jetstream) [Streams](https://docs.nats.io/nats-concepts/jetstream/streams), [Consumers](https://docs.nats.io/nats-concepts/jetstream/consumers), [Key/Value Stores](https://docs.nats.io/nats-concepts/jetstream/key-value-store), and [Object Stores](https://docs.nats.io/nats-concepts/jetstream/obj_store) via Kubernetes CRDs.
+The JetStream controllers allows you to manage [NATS JetStream](https://docs.nats.io/nats-concepts/jetstream) resources via Kubernetes CRDs.
+
+### Controller Modes
+
+NACK supports two controller modes with different capabilities:
+
+| Mode | Streams | Consumers | Key/Value | Object Store | Accounts |
+|------|---------|-----------|-----------|--------------|----------|
+| **Legacy (default)** | ✅ | ✅ | ❌ | ❌ | ❌ |
+| **Control-loop** (`--control-loop`) | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+> **Important**: Key/Value stores and Object stores are **only supported in control-loop mode**. If you create KeyValue or ObjectStore resources without enabling control-loop mode, they will not be reconciled.
 
 Resources managed by NACK controllers are expected to _exclusively_ be managed by NACK, and configuration state will be enforced if mutated by an external client.
 
@@ -84,6 +95,7 @@ spec:
   maxDeliver: 20
   ackPolicy: explicit
 ---
+# Note: KeyValue requires control-loop mode to be enabled
 apiVersion: jetstream.nats.io/v1beta2
 kind: KeyValue
 metadata:
@@ -95,6 +107,7 @@ spec:
   maxBytes: 2048
   compression: true
 ---
+# Note: ObjectStore requires control-loop mode to be enabled
 apiVersion: jetstream.nats.io/v1beta2
 kind: ObjectStore
 metadata:
