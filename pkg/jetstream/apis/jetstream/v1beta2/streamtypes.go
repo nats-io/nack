@@ -55,10 +55,10 @@ type StreamSpec struct {
 	ConsumerLimits         *ConsumerLimits   `json:"consumerLimits"`
 	AllowMsgTTL            bool              `json:"allowMsgTtl"`
 	SubjectDeleteMarkerTTL string            `json:"subjectDeleteMarkerTtl"`
-	AllowMsgCounter        bool              `json:"allowMsgCounter"`      // Enable message counters
-	AllowAtomicPublish     bool              `json:"allowAtomicPublish"`   // Allow atomic batch publishing
-	AllowMsgSchedules      bool              `json:"allowMsgSchedules"`    // Enable message scheduling
-	PersistMode            string            `json:"persistMode"`          // Persistence mode: default, async, or empty for default
+	AllowMsgCounter        bool              `json:"allowMsgCounter"`    // Enable message counters
+	AllowAtomicPublish     bool              `json:"allowAtomicPublish"` // Allow atomic batch publishing
+	AllowMsgSchedules      bool              `json:"allowMsgSchedules"`  // Enable message scheduling
+	PersistMode            string            `json:"persistMode"`        // Persistence mode: default, async, or empty for default
 	BaseStreamConfig
 }
 

@@ -337,7 +337,6 @@ func createStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 		opts = append(opts, jsm.SubjectDeleteMarkerTTL(d))
 	}
 
-	// Handle new stream fields
 	if spec.AllowMsgCounter {
 		opts = append(opts, func(o *jsmapi.StreamConfig) error {
 			o.AllowMsgCounter = true
@@ -359,22 +358,16 @@ func createStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 		})
 	}
 
-	// Handle PersistMode
-	switch spec.PersistMode {
-	case "async":
+	if spec.PersistMode == "async" {
 		opts = append(opts, func(o *jsmapi.StreamConfig) error {
 			o.PersistMode = jsmapi.AsyncPersistMode
 			return nil
 		})
-	case "default":
+	} else if spec.PersistMode == "default" {
 		opts = append(opts, func(o *jsmapi.StreamConfig) error {
 			o.PersistMode = jsmapi.DefaultPersistMode
 			return nil
 		})
-	case "":
-		// Default, don't set
-	default:
-		// Invalid value, server will reject if not valid
 	}
 
 	_, err = c.NewStream(ctx, spec.Name, opts)
@@ -492,15 +485,10 @@ func updateStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 	}
 
 	// Handle PersistMode
-	switch spec.PersistMode {
-	case "async":
+	if spec.PersistMode == "async" {
 		config.PersistMode = jsmapi.AsyncPersistMode
-	case "default":
+	} else if spec.PersistMode == "default" {
 		config.PersistMode = jsmapi.DefaultPersistMode
-	case "":
-		// Default, don't set
-	default:
-		// Invalid value, server will reject if not valid
 	}
 
 	return js.UpdateConfiguration(config)

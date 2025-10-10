@@ -552,21 +552,16 @@ func streamSpecToConfig(spec *api.StreamSpec, currentConfig *jsmapi.StreamConfig
 	}
 
 	// persistMode
-	switch spec.PersistMode {
-	case "async":
+	if spec.PersistMode == "async" {
 		opts = append(opts, func(o *jsmapi.StreamConfig) error {
 			o.PersistMode = jsmapi.AsyncPersistMode
 			return nil
 		})
-	case "default":
+	} else if spec.PersistMode == "default" {
 		opts = append(opts, func(o *jsmapi.StreamConfig) error {
 			o.PersistMode = jsmapi.DefaultPersistMode
 			return nil
 		})
-	case "":
-		// Default, don't set
-	default:
-		// Invalid value, server will reject if not valid
 	}
 
 	return opts, nil

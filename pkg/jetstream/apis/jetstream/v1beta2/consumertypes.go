@@ -22,7 +22,6 @@ func (c *Consumer) GetSpec() interface{} {
 
 // ConsumerSpec is the spec for a Consumer resource
 type ConsumerSpec struct {
-	Name               string            `json:"name"`        // Consumer name (separate from durable)
 	Description        string            `json:"description"`
 	AckPolicy          string            `json:"ackPolicy"`
 	AckWait            string            `json:"ackWait"`
@@ -51,10 +50,10 @@ type ConsumerSpec struct {
 	Replicas           int               `json:"replicas"`
 	MemStorage         bool              `json:"memStorage"` // Maps to MemoryStorage
 	Metadata           map[string]string `json:"metadata"`
-	PauseUntil         string            `json:"pauseUntil"`       // RFC3339 timestamp for pausing consumer
-	PriorityPolicy     string            `json:"priorityPolicy"`   // Priority policy: none, pinned_client, overflow, prioritized
-	PinnedTTL          string            `json:"pinnedTtl"`        // Duration for pinned client timeout
-	PriorityGroups     []string          `json:"priorityGroups"`   // List of priority groups
+	PauseUntil         string            `json:"pauseUntil"`     // RFC3339 timestamp for pausing consumer
+	PriorityPolicy     string            `json:"priorityPolicy"` // Priority policy: none, pinned_client, overflow, prioritized
+	PinnedTTL          string            `json:"pinnedTtl"`      // Duration for pinned client timeout
+	PriorityGroups     []string          `json:"priorityGroups"` // List of priority groups
 
 	StreamName string `json:"streamName"`
 	BaseStreamConfig

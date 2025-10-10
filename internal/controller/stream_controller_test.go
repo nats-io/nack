@@ -875,10 +875,10 @@ func Test_mapSpecToConfig(t *testing.T) {
 		{
 			name: "persist mode default",
 			spec: &api.StreamSpec{
-				PersistMode: "default",
-				AllowMsgCounter: false,
+				PersistMode:        "default",
+				AllowMsgCounter:    false,
 				AllowAtomicPublish: false,
-				AllowMsgSchedules: false,
+				AllowMsgSchedules:  false,
 			},
 			want: jsmapi.StreamConfig{
 				PersistMode: jsmapi.DefaultPersistMode,

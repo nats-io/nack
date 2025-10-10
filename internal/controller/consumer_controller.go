@@ -486,11 +486,6 @@ func consumerSpecToConfig(spec *api.ConsumerSpec) ([]jsm.ConsumerOption, error) 
 		opts = append(opts, jsm.ConsumerOverrideMemoryStorage())
 	}
 
-	// Handle new consumer name field (separate from durable)
-	if spec.Name != "" {
-		opts = append(opts, jsm.ConsumerName(spec.Name))
-	}
-
 	// Handle PauseUntil for pausing consumer
 	if spec.PauseUntil != "" {
 		t, err := time.Parse(time.RFC3339, spec.PauseUntil)
@@ -511,9 +506,6 @@ func consumerSpecToConfig(spec *api.ConsumerSpec) ([]jsm.ConsumerOption, error) 
 				return nil, fmt.Errorf("invalid pinnedTTL duration: %w", err)
 			}
 			opts = append(opts, jsm.PinnedClientPriorityGroups(dur, spec.PriorityGroups...))
-		} else {
-			// Default TTL if not specified
-			opts = append(opts, jsm.PinnedClientPriorityGroups(5*time.Minute, spec.PriorityGroups...))
 		}
 	case "overflow":
 		opts = append(opts, jsm.OverflowPriorityGroups(spec.PriorityGroups...))
