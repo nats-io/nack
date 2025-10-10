@@ -527,6 +527,48 @@ func streamSpecToConfig(spec *api.StreamSpec, currentConfig *jsmapi.StreamConfig
 		opts = append(opts, jsm.SubjectDeleteMarkerTTL(d))
 	}
 
+	// allowMsgCounter
+	if spec.AllowMsgCounter {
+		opts = append(opts, func(o *jsmapi.StreamConfig) error {
+			o.AllowMsgCounter = true
+			return nil
+		})
+	}
+
+	// allowAtomicPublish
+	if spec.AllowAtomicPublish {
+		opts = append(opts, func(o *jsmapi.StreamConfig) error {
+			o.AllowAtomicPublish = true
+			return nil
+		})
+	}
+
+	// allowMsgSchedules
+	if spec.AllowMsgSchedules {
+		opts = append(opts, func(o *jsmapi.StreamConfig) error {
+			o.AllowMsgSchedules = true
+			return nil
+		})
+	}
+
+	// persistMode
+	switch spec.PersistMode {
+	case "async":
+		opts = append(opts, func(o *jsmapi.StreamConfig) error {
+			o.PersistMode = jsmapi.AsyncPersistMode
+			return nil
+		})
+	case "default":
+		opts = append(opts, func(o *jsmapi.StreamConfig) error {
+			o.PersistMode = jsmapi.DefaultPersistMode
+			return nil
+		})
+	case "":
+		// Default, don't set
+	default:
+		// Invalid value, server will reject if not valid
+	}
+
 	return opts, nil
 }
 

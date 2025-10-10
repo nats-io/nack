@@ -777,6 +777,10 @@ func Test_mapSpecToConfig(t *testing.T) {
 				Subjects:               []string{"orders.*"},
 				AllowMsgTTL:            true,
 				SubjectDeleteMarkerTTL: "10s",
+				AllowMsgCounter:        true,
+				AllowAtomicPublish:     true,
+				AllowMsgSchedules:      true,
+				PersistMode:            "async",
 				BaseStreamConfig: api.BaseStreamConfig{
 					PreventDelete: false,
 					PreventUpdate: false,
@@ -857,10 +861,27 @@ func Test_mapSpecToConfig(t *testing.T) {
 				ConsumerLimits:         jsmapi.StreamConsumerLimits{},
 				AllowMsgTTL:            true,
 				SubjectDeleteMarkerTTL: time.Second * 10,
+				AllowMsgCounter:        true,
+				AllowAtomicPublish:     true,
+				AllowMsgSchedules:      true,
+				PersistMode:            jsmapi.AsyncPersistMode,
 				Metadata: map[string]string{
 					"meta": "data",
 				},
 				Template: "",
+			},
+			wantErr: false,
+		},
+		{
+			name: "persist mode default",
+			spec: &api.StreamSpec{
+				PersistMode: "default",
+				AllowMsgCounter: false,
+				AllowAtomicPublish: false,
+				AllowMsgSchedules: false,
+			},
+			want: jsmapi.StreamConfig{
+				PersistMode: jsmapi.DefaultPersistMode,
 			},
 			wantErr: false,
 		},

@@ -18,6 +18,7 @@ package v1beta2
 // ConsumerSpecApplyConfiguration represents a declarative configuration of the ConsumerSpec type for use
 // with apply.
 type ConsumerSpecApplyConfiguration struct {
+	Name               *string           `json:"name,omitempty"`
 	Description        *string           `json:"description,omitempty"`
 	AckPolicy          *string           `json:"ackPolicy,omitempty"`
 	AckWait            *string           `json:"ackWait,omitempty"`
@@ -46,6 +47,10 @@ type ConsumerSpecApplyConfiguration struct {
 	Replicas           *int              `json:"replicas,omitempty"`
 	MemStorage         *bool             `json:"memStorage,omitempty"`
 	Metadata           map[string]string `json:"metadata,omitempty"`
+	PauseUntil         *string           `json:"pauseUntil,omitempty"`
+	PriorityPolicy     *string           `json:"priorityPolicy,omitempty"`
+	PinnedTTL          *string           `json:"pinnedTtl,omitempty"`
+	PriorityGroups     []string          `json:"priorityGroups,omitempty"`
 	StreamName         *string           `json:"streamName,omitempty"`
 }
 
@@ -53,6 +58,14 @@ type ConsumerSpecApplyConfiguration struct {
 // apply.
 func ConsumerSpec() *ConsumerSpecApplyConfiguration {
 	return &ConsumerSpecApplyConfiguration{}
+}
+
+// WithName sets the Name field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Name field is set to the value of the last call.
+func (b *ConsumerSpecApplyConfiguration) WithName(value string) *ConsumerSpecApplyConfiguration {
+	b.Name = &value
+	return b
 }
 
 // WithDescription sets the Description field in the declarative configuration to the given value
@@ -285,6 +298,40 @@ func (b *ConsumerSpecApplyConfiguration) WithMetadata(entries map[string]string)
 	}
 	for k, v := range entries {
 		b.Metadata[k] = v
+	}
+	return b
+}
+
+// WithPauseUntil sets the PauseUntil field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the PauseUntil field is set to the value of the last call.
+func (b *ConsumerSpecApplyConfiguration) WithPauseUntil(value string) *ConsumerSpecApplyConfiguration {
+	b.PauseUntil = &value
+	return b
+}
+
+// WithPriorityPolicy sets the PriorityPolicy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the PriorityPolicy field is set to the value of the last call.
+func (b *ConsumerSpecApplyConfiguration) WithPriorityPolicy(value string) *ConsumerSpecApplyConfiguration {
+	b.PriorityPolicy = &value
+	return b
+}
+
+// WithPinnedTTL sets the PinnedTTL field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the PinnedTTL field is set to the value of the last call.
+func (b *ConsumerSpecApplyConfiguration) WithPinnedTTL(value string) *ConsumerSpecApplyConfiguration {
+	b.PinnedTTL = &value
+	return b
+}
+
+// WithPriorityGroups adds the given value to the PriorityGroups field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the PriorityGroups field.
+func (b *ConsumerSpecApplyConfiguration) WithPriorityGroups(values ...string) *ConsumerSpecApplyConfiguration {
+	for i := range values {
+		b.PriorityGroups = append(b.PriorityGroups, values[i])
 	}
 	return b
 }
