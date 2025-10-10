@@ -486,7 +486,7 @@ var _ = Describe("Stream Controller", func() {
 			Expect(streamInfo.Config.Subjects).To(Equal([]string{"tests.*"}))
 		})
 
-		// TODO: Uncomment when test suite is updated to use jsm.go API or newer nats.go version with these fields
+		// TODO: Uncomment when nats.go is updated to v1.46.1 or later which has these fields
 		// It("should create stream with new feature flags on the server", func(ctx SpecContext) {
 		// 	By("updating the stream spec with new feature flags")
 		// 	err := k8sClient.Get(ctx, typeNamespacedName, stream)

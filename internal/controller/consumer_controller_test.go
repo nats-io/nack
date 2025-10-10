@@ -395,7 +395,7 @@ var _ = Describe("Consumer Controller", func() {
 				Expect(streamInfo.Config.ReplayPolicy).To(Equal(jetstream.ReplayInstantPolicy))
 			})
 
-			// TODO: Uncomment when test suite is updated to use jsm.go API or when nats.go jetstream types match jsmapi types
+			// TODO: Uncomment when nats.go is updated to v1.46.1 or later which has these fields
 			// It("should set InactiveThreshold and priority fields on the server", func(ctx SpecContext) {
 			// 	By("updating the consumer spec with new fields")
 			// 	err := k8sClient.Get(ctx, typeNamespacedName, consumer)
@@ -421,7 +421,7 @@ var _ = Describe("Consumer Controller", func() {
 
 			// 	By("verifying new fields are set on server")
 			// 	Expect(consumerInfo.Config.InactiveThreshold).To(Equal(30 * time.Second))
-			// 	Expect(consumerInfo.Config.PriorityPolicy).To(Equal(jsmapi.PriorityPinnedClient))
+			// 	Expect(consumerInfo.Config.PriorityPolicy).To(Equal(jetstream.PriorityPolicyPinned))
 			// 	Expect(consumerInfo.Config.PinnedTTL).To(Equal(5 * time.Minute))
 			// 	Expect(consumerInfo.Config.PriorityGroups).To(Equal([]string{"high", "medium"}))
 			// })
