@@ -486,7 +486,6 @@ func consumerSpecToConfig(spec *api.ConsumerSpec) ([]jsm.ConsumerOption, error) 
 		opts = append(opts, jsm.ConsumerOverrideMemoryStorage())
 	}
 
-	// Handle PauseUntil for pausing consumer
 	if spec.PauseUntil != "" {
 		t, err := time.Parse(time.RFC3339, spec.PauseUntil)
 		if err != nil {
@@ -495,11 +494,10 @@ func consumerSpecToConfig(spec *api.ConsumerSpec) ([]jsm.ConsumerOption, error) 
 		opts = append(opts, jsm.PauseUntil(t))
 	}
 
-	// Handle PriorityPolicy with PriorityGroups and PinnedTTL
 	switch spec.PriorityPolicy {
 	case "", "none":
 		// Default is none, no need to set
-	case "pinned_client", "pinned":
+	case "pinned_client":
 		if spec.PinnedTTL != "" {
 			dur, err := time.ParseDuration(spec.PinnedTTL)
 			if err != nil {

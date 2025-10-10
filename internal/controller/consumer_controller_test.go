@@ -739,6 +739,7 @@ func Test_consumerSpecToConfig(t *testing.T) {
 				Replicas:           9,
 				SampleFreq:         "25%",
 				StreamName:         "",
+				InactiveThreshold:  "30s",
 				Metadata: map[string]string{
 					"meta": "data",
 				},
@@ -773,7 +774,7 @@ func Test_consumerSpecToConfig(t *testing.T) {
 				MaxRequestBatch:    7,
 				MaxRequestExpires:  8 * time.Second,
 				MaxRequestMaxBytes: 1024,
-				InactiveThreshold:  0, // TODO no value?
+				InactiveThreshold:  30 * time.Second,
 				Replicas:           9,
 				MemoryStorage:      true,
 				FilterSubjects:     []string{"time.us.east", "time.us.west"},
@@ -812,6 +813,7 @@ func Test_consumerSpecToConfig(t *testing.T) {
 				Replicas:           9,
 				SampleFreq:         "30%",
 				StreamName:         "",
+				InactiveThreshold:  "1m",
 				Metadata: map[string]string{
 					"meta": "data",
 				},
@@ -848,7 +850,7 @@ func Test_consumerSpecToConfig(t *testing.T) {
 				MaxRequestBatch:    7,
 				MaxRequestExpires:  8 * time.Second,
 				MaxRequestMaxBytes: 1024,
-				InactiveThreshold:  0, // TODO no value?
+				InactiveThreshold:  time.Minute,
 				Replicas:           9,
 				MemoryStorage:      false,
 				Metadata: map[string]string{
@@ -869,6 +871,39 @@ func Test_consumerSpecToConfig(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "inactive threshold valid duration",
+			spec: &api.ConsumerSpec{
+				DurableName:       "test-consumer",
+				InactiveThreshold: "2h30m",
+			},
+			want: &jsmapi.ConsumerConfig{
+				Durable:           "test-consumer",
+				InactiveThreshold: 2*time.Hour + 30*time.Minute,
+			},
+			wantErr: false,
+		},
+		{
+			name: "inactive threshold empty string",
+			spec: &api.ConsumerSpec{
+				DurableName:       "test-consumer",
+				InactiveThreshold: "",
+			},
+			want: &jsmapi.ConsumerConfig{
+				Durable:           "test-consumer",
+				InactiveThreshold: 0,
+			},
+			wantErr: false,
+		},
+		{
+			name: "inactive threshold invalid duration",
+			spec: &api.ConsumerSpec{
+				DurableName:       "test-consumer",
+				InactiveThreshold: "not-a-duration",
+			},
+			want:    nil,
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -878,12 +913,14 @@ func Test_consumerSpecToConfig(t *testing.T) {
 				return
 			}
 
-			got := &jsmapi.ConsumerConfig{}
-			for _, o := range cOpts {
-				o(got)
-			}
+			if !tt.wantErr {
+				got := &jsmapi.ConsumerConfig{}
+				for _, o := range cOpts {
+					o(got)
+				}
 
-			assert.EqualValues(t, tt.want, got, "consumerSpecToConfig(%v)", tt.spec)
+				assert.EqualValues(t, tt.want, got, "consumerSpecToConfig(%v)", tt.spec)
+			}
 		})
 	}
 }

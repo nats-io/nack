@@ -346,7 +346,7 @@ func consumerSpecToOpts(spec apis.ConsumerSpec) ([]jsm.ConsumerOption, error) {
 	switch spec.PriorityPolicy {
 	case "", "none":
 		// Default is none, no need to set
-	case "pinned_client", "pinned":
+	case "pinned_client":
 		if spec.PinnedTTL != "" {
 			dur, err := time.ParseDuration(spec.PinnedTTL)
 			if err != nil {
