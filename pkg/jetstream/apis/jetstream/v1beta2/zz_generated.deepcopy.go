@@ -276,6 +276,11 @@ func (in *ConsumerSpec) DeepCopyInto(out *ConsumerSpec) {
 			(*out)[key] = val
 		}
 	}
+	if in.PriorityGroups != nil {
+		in, out := &in.PriorityGroups, &out.PriorityGroups
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	in.BaseStreamConfig.DeepCopyInto(&out.BaseStreamConfig)
 	return
 }

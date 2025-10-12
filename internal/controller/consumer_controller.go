@@ -486,6 +486,33 @@ func consumerSpecToConfig(spec *api.ConsumerSpec) ([]jsm.ConsumerOption, error) 
 		opts = append(opts, jsm.ConsumerOverrideMemoryStorage())
 	}
 
+	if spec.PauseUntil != "" {
+		t, err := time.Parse(time.RFC3339, spec.PauseUntil)
+		if err != nil {
+			return nil, fmt.Errorf("invalid pauseUntil time: %w", err)
+		}
+		opts = append(opts, jsm.PauseUntil(t))
+	}
+
+	switch spec.PriorityPolicy {
+	case "", "none":
+		// Default is none, no need to set
+	case "pinned_client":
+		if spec.PinnedTTL != "" {
+			dur, err := time.ParseDuration(spec.PinnedTTL)
+			if err != nil {
+				return nil, fmt.Errorf("invalid pinnedTTL duration: %w", err)
+			}
+			opts = append(opts, jsm.PinnedClientPriorityGroups(dur, spec.PriorityGroups...))
+		}
+	case "overflow":
+		opts = append(opts, jsm.OverflowPriorityGroups(spec.PriorityGroups...))
+	case "prioritized":
+		opts = append(opts, jsm.PrioritizedPriorityGroups(spec.PriorityGroups...))
+	default:
+		return nil, fmt.Errorf("invalid priority policy: %s", spec.PriorityPolicy)
+	}
+
 	return opts, nil
 }
 

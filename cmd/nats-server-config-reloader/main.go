@@ -43,12 +43,12 @@ func main() {
 
 	// Help and version
 	var (
-		showHelp     bool
-		showVersion  bool
-		fileSet      StringSet
-		customSignal int
-		forcePoll    bool
-		pollInterval time.Duration
+		showHelp          bool
+		showVersion       bool
+		fileSet           StringSet
+		customSignal      int
+		forcePoll         bool
+		pollInterval      time.Duration
 		maxWatcherRetries int
 	)
 

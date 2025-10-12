@@ -395,6 +395,37 @@ var _ = Describe("Consumer Controller", func() {
 				Expect(streamInfo.Config.ReplayPolicy).To(Equal(jetstream.ReplayInstantPolicy))
 			})
 
+			// TODO: Uncomment when nats.go is updated to v1.46.1 or later which has these fields
+			// It("should set InactiveThreshold and priority fields on the server", func(ctx SpecContext) {
+			// 	By("updating the consumer spec with new fields")
+			// 	err := k8sClient.Get(ctx, typeNamespacedName, consumer)
+			// 	Expect(err).NotTo(HaveOccurred())
+
+			// 	consumer.Spec.InactiveThreshold = "30s"
+			// 	consumer.Spec.PriorityPolicy = "pinned_client"
+			// 	consumer.Spec.PinnedTTL = "5m"
+			// 	consumer.Spec.PriorityGroups = []string{"high", "medium"}
+			// 	Expect(k8sClient.Update(ctx, consumer)).To(Succeed())
+
+			// 	By("reconciling the updated resource")
+			// 	result, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
+			// 	Expect(err).NotTo(HaveOccurred())
+			// 	Expect(result.IsZero()).To(BeTrue())
+
+			// 	By("fetching the updated consumer from NATS")
+			// 	natsConsumer, err := jsClient.Consumer(ctx, streamName, consumerName)
+			// 	Expect(err).NotTo(HaveOccurred())
+
+			// 	consumerInfo, err := natsConsumer.Info(ctx)
+			// 	Expect(err).NotTo(HaveOccurred())
+
+			// 	By("verifying new fields are set on server")
+			// 	Expect(consumerInfo.Config.InactiveThreshold).To(Equal(30 * time.Second))
+			// 	Expect(consumerInfo.Config.PriorityPolicy).To(Equal(jetstream.PriorityPolicyPinned))
+			// 	Expect(consumerInfo.Config.PinnedTTL).To(Equal(5 * time.Minute))
+			// 	Expect(consumerInfo.Config.PriorityGroups).To(Equal([]string{"high", "medium"}))
+			// })
+
 			When("PreventUpdate is set", func() {
 				BeforeEach(func(ctx SpecContext) {
 					By("setting preventUpdate on the resource")
@@ -739,6 +770,7 @@ func Test_consumerSpecToConfig(t *testing.T) {
 				Replicas:           9,
 				SampleFreq:         "25%",
 				StreamName:         "",
+				InactiveThreshold:  "30s",
 				Metadata: map[string]string{
 					"meta": "data",
 				},
@@ -773,7 +805,7 @@ func Test_consumerSpecToConfig(t *testing.T) {
 				MaxRequestBatch:    7,
 				MaxRequestExpires:  8 * time.Second,
 				MaxRequestMaxBytes: 1024,
-				InactiveThreshold:  0, // TODO no value?
+				InactiveThreshold:  30 * time.Second,
 				Replicas:           9,
 				MemoryStorage:      true,
 				FilterSubjects:     []string{"time.us.east", "time.us.west"},
@@ -812,6 +844,7 @@ func Test_consumerSpecToConfig(t *testing.T) {
 				Replicas:           9,
 				SampleFreq:         "30%",
 				StreamName:         "",
+				InactiveThreshold:  "1m",
 				Metadata: map[string]string{
 					"meta": "data",
 				},
@@ -848,7 +881,7 @@ func Test_consumerSpecToConfig(t *testing.T) {
 				MaxRequestBatch:    7,
 				MaxRequestExpires:  8 * time.Second,
 				MaxRequestMaxBytes: 1024,
-				InactiveThreshold:  0, // TODO no value?
+				InactiveThreshold:  time.Minute,
 				Replicas:           9,
 				MemoryStorage:      false,
 				Metadata: map[string]string{
@@ -869,6 +902,114 @@ func Test_consumerSpecToConfig(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "inactive threshold valid duration",
+			spec: &api.ConsumerSpec{
+				DurableName:       "test-consumer",
+				InactiveThreshold: "2h30m",
+			},
+			want: &jsmapi.ConsumerConfig{
+				Durable:           "test-consumer",
+				InactiveThreshold: 2*time.Hour + 30*time.Minute,
+			},
+			wantErr: false,
+		},
+		{
+			name: "inactive threshold empty string",
+			spec: &api.ConsumerSpec{
+				DurableName:       "test-consumer",
+				InactiveThreshold: "",
+			},
+			want: &jsmapi.ConsumerConfig{
+				Durable:           "test-consumer",
+				InactiveThreshold: 0,
+			},
+			wantErr: false,
+		},
+		{
+			name: "inactive threshold invalid duration",
+			spec: &api.ConsumerSpec{
+				DurableName:       "test-consumer",
+				InactiveThreshold: "not-a-duration",
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "priority policy pinned_client with ttl",
+			spec: &api.ConsumerSpec{
+				DurableName:    "test-consumer",
+				PriorityPolicy: "pinned_client",
+				PinnedTTL:      "10m",
+				PriorityGroups: []string{"gold", "silver"},
+			},
+			want: &jsmapi.ConsumerConfig{
+				Durable:        "test-consumer",
+				PriorityPolicy: jsmapi.PriorityPinnedClient,
+				PinnedTTL:      10 * time.Minute,
+				PriorityGroups: []string{"gold", "silver"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "priority policy overflow",
+			spec: &api.ConsumerSpec{
+				DurableName:    "test-consumer",
+				PriorityPolicy: "overflow",
+				PriorityGroups: []string{"backup1", "backup2"},
+			},
+			want: &jsmapi.ConsumerConfig{
+				Durable:        "test-consumer",
+				PriorityPolicy: jsmapi.PriorityOverflow,
+				PriorityGroups: []string{"backup1", "backup2"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "priority policy prioritized",
+			spec: &api.ConsumerSpec{
+				DurableName:    "test-consumer",
+				PriorityPolicy: "prioritized",
+				PriorityGroups: []string{"level1", "level2", "level3"},
+			},
+			want: &jsmapi.ConsumerConfig{
+				Durable:        "test-consumer",
+				PriorityPolicy: jsmapi.PriorityPrioritized,
+				PriorityGroups: []string{"level1", "level2", "level3"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "priority policy none",
+			spec: &api.ConsumerSpec{
+				DurableName:    "test-consumer",
+				PriorityPolicy: "none",
+			},
+			want: &jsmapi.ConsumerConfig{
+				Durable: "test-consumer",
+			},
+			wantErr: false,
+		},
+		{
+			name: "priority policy invalid",
+			spec: &api.ConsumerSpec{
+				DurableName:    "test-consumer",
+				PriorityPolicy: "invalid_policy",
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "priority policy pinned_client invalid ttl",
+			spec: &api.ConsumerSpec{
+				DurableName:    "test-consumer",
+				PriorityPolicy: "pinned_client",
+				PinnedTTL:      "not-a-duration",
+				PriorityGroups: []string{"gold"},
+			},
+			want:    nil,
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -878,12 +1019,14 @@ func Test_consumerSpecToConfig(t *testing.T) {
 				return
 			}
 
-			got := &jsmapi.ConsumerConfig{}
-			for _, o := range cOpts {
-				o(got)
-			}
+			if !tt.wantErr {
+				got := &jsmapi.ConsumerConfig{}
+				for _, o := range cOpts {
+					o(got)
+				}
 
-			assert.EqualValues(t, tt.want, got, "consumerSpecToConfig(%v)", tt.spec)
+				assert.EqualValues(t, tt.want, got, "consumerSpecToConfig(%v)", tt.spec)
+			}
 		})
 	}
 }

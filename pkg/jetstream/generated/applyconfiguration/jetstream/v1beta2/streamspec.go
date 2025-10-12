@@ -55,6 +55,10 @@ type StreamSpecApplyConfiguration struct {
 	ConsumerLimits         *ConsumerLimitsApplyConfiguration   `json:"consumerLimits,omitempty"`
 	AllowMsgTTL            *bool                               `json:"allowMsgTtl,omitempty"`
 	SubjectDeleteMarkerTTL *string                             `json:"subjectDeleteMarkerTtl,omitempty"`
+	AllowMsgCounter        *bool                               `json:"allowMsgCounter,omitempty"`
+	AllowAtomicPublish     *bool                               `json:"allowAtomicPublish,omitempty"`
+	AllowMsgSchedules      *bool                               `json:"allowMsgSchedules,omitempty"`
+	PersistMode            *string                             `json:"persistMode,omitempty"`
 }
 
 // StreamSpecApplyConfiguration constructs a declarative configuration of the StreamSpec type for use with
@@ -337,5 +341,37 @@ func (b *StreamSpecApplyConfiguration) WithAllowMsgTTL(value bool) *StreamSpecAp
 // If called multiple times, the SubjectDeleteMarkerTTL field is set to the value of the last call.
 func (b *StreamSpecApplyConfiguration) WithSubjectDeleteMarkerTTL(value string) *StreamSpecApplyConfiguration {
 	b.SubjectDeleteMarkerTTL = &value
+	return b
+}
+
+// WithAllowMsgCounter sets the AllowMsgCounter field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the AllowMsgCounter field is set to the value of the last call.
+func (b *StreamSpecApplyConfiguration) WithAllowMsgCounter(value bool) *StreamSpecApplyConfiguration {
+	b.AllowMsgCounter = &value
+	return b
+}
+
+// WithAllowAtomicPublish sets the AllowAtomicPublish field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the AllowAtomicPublish field is set to the value of the last call.
+func (b *StreamSpecApplyConfiguration) WithAllowAtomicPublish(value bool) *StreamSpecApplyConfiguration {
+	b.AllowAtomicPublish = &value
+	return b
+}
+
+// WithAllowMsgSchedules sets the AllowMsgSchedules field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the AllowMsgSchedules field is set to the value of the last call.
+func (b *StreamSpecApplyConfiguration) WithAllowMsgSchedules(value bool) *StreamSpecApplyConfiguration {
+	b.AllowMsgSchedules = &value
+	return b
+}
+
+// WithPersistMode sets the PersistMode field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the PersistMode field is set to the value of the last call.
+func (b *StreamSpecApplyConfiguration) WithPersistMode(value string) *StreamSpecApplyConfiguration {
+	b.PersistMode = &value
 	return b
 }

@@ -32,7 +32,7 @@ type ConsumerSpec struct {
 	FilterSubject      string            `json:"filterSubject"`
 	FilterSubjects     []string          `json:"filterSubjects"`
 	FlowControl        bool              `json:"flowControl"`
-	HeartbeatInterval  string            `json:"heartbeatInterval"` // Maps to Heartbeat
+	HeartbeatInterval  string            `json:"heartbeatInterval"` // Maps to IdleHeartbeat
 	MaxAckPending      int               `json:"maxAckPending"`
 	MaxDeliver         int               `json:"maxDeliver"`
 	BackOff            []string          `json:"backoff"`
@@ -50,6 +50,10 @@ type ConsumerSpec struct {
 	Replicas           int               `json:"replicas"`
 	MemStorage         bool              `json:"memStorage"` // Maps to MemoryStorage
 	Metadata           map[string]string `json:"metadata"`
+	PauseUntil         string            `json:"pauseUntil"`     // RFC3339 timestamp for pausing consumer
+	PriorityPolicy     string            `json:"priorityPolicy"` // Priority policy: none, pinned_client, overflow, prioritized
+	PinnedTTL          string            `json:"pinnedTtl"`      // Duration for pinned client timeout
+	PriorityGroups     []string          `json:"priorityGroups"` // List of priority groups
 
 	StreamName string `json:"streamName"`
 	BaseStreamConfig

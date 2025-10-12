@@ -55,6 +55,10 @@ type StreamSpec struct {
 	ConsumerLimits         *ConsumerLimits   `json:"consumerLimits"`
 	AllowMsgTTL            bool              `json:"allowMsgTtl"`
 	SubjectDeleteMarkerTTL string            `json:"subjectDeleteMarkerTtl"`
+	AllowMsgCounter        bool              `json:"allowMsgCounter"`
+	AllowAtomicPublish     bool              `json:"allowAtomicPublish"`
+	AllowMsgSchedules      bool              `json:"allowMsgSchedules"`
+	PersistMode            string            `json:"persistMode"`
 	BaseStreamConfig
 }
 

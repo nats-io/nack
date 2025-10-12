@@ -337,6 +337,39 @@ func createStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 		opts = append(opts, jsm.SubjectDeleteMarkerTTL(d))
 	}
 
+	if spec.AllowMsgCounter {
+		opts = append(opts, func(o *jsmapi.StreamConfig) error {
+			o.AllowMsgCounter = true
+			return nil
+		})
+	}
+
+	if spec.AllowAtomicPublish {
+		opts = append(opts, func(o *jsmapi.StreamConfig) error {
+			o.AllowAtomicPublish = true
+			return nil
+		})
+	}
+
+	if spec.AllowMsgSchedules {
+		opts = append(opts, func(o *jsmapi.StreamConfig) error {
+			o.AllowMsgSchedules = true
+			return nil
+		})
+	}
+
+	if spec.PersistMode == "async" {
+		opts = append(opts, func(o *jsmapi.StreamConfig) error {
+			o.PersistMode = jsmapi.AsyncPersistMode
+			return nil
+		})
+	} else if spec.PersistMode == "default" {
+		opts = append(opts, func(o *jsmapi.StreamConfig) error {
+			o.PersistMode = jsmapi.DefaultPersistMode
+			return nil
+		})
+	}
+
 	_, err = c.NewStream(ctx, spec.Name, opts)
 	return err
 }
@@ -405,6 +438,9 @@ func updateStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 		SubjectTransform:       subjectTransform,
 		AllowMsgTTL:            spec.AllowMsgTTL,
 		SubjectDeleteMarkerTTL: subjectDeleteMarkerTTL,
+		AllowMsgCounter:        spec.AllowMsgCounter,
+		AllowAtomicPublish:     spec.AllowAtomicPublish,
+		AllowMsgSchedules:      spec.AllowMsgSchedules,
 	}
 	if spec.RePublish != nil {
 		config.RePublish = &jsmapi.RePublish{
@@ -446,6 +482,13 @@ func updateStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 		config.Compression = jsmapi.S2Compression
 	case "none":
 		config.Compression = jsmapi.NoCompression
+	}
+
+	// Handle PersistMode
+	if spec.PersistMode == "async" {
+		config.PersistMode = jsmapi.AsyncPersistMode
+	} else if spec.PersistMode == "default" {
+		config.PersistMode = jsmapi.DefaultPersistMode
 	}
 
 	return js.UpdateConfiguration(config)

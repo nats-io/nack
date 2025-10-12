@@ -486,6 +486,39 @@ var _ = Describe("Stream Controller", func() {
 			Expect(streamInfo.Config.Subjects).To(Equal([]string{"tests.*"}))
 		})
 
+		// TODO: Uncomment when nats.go is updated to v1.46.1 or later which has these fields
+		// It("should create stream with new feature flags on the server", func(ctx SpecContext) {
+		// 	By("updating the stream spec with new feature flags")
+		// 	err := k8sClient.Get(ctx, typeNamespacedName, stream)
+		// 	Expect(err).NotTo(HaveOccurred())
+
+		// 	stream.Spec.AllowMsgCounter = true
+		// 	stream.Spec.AllowAtomicPublish = true
+		// 	stream.Spec.AllowMsgSchedules = true
+		// 	stream.Spec.PersistMode = "async"
+		// 	Expect(k8sClient.Update(ctx, stream)).To(Succeed())
+
+		// 	By("reconciling the updated resource")
+		// 	result, err := controller.Reconcile(ctx, reconcile.Request{
+		// 		NamespacedName: typeNamespacedName,
+		// 	})
+		// 	Expect(err).NotTo(HaveOccurred())
+		// 	Expect(result.IsZero()).To(BeTrue())
+
+		// 	By("fetching the updated stream from NATS")
+		// 	natsStream, err := jsClient.Stream(ctx, streamName)
+		// 	Expect(err).NotTo(HaveOccurred())
+
+		// 	streamInfo, err := natsStream.Info(ctx)
+		// 	Expect(err).NotTo(HaveOccurred())
+
+		// 	By("verifying new feature flags are set on server")
+		// 	Expect(streamInfo.Config.AllowMsgCounter).To(BeTrue())
+		// 	Expect(streamInfo.Config.AllowAtomicPublish).To(BeTrue())
+		// 	Expect(streamInfo.Config.AllowMsgSchedules).To(BeTrue())
+		// 	Expect(streamInfo.Config.PersistMode).To(Equal(jetstream.AsyncPersistMode))
+		// })
+
 		It("should set an error state when the nats server is not available", func(ctx SpecContext) {
 			By("setting up controller with unavailable nats server")
 			// Setup client for not running server
@@ -777,6 +810,10 @@ func Test_mapSpecToConfig(t *testing.T) {
 				Subjects:               []string{"orders.*"},
 				AllowMsgTTL:            true,
 				SubjectDeleteMarkerTTL: "10s",
+				AllowMsgCounter:        true,
+				AllowAtomicPublish:     true,
+				AllowMsgSchedules:      true,
+				PersistMode:            "async",
 				BaseStreamConfig: api.BaseStreamConfig{
 					PreventDelete: false,
 					PreventUpdate: false,
@@ -857,10 +894,27 @@ func Test_mapSpecToConfig(t *testing.T) {
 				ConsumerLimits:         jsmapi.StreamConsumerLimits{},
 				AllowMsgTTL:            true,
 				SubjectDeleteMarkerTTL: time.Second * 10,
+				AllowMsgCounter:        true,
+				AllowAtomicPublish:     true,
+				AllowMsgSchedules:      true,
+				PersistMode:            jsmapi.AsyncPersistMode,
 				Metadata: map[string]string{
 					"meta": "data",
 				},
 				Template: "",
+			},
+			wantErr: false,
+		},
+		{
+			name: "persist mode default",
+			spec: &api.StreamSpec{
+				PersistMode:        "default",
+				AllowMsgCounter:    false,
+				AllowAtomicPublish: false,
+				AllowMsgSchedules:  false,
+			},
+			want: jsmapi.StreamConfig{
+				PersistMode: jsmapi.DefaultPersistMode,
 			},
 			wantErr: false,
 		},
