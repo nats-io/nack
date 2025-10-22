@@ -5,8 +5,8 @@ import (
 )
 
 type CredentialsSecret struct {
-	Name string `json:"name"`
-	Key  string `json:"key"`
+	Name string `json:"name,omitempty"`
+	Key  string `json:"key,omitempty"`
 }
 
 type Status struct {
@@ -29,46 +29,46 @@ type BaseStreamConfig struct {
 }
 
 type ConnectionOpts struct {
-	Account  string   `json:"account"`
-	Creds    string   `json:"creds"`
-	Nkey     string   `json:"nkey"`
-	Servers  []string `json:"servers"`
+	Account  string   `json:"account,omitempty"`
+	Creds    string   `json:"creds,omitempty"`
+	Nkey     string   `json:"nkey,omitempty"`
+	Servers  []string `json:"servers,omitempty"`
 	TLS      TLS      `json:"tls"`
-	TLSFirst bool     `json:"tlsFirst"`
-	JsDomain string   `json:"jsDomain"`
+	TLSFirst bool     `json:"tlsFirst,omitempty"`
+	JsDomain string   `json:"jsDomain,omitempty"`
 }
 
 type ConsumerLimits struct {
-	InactiveThreshold string `json:"inactiveThreshold"`
-	MaxAckPending     int    `json:"maxAckPending"`
+	InactiveThreshold string `json:"inactiveThreshold,omitempty"`
+	MaxAckPending     int    `json:"maxAckPending,omitempty"`
 }
 
 type TLS struct {
-	ClientCert string   `json:"clientCert"`
-	ClientKey  string   `json:"clientKey"`
-	RootCAs    []string `json:"rootCas"`
+	ClientCert string   `json:"clientCert,omitempty"`
+	ClientKey  string   `json:"clientKey,omitempty"`
+	RootCAs    []string `json:"rootCas,omitempty"`
 }
 
 type TLSSecret struct {
-	ClientCert string     `json:"cert"`
-	ClientKey  string     `json:"key"`
-	RootCAs    string     `json:"ca"`
+	ClientCert string     `json:"cert,omitempty"`
+	ClientKey  string     `json:"key,omitempty"`
+	RootCAs    string     `json:"ca,omitempty"`
 	Secret     *SecretRef `json:"secret"`
 }
 
 type CredsSecret struct {
-	File   string     `json:"file"`
-	Secret *SecretRef `json:"secret"`
+	File   string     `json:"file,omitempty"`
+	Secret *SecretRef `json:"secret,omitempty"`
 }
 
 type TokenSecret struct {
-	Token  string    `json:"token"`
+	Token  string    `json:"token,omitempty"`
 	Secret SecretRef `json:"secret"`
 }
 
 type User struct {
-	User     string    `json:"user"`
-	Password string    `json:"password"`
+	User     string    `json:"user,omitempty"`
+	Password string    `json:"password,omitempty"`
 	Secret   SecretRef `json:"secret"`
 }
 

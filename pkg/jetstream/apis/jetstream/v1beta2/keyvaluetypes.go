@@ -22,19 +22,19 @@ func (s *KeyValue) GetSpec() interface{} {
 
 // StreamSpec is the spec for a Stream resource
 type KeyValueSpec struct {
-	Bucket       string           `json:"bucket"`
-	Description  string           `json:"description"`
-	MaxValueSize int              `json:"maxValueSize"`
-	History      int              `json:"history"`
-	TTL          string           `json:"ttl"`
-	MaxBytes     int              `json:"maxBytes"`
-	Storage      string           `json:"storage"`
-	Replicas     int              `json:"replicas"`
-	Placement    *StreamPlacement `json:"placement"`
-	RePublish    *RePublish       `json:"republish"`
-	Mirror       *StreamSource    `json:"mirror"`
-	Sources      []*StreamSource  `json:"sources"`
-	Compression  bool             `json:"compression"`
+	Bucket       string           `json:"bucket,omitempty"`
+	Description  string           `json:"description,omitempty"`
+	MaxValueSize int              `json:"maxValueSize,omitempty"`
+	History      int              `json:"history,omitempty"`
+	TTL          string           `json:"ttl,omitempty"`
+	MaxBytes     int              `json:"maxBytes,omitempty"`
+	Storage      string           `json:"storage,omitempty"`
+	Replicas     int              `json:"replicas,omitempty"`
+	Placement    *StreamPlacement `json:"placement,omitempty"`
+	RePublish    *RePublish       `json:"republish,omitempty"`
+	Mirror       *StreamSource    `json:"mirror,omitempty"`
+	Sources      []*StreamSource  `json:"sources,omitempty"`
+	Compression  bool             `json:"compression,omitempty"`
 	BaseStreamConfig
 }
 
