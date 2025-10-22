@@ -395,36 +395,35 @@ var _ = Describe("Consumer Controller", func() {
 				Expect(streamInfo.Config.ReplayPolicy).To(Equal(jetstream.ReplayInstantPolicy))
 			})
 
-			// TODO: Uncomment when nats.go is updated to v1.46.1 or later which has these fields
-			// It("should set InactiveThreshold and priority fields on the server", func(ctx SpecContext) {
-			// 	By("updating the consumer spec with new fields")
-			// 	err := k8sClient.Get(ctx, typeNamespacedName, consumer)
-			// 	Expect(err).NotTo(HaveOccurred())
+			It("should set InactiveThreshold and priority fields on the server", func(ctx SpecContext) {
+				By("updating the consumer spec with new fields")
+				err := k8sClient.Get(ctx, typeNamespacedName, consumer)
+				Expect(err).NotTo(HaveOccurred())
 
-			// 	consumer.Spec.InactiveThreshold = "30s"
-			// 	consumer.Spec.PriorityPolicy = "pinned_client"
-			// 	consumer.Spec.PinnedTTL = "5m"
-			// 	consumer.Spec.PriorityGroups = []string{"high", "medium"}
-			// 	Expect(k8sClient.Update(ctx, consumer)).To(Succeed())
+				consumer.Spec.InactiveThreshold = "30s"
+				consumer.Spec.PriorityPolicy = "pinned_client"
+				consumer.Spec.PinnedTTL = "5m"
+				consumer.Spec.PriorityGroups = []string{"high", "medium"}
+				Expect(k8sClient.Update(ctx, consumer)).To(Succeed())
 
-			// 	By("reconciling the updated resource")
-			// 	result, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
-			// 	Expect(err).NotTo(HaveOccurred())
-			// 	Expect(result.IsZero()).To(BeTrue())
+				By("reconciling the updated resource")
+				result, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result.IsZero()).To(BeTrue())
 
-			// 	By("fetching the updated consumer from NATS")
-			// 	natsConsumer, err := jsClient.Consumer(ctx, streamName, consumerName)
-			// 	Expect(err).NotTo(HaveOccurred())
+				By("fetching the updated consumer from NATS")
+				natsConsumer, err := jsClient.Consumer(ctx, streamName, consumerName)
+				Expect(err).NotTo(HaveOccurred())
 
-			// 	consumerInfo, err := natsConsumer.Info(ctx)
-			// 	Expect(err).NotTo(HaveOccurred())
+				consumerInfo, err := natsConsumer.Info(ctx)
+				Expect(err).NotTo(HaveOccurred())
 
-			// 	By("verifying new fields are set on server")
-			// 	Expect(consumerInfo.Config.InactiveThreshold).To(Equal(30 * time.Second))
-			// 	Expect(consumerInfo.Config.PriorityPolicy).To(Equal(jetstream.PriorityPolicyPinned))
-			// 	Expect(consumerInfo.Config.PinnedTTL).To(Equal(5 * time.Minute))
-			// 	Expect(consumerInfo.Config.PriorityGroups).To(Equal([]string{"high", "medium"}))
-			// })
+				By("verifying new fields are set on server")
+				Expect(consumerInfo.Config.InactiveThreshold).To(Equal(30 * time.Second))
+				Expect(consumerInfo.Config.PriorityPolicy).To(Equal(jetstream.PriorityPolicyPinned))
+				Expect(consumerInfo.Config.PinnedTTL).To(Equal(5 * time.Minute))
+				Expect(consumerInfo.Config.PriorityGroups).To(Equal([]string{"high", "medium"}))
+			})
 
 			When("PreventUpdate is set", func() {
 				BeforeEach(func(ctx SpecContext) {
