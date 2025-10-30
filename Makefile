@@ -211,6 +211,12 @@ test: envtest
 	$(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path ## Get k8s binaries
 	go test -race -cover -count=1 -timeout 30s ./controllers/... ./pkg/natsreloader/... ./internal/controller/...
 
+.PHONY: test-e2e
+test-e2e:
+	@echo "Running e2e tests with kuttl..."
+	@command -v kubectl-kuttl >/dev/null 2>&1 || { echo "kuttl not installed. Install: kubectl krew install kuttl"; exit 1; }
+	kubectl kuttl test
+
 .PHONY: clean
 clean:
 	rm -f jetstream-controller jetstream-controller.docker \

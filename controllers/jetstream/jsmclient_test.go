@@ -9,10 +9,18 @@ import (
 )
 
 type mockStream struct {
-	deleteErr error
+	deleteErr            error
+	capturedConfig       *jsmapi.StreamConfig
+	updateConfigCallback func(cnf jsmapi.StreamConfig) error
 }
 
 func (m *mockStream) UpdateConfiguration(cnf jsmapi.StreamConfig, opts ...jsm.StreamOption) error {
+	if m.capturedConfig != nil {
+		*m.capturedConfig = cnf
+	}
+	if m.updateConfigCallback != nil {
+		return m.updateConfigCallback(cnf)
+	}
 	return nil
 }
 
