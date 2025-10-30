@@ -648,6 +648,10 @@ spec:
               inactiveThreshold:
                 description: The idle time an Ephemeral Consumer allows before it is removed.
                 type: string
+              pauseUntil:
+                description: RFC3339 timestamp until which the consumer should be paused.
+                type: string
+                default: ''
               priorityPolicy:
                 description: Priority policy for consumer (pinned_client, overflow, prioritized, or none).
                 type: string

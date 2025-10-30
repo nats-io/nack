@@ -111,9 +111,10 @@ func TestProcessStream(t *testing.T) {
 				Generation: 2,
 			},
 			Spec: apis.StreamSpec{
-				Name:    name,
-				MaxAge:  "1h",
-				Storage: "memory",
+				Name:              name,
+				MaxAge:            "1h",
+				Storage:           "memory",
+				AllowMsgSchedules: true,
 			},
 			Status: apis.Status{
 				ObservedGeneration: 1,
@@ -125,12 +126,21 @@ func TestProcessStream(t *testing.T) {
 
 		jc.PrependReactor("update", "streams", updateObject)
 
+		// Capture the config that gets passed to UpdateConfiguration
+		var capturedConfig jsmapi.StreamConfig
 		jsmc := &mockJsmClient{
 			loadStreamErr: nil,
-			loadStream:    &mockStream{},
+			loadStream: &mockStream{
+				capturedConfig: &capturedConfig,
+			},
 		}
 		if err := ctrl.processStream(ns, name, testWrapJSMC(jsmc)); err != nil {
 			t.Fatal(err)
+		}
+
+		// Verify that AllowMsgSchedules was set in the config
+		if !capturedConfig.AllowMsgSchedules {
+			t.Errorf("AllowMsgSchedules not set in stream config during update: got=%v, want=true", capturedConfig.AllowMsgSchedules)
 		}
 
 		if got := len(rec.Events); got != wantEvents {
