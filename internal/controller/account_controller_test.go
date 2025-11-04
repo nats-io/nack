@@ -75,9 +75,14 @@ var _ = Describe("Account Controller", func() {
 
 					controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
 					controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
+					controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
 
 					Expect(k8sClient.Get(ctx, typeNamespacedName, account)).To(Succeed())
 					Expect(controllerutil.ContainsFinalizer(account, accountFinalizer)).To(BeTrue())
+					Expect(len(account.Status.Conditions)).To(BeNumerically("==", 1))
+					Expect(account.Status.Conditions[0].Type).To(Equal(readyCondType))
+					Expect(account.Status.Conditions[0].Status).To(Equal(v1.ConditionTrue))
+					Expect(account.Status.Conditions[0].Message).To(Equal("Account is ready"))
 				}
 
 				By("creating a dependent stream resource")

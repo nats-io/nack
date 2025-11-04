@@ -133,7 +133,7 @@ func (r *AccountReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		if err := r.Update(ctx, account); err != nil {
 			return ctrl.Result{}, fmt.Errorf("update account resource to add finalizer: %w", err)
 		}
-		return ctrl.Result{}, nil
+		return ctrl.Result{Requeue: true}, nil
 	}
 
 	// Update ready status for non-deleted accounts
