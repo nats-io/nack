@@ -22,7 +22,7 @@ func (s *Stream) GetSpec() interface{} {
 
 // StreamSpec is the spec for a Stream resource
 type StreamSpec struct {
-	Name                   string            `json:"name,omitempty"`
+	Name                   string            `json:"name"`
 	Description            string            `json:"description,omitempty"`
 	Subjects               []string          `json:"subjects,omitempty"`
 	Retention              string            `json:"retention,omitempty"`
@@ -73,7 +73,7 @@ type StreamPlacement struct {
 }
 
 type StreamSource struct {
-	Name          string `json:"name,omitempty"`
+	Name          string `json:"name"`
 	OptStartSeq   int    `json:"optStartSeq,omitempty"`
 	OptStartTime  string `json:"optStartTime,omitempty"`
 	FilterSubject string `json:"filterSubject,omitempty"`
@@ -85,8 +85,8 @@ type StreamSource struct {
 }
 
 type RePublish struct {
-	Source      string `json:"source,omitempty"`
-	Destination string `json:"destination,omitempty"`
+	Source      string `json:"source"`
+	Destination string `json:"destination"`
 	HeadersOnly bool   `json:"headers_only,omitempty"`
 }
 

@@ -55,7 +55,7 @@ type ConsumerSpec struct {
 	PinnedTTL          string            `json:"pinnedTtl,omitempty"`      // Duration for pinned client timeout
 	PriorityGroups     []string          `json:"priorityGroups,omitempty"` // List of priority groups
 
-	StreamName string `json:"streamName,omitempty"`
+	StreamName string `json:"streamName"`
 	BaseStreamConfig
 }
 

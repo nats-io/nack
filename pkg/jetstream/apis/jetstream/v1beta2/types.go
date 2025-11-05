@@ -5,8 +5,8 @@ import (
 )
 
 type CredentialsSecret struct {
-	Name string `json:"name,omitempty"`
-	Key  string `json:"key,omitempty"`
+	Name string `json:"name"`
+	Key  string `json:"key"`
 }
 
 type Status struct {
@@ -58,7 +58,7 @@ type TLSSecret struct {
 
 type CredsSecret struct {
 	File   string     `json:"file,omitempty"`
-	Secret *SecretRef `json:"secret,omitempty"`
+	Secret *SecretRef `json:"secret"`
 }
 
 type TokenSecret struct {

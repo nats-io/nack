@@ -22,7 +22,7 @@ func (s *KeyValue) GetSpec() interface{} {
 
 // StreamSpec is the spec for a Stream resource
 type KeyValueSpec struct {
-	Bucket       string           `json:"bucket,omitempty"`
+	Bucket       string           `json:"bucket"`
 	Description  string           `json:"description,omitempty"`
 	MaxValueSize int              `json:"maxValueSize,omitempty"`
 	History      int              `json:"history,omitempty"`
