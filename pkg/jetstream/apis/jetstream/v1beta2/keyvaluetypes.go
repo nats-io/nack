@@ -1,6 +1,8 @@
 package v1beta2
 
 import (
+	"time"
+
 	k8smeta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
