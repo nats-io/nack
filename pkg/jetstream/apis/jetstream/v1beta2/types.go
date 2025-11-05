@@ -44,8 +44,8 @@ type ConsumerLimits struct {
 }
 
 type TLS struct {
-	ClientCert string   `json:"clientCert,omitempty"`
-	ClientKey  string   `json:"clientKey,omitempty"`
+	ClientCert string   `json:"clientCert"`
+	ClientKey  string   `json:"clientKey"`
 	RootCAs    []string `json:"rootCas,omitempty"`
 }
 
