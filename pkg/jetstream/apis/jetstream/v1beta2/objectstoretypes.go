@@ -23,14 +23,14 @@ func (s *ObjectStore) GetSpec() interface{} {
 // StreamSpec is the spec for a Stream resource
 type ObjectStoreSpec struct {
 	Bucket      string            `json:"bucket"`
-	Description string            `json:"description"`
-	TTL         string            `json:"ttl"`
-	MaxBytes    int               `json:"maxBytes"`
-	Storage     string            `json:"storage"`
-	Replicas    int               `json:"replicas"`
-	Placement   *StreamPlacement  `json:"placement"`
-	Compression bool              `json:"compression"`
-	Metadata    map[string]string `json:"metadata"`
+	Description string            `json:"description,omitempty"`
+	TTL         string            `json:"ttl,omitempty"`
+	MaxBytes    int               `json:"maxBytes,omitempty"`
+	Storage     string            `json:"storage,omitempty"`
+	Replicas    int               `json:"replicas,omitempty"`
+	Placement   *StreamPlacement  `json:"placement,omitempty"`
+	Compression bool              `json:"compression,omitempty"`
+	Metadata    map[string]string `json:"metadata,omitempty"`
 	BaseStreamConfig
 }
 

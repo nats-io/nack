@@ -22,38 +22,38 @@ func (c *Consumer) GetSpec() interface{} {
 
 // ConsumerSpec is the spec for a Consumer resource
 type ConsumerSpec struct {
-	Description        string            `json:"description"`
-	AckPolicy          string            `json:"ackPolicy"`
-	AckWait            string            `json:"ackWait"`
-	DeliverPolicy      string            `json:"deliverPolicy"`
-	DeliverSubject     string            `json:"deliverSubject"`
-	DeliverGroup       string            `json:"deliverGroup"`
-	DurableName        string            `json:"durableName"` // Maps to Durable
-	FilterSubject      string            `json:"filterSubject"`
-	FilterSubjects     []string          `json:"filterSubjects"`
-	FlowControl        bool              `json:"flowControl"`
-	HeartbeatInterval  string            `json:"heartbeatInterval"` // Maps to IdleHeartbeat
-	MaxAckPending      int               `json:"maxAckPending"`
-	MaxDeliver         int               `json:"maxDeliver"`
-	BackOff            []string          `json:"backoff"`
-	MaxWaiting         int               `json:"maxWaiting"`
-	OptStartSeq        int               `json:"optStartSeq"`
-	OptStartTime       string            `json:"optStartTime"`
-	RateLimitBps       int               `json:"rateLimitBps"` // Maps to RateLimit
-	ReplayPolicy       string            `json:"replayPolicy"`
-	SampleFreq         string            `json:"sampleFreq"` // Maps to SampleFrequency
-	HeadersOnly        bool              `json:"headersOnly"`
-	MaxRequestBatch    int               `json:"maxRequestBatch"`
-	MaxRequestExpires  string            `json:"maxRequestExpires"`
-	MaxRequestMaxBytes int               `json:"maxRequestMaxBytes"`
-	InactiveThreshold  string            `json:"inactiveThreshold"`
-	Replicas           int               `json:"replicas"`
-	MemStorage         bool              `json:"memStorage"` // Maps to MemoryStorage
-	Metadata           map[string]string `json:"metadata"`
-	PauseUntil         string            `json:"pauseUntil"`     // RFC3339 timestamp for pausing consumer
-	PriorityPolicy     string            `json:"priorityPolicy"` // Priority policy: none, pinned_client, overflow, prioritized
-	PinnedTTL          string            `json:"pinnedTtl"`      // Duration for pinned client timeout
-	PriorityGroups     []string          `json:"priorityGroups"` // List of priority groups
+	Description        string            `json:"description,omitempty"`
+	AckPolicy          string            `json:"ackPolicy,omitempty"`
+	AckWait            string            `json:"ackWait,omitempty"`
+	DeliverPolicy      string            `json:"deliverPolicy,omitempty"`
+	DeliverSubject     string            `json:"deliverSubject,omitempty"`
+	DeliverGroup       string            `json:"deliverGroup,omitempty"`
+	DurableName        string            `json:"durableName,omitempty"` // Maps to Durable
+	FilterSubject      string            `json:"filterSubject,omitempty"`
+	FilterSubjects     []string          `json:"filterSubjects,omitempty"`
+	FlowControl        bool              `json:"flowControl,omitempty"`
+	HeartbeatInterval  string            `json:"heartbeatInterval,omitempty"` // Maps to IdleHeartbeat
+	MaxAckPending      int               `json:"maxAckPending,omitempty"`
+	MaxDeliver         int               `json:"maxDeliver,omitempty"`
+	BackOff            []string          `json:"backoff,omitempty"`
+	MaxWaiting         int               `json:"maxWaiting,omitempty"`
+	OptStartSeq        int               `json:"optStartSeq,omitempty"`
+	OptStartTime       string            `json:"optStartTime,omitempty"`
+	RateLimitBps       int               `json:"rateLimitBps,omitempty"` // Maps to RateLimit
+	ReplayPolicy       string            `json:"replayPolicy,omitempty"`
+	SampleFreq         string            `json:"sampleFreq,omitempty"` // Maps to SampleFrequency
+	HeadersOnly        bool              `json:"headersOnly,omitempty"`
+	MaxRequestBatch    int               `json:"maxRequestBatch,omitempty"`
+	MaxRequestExpires  string            `json:"maxRequestExpires,omitempty"`
+	MaxRequestMaxBytes int               `json:"maxRequestMaxBytes,omitempty"`
+	InactiveThreshold  string            `json:"inactiveThreshold,omitempty"`
+	Replicas           int               `json:"replicas,omitempty"`
+	MemStorage         bool              `json:"memStorage,omitempty"` // Maps to MemoryStorage
+	Metadata           map[string]string `json:"metadata,omitempty"`
+	PauseUntil         string            `json:"pauseUntil,omitempty"`     // RFC3339 timestamp for pausing consumer
+	PriorityPolicy     string            `json:"priorityPolicy,omitempty"` // Priority policy: none, pinned_client, overflow, prioritized
+	PinnedTTL          string            `json:"pinnedTtl,omitempty"`      // Duration for pinned client timeout
+	PriorityGroups     []string          `json:"priorityGroups,omitempty"` // List of priority groups
 
 	StreamName string `json:"streamName"`
 	BaseStreamConfig
