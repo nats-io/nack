@@ -1183,6 +1183,11 @@ spec:
               ttl:
                 description: The time expiry for keys.
                 type: string
+              limitMarkerTtl:
+                description: LimitMarkerTTL is how long the bucket keeps markers when
+                  keys are removed by the TTL setting, 0 meaning markers are not supported
+                format: int64
+                type: integer
               maxBytes:
                 description: The maximum size of the KV Store in bytes.
                 type: integer
