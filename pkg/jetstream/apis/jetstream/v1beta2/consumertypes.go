@@ -6,6 +6,7 @@ import (
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:storageversion
 
 // Consumer is a specification for a Consumer resource
 type Consumer struct {
@@ -55,8 +56,8 @@ type ConsumerSpec struct {
 	PinnedTTL          string            `json:"pinnedTtl,omitempty"`      // Duration for pinned client timeout
 	PriorityGroups     []string          `json:"priorityGroups,omitempty"` // List of priority groups
 
-	StreamName string `json:"streamName"`
-	BaseStreamConfig
+	StreamName       string `json:"streamName,omitempty"`
+	BaseStreamConfig `json:"baseStreamConfig"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
