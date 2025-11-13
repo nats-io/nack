@@ -185,7 +185,7 @@ func (c *jsController) natsConfigFromOpts(opts api.ConnectionOpts, ns string) (*
 			return nil, err
 		}
 
-		accDir := filepath.Join(c.cacheDir, c.controllerConfig.Namespace, opts.Account)
+		accDir := filepath.Join(c.cacheDir, ns, opts.Account)
 		if err := os.MkdirAll(accDir, 0o755); err != nil {
 			return nil, err
 		}
@@ -274,7 +274,7 @@ func (c *jsController) natsConfigFromOpts(opts api.ConnectionOpts, ns string) (*
 			return nil, err
 		}
 
-		accDir := filepath.Join(c.cacheDir, c.controllerConfig.Namespace, opts.Account)
+		accDir := filepath.Join(c.cacheDir, ns, opts.Account)
 		if err := os.MkdirAll(accDir, 0o755); err != nil {
 			return nil, err
 		}
