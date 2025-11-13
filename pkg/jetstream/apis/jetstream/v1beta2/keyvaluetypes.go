@@ -37,6 +37,10 @@ type KeyValueSpec struct {
 	Mirror       *StreamSource    `json:"mirror,omitempty"`
 	Sources      []*StreamSource  `json:"sources,omitempty"`
 	Compression  bool             `json:"compression,omitempty"`
+	// LimitMarkerTTL is how long the bucket keeps markers when keys are removed by the TTL setting, 0 meaning markers are not supported
+	// +optional
+	LimitMarkerTTL time.Duration `json:"limitMarkerTtl,omitempty"`
+
 	BaseStreamConfig
 }
 
