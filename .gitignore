@@ -20,3 +20,5 @@
 /tools
 /bin
 /.idea
+
+/kubeconfig
