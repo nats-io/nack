@@ -30,21 +30,13 @@ default:
 	#   make nats-server-config-reloader
 	#   make nats-boot-config
 
-generate: fetch-modules pkg/k8scodegen/file-header.txt
-	rm -rf pkg/jetstream/generated
-	D="$(codeGeneratorDir)"; : "$${D:=`go list -m -f '{{.Dir}}' k8s.io/code-generator`}"; \
-	source "$$D/kube_codegen.sh" ; \
-	kube::codegen::gen_helpers \
-	  --boilerplate pkg/k8scodegen/file-header.txt \
-	  pkg/jetstream/apis; \
-	kube::codegen::gen_client \
-		--with-watch \
-		--with-applyconfig \
-		--boilerplate pkg/k8scodegen/file-header.txt \
-		--output-dir pkg/jetstream/generated \
-		--output-pkg github.com/nats-io/nack/pkg/jetstream/generated \
-		--one-input-api jetstream/v1beta2 \
-		pkg/jetstream/apis
+.PHONY: manifests
+manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
+	$(CONTROLLER_GEN) crd paths=./pkg/jetstream/apis/... output:crd:artifacts:config=deploy/crds/
+
+.PHONY: generate
+generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
+	$(CONTROLLER_GEN) object:headerFile="pkg/k8scodegen/file-header.txt" paths="pkg/jetstream/apis/..."
 
 jetstream-controller: $(jetstreamSrc)
 	go build -race -o $@ \
@@ -198,11 +190,18 @@ endef
 
 ENVTEST ?= $(LOCALBIN)/setup-envtest-$(ENVTEST_VERSION)
 ENVTEST_VERSION ?= release-0.20
+CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
+CONTROLLER_TOOLS_VERSION ?= v0.17.2
 
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download setup-envtest locally if necessary.
 $(ENVTEST): $(LOCALBIN)
 	$(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest,$(ENVTEST_VERSION))
+
+.PHONY: controller-gen
+controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary.
+$(CONTROLLER_GEN): $(LOCALBIN)
+	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen,$(CONTROLLER_TOOLS_VERSION))
 
 
 .PHONY: test

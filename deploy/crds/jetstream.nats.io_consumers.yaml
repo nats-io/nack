@@ -1,0 +1,320 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.2
+  name: consumers.jetstream.nats.io
+spec:
+  group: jetstream.nats.io
+  names:
+    kind: Consumer
+    listKind: ConsumerList
+    plural: consumers
+    singular: consumer
+  scope: Namespaced
+  versions:
+  - name: v1beta1
+    schema:
+      openAPIV3Schema:
+        description: Consumer is a specification for a Consumer resource
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ConsumerSpec is the spec for a Consumer resource
+            properties:
+              ackPolicy:
+                type: string
+              ackWait:
+                type: string
+              deliverGroup:
+                type: string
+              deliverPolicy:
+                type: string
+              deliverSubject:
+                type: string
+              description:
+                type: string
+              durableName:
+                type: string
+              filterSubject:
+                type: string
+              flowControl:
+                type: boolean
+              heartbeatInterval:
+                type: string
+              maxAckPending:
+                type: integer
+              maxDeliver:
+                type: integer
+              optStartSeq:
+                type: integer
+              optStartTime:
+                type: string
+              rateLimitBps:
+                type: integer
+              replayPolicy:
+                type: string
+              sampleFreq:
+                type: string
+              streamName:
+                type: string
+            required:
+            - ackPolicy
+            - ackWait
+            - deliverGroup
+            - deliverPolicy
+            - deliverSubject
+            - description
+            - durableName
+            - filterSubject
+            - flowControl
+            - heartbeatInterval
+            - maxAckPending
+            - maxDeliver
+            - optStartSeq
+            - optStartTime
+            - rateLimitBps
+            - replayPolicy
+            - sampleFreq
+            - streamName
+            type: object
+          status:
+            properties:
+              conditions:
+                items:
+                  properties:
+                    lastTransitionTime:
+                      type: string
+                    message:
+                      type: string
+                    reason:
+                      type: string
+                    status:
+                      type: string
+                    type:
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              observedGeneration:
+                format: int64
+                type: integer
+            required:
+            - conditions
+            - observedGeneration
+            type: object
+        required:
+        - spec
+        - status
+        type: object
+    served: true
+    storage: false
+  - name: v1beta2
+    schema:
+      openAPIV3Schema:
+        description: Consumer is a specification for a Consumer resource
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ConsumerSpec is the spec for a Consumer resource
+            properties:
+              ackPolicy:
+                type: string
+              ackWait:
+                type: string
+              backoff:
+                items:
+                  type: string
+                type: array
+              baseStreamConfig:
+                properties:
+                  connectionOpts:
+                    properties:
+                      account:
+                        type: string
+                      creds:
+                        type: string
+                      jsDomain:
+                        type: string
+                      nkey:
+                        type: string
+                      servers:
+                        items:
+                          type: string
+                        type: array
+                      tls:
+                        properties:
+                          clientCert:
+                            type: string
+                          clientKey:
+                            type: string
+                          rootCas:
+                            items:
+                              type: string
+                            type: array
+                        required:
+                        - clientCert
+                        - clientKey
+                        - rootCas
+                        type: object
+                      tlsFirst:
+                        type: boolean
+                    required:
+                    - account
+                    - creds
+                    - jsDomain
+                    - nkey
+                    - servers
+                    - tls
+                    - tlsFirst
+                    type: object
+                  preventDelete:
+                    type: boolean
+                  preventUpdate:
+                    type: boolean
+                required:
+                - connectionOpts
+                type: object
+              deliverGroup:
+                type: string
+              deliverPolicy:
+                type: string
+              deliverSubject:
+                type: string
+              description:
+                type: string
+              durableName:
+                type: string
+              filterSubject:
+                type: string
+              filterSubjects:
+                items:
+                  type: string
+                type: array
+              flowControl:
+                type: boolean
+              headersOnly:
+                type: boolean
+              heartbeatInterval:
+                type: string
+              inactiveThreshold:
+                type: string
+              maxAckPending:
+                type: integer
+              maxDeliver:
+                type: integer
+              maxRequestBatch:
+                type: integer
+              maxRequestExpires:
+                type: string
+              maxRequestMaxBytes:
+                type: integer
+              maxWaiting:
+                type: integer
+              memStorage:
+                type: boolean
+              metadata:
+                additionalProperties:
+                  type: string
+                type: object
+              optStartSeq:
+                type: integer
+              optStartTime:
+                type: string
+              pauseUntil:
+                type: string
+              pinnedTtl:
+                type: string
+              priorityGroups:
+                items:
+                  type: string
+                type: array
+              priorityPolicy:
+                type: string
+              rateLimitBps:
+                type: integer
+              replayPolicy:
+                type: string
+              replicas:
+                type: integer
+              sampleFreq:
+                type: string
+              streamName:
+                type: string
+            required:
+            - baseStreamConfig
+            type: object
+          status:
+            properties:
+              conditions:
+                items:
+                  properties:
+                    lastTransitionTime:
+                      type: string
+                    message:
+                      type: string
+                    reason:
+                      type: string
+                    status:
+                      type: string
+                    type:
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              observedGeneration:
+                format: int64
+                type: integer
+            required:
+            - conditions
+            - observedGeneration
+            type: object
+        required:
+        - spec
+        - status
+        type: object
+    served: true
+    storage: true

@@ -23,9 +23,9 @@ type Condition struct {
 }
 
 type BaseStreamConfig struct {
-	PreventDelete bool `json:"preventDelete"`
-	PreventUpdate bool `json:"preventUpdate"`
-	ConnectionOpts
+	PreventDelete  bool `json:"preventDelete,omitempty"`
+	PreventUpdate  bool `json:"preventUpdate,omitempty"`
+	ConnectionOpts `json:"connectionOpts"`
 }
 
 type ConnectionOpts struct {

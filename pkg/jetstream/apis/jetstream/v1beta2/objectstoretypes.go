@@ -6,6 +6,7 @@ import (
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:storageversion
 
 // Stream is a specification for a Stream resource
 type ObjectStore struct {
