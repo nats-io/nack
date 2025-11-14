@@ -204,7 +204,6 @@ envtest: $(ENVTEST) ## Download setup-envtest locally if necessary.
 $(ENVTEST): $(LOCALBIN)
 	$(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest,$(ENVTEST_VERSION))
 
-
 .PHONY: test
 test: envtest
 	go vet ./controllers/... ./pkg/natsreloader/... ./internal/controller/...
@@ -215,6 +214,10 @@ test: envtest
 test-e2e:
 	@echo "Running e2e tests with kuttl..."
 	@command -v kubectl-kuttl >/dev/null 2>&1 || { echo "kuttl not installed. Install: kubectl krew install kuttl"; exit 1; }
+	kind delete cluster || true
+	kind create cluster
+	docker build -t nack:test -f tests/Dockerfile .
+	kind load docker-image nack:test
 	kubectl kuttl test
 
 .PHONY: clean
@@ -223,33 +226,6 @@ clean:
 		nats-server-config-reloader nats-server-config-reloader.docker \
 		nats-boot-config nats-boot-config.docker
 
-tools/minikube:
-	mkdir -p $(dir $@)
-	curl -L -o $@ https://storage.googleapis.com/minikube/releases/v1.25.1/minikube-linux-amd64
-	chmod u+x $@
-
-tools/kubeconfig.yaml:
-	mkdir -p $(dir $@)
-	touch $@
-	chmod 600 $@
-
-.PHONY: minikube-start
-minikube-start: kver ?= 1.22.2
-minikube-start: tools/kubeconfig.yaml tools/minikube
-	KUBECONFIG=$(word 1,$^) $(word 2,$^) start --vm-driver=docker --kubernetes-version=v$(kver) \
-		--extra-config=apiserver.service-account-signing-key-file=/var/lib/minikube/certs/sa.key \
-		--extra-config=apiserver.service-account-key-file=/var/lib/minikube/certs/sa.pub \
-		--extra-config=apiserver.service-account-issuer=api \
-		--extra-config=apiserver.service-account-api-audiences=api
-
-.PHONY: minikube-stop
-minikube-stop: tools/kubeconfig.yaml tools/minikube
-	KUBECONFIG=$(word 1,$^) $(word 2,$^) stop
-
-.PHONY: minikube-delete
-minikube-delete: tools/kubeconfig.yaml tools/minikube
-	KUBECONFIG=$(word 1,$^) $(word 2,$^) delete
-
-.PHONY: minikube-status
-minikube-status: tools/kubeconfig.yaml tools/minikube
-	KUBECONFIG=$(word 1,$^) $(word 2,$^) status
+.PHONY: install-kind
+install-kind:
+	go install sigs.k8s.io/kind@v0.30.0
