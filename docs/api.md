@@ -2006,6 +2006,13 @@ The user and password to be used to connect to the NATS Service.
           The time expiry for keys.<br/>
         </td>
         <td>false</td>
+      </tr><tr>
+        <td><b>limitMarkerTtl</b></td>
+        <td>integer</td>
+        <td>
+           How long the bucket keeps markers when keys are removed by the TTL setting, 0 meaning markers are not supported<br/>
+        </td>
+        <td>false</td>
       </tr></tbody>
 </table>
 

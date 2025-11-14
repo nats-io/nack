@@ -320,13 +320,14 @@ func getServerKeyValueState(ctx context.Context, js jetstream.JetStream, keyValu
 func keyValueSpecToConfig(spec *api.KeyValueSpec) (jetstream.KeyValueConfig, error) {
 	// Set directly mapped fields
 	config := jetstream.KeyValueConfig{
-		Bucket:       spec.Bucket,
-		Compression:  spec.Compression,
-		Description:  spec.Description,
-		History:      uint8(spec.History),
-		MaxBytes:     int64(spec.MaxBytes),
-		MaxValueSize: int32(spec.MaxValueSize),
-		Replicas:     spec.Replicas,
+		Bucket:         spec.Bucket,
+		Compression:    spec.Compression,
+		Description:    spec.Description,
+		History:        uint8(spec.History),
+		MaxBytes:       int64(spec.MaxBytes),
+		MaxValueSize:   int32(spec.MaxValueSize),
+		Replicas:       spec.Replicas,
+		LimitMarkerTTL: spec.LimitMarkerTTL,
 	}
 
 	// TTL

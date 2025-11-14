@@ -16,25 +16,28 @@
 package v1beta2
 
 import (
+	time "time"
+
 	jetstreamv1beta2 "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 )
 
 // KeyValueSpecApplyConfiguration represents a declarative configuration of the KeyValueSpec type for use
 // with apply.
 type KeyValueSpecApplyConfiguration struct {
-	Bucket       *string                            `json:"bucket,omitempty"`
-	Description  *string                            `json:"description,omitempty"`
-	MaxValueSize *int                               `json:"maxValueSize,omitempty"`
-	History      *int                               `json:"history,omitempty"`
-	TTL          *string                            `json:"ttl,omitempty"`
-	MaxBytes     *int                               `json:"maxBytes,omitempty"`
-	Storage      *string                            `json:"storage,omitempty"`
-	Replicas     *int                               `json:"replicas,omitempty"`
-	Placement    *StreamPlacementApplyConfiguration `json:"placement,omitempty"`
-	RePublish    *RePublishApplyConfiguration       `json:"republish,omitempty"`
-	Mirror       *StreamSourceApplyConfiguration    `json:"mirror,omitempty"`
-	Sources      []*jetstreamv1beta2.StreamSource   `json:"sources,omitempty"`
-	Compression  *bool                              `json:"compression,omitempty"`
+	Bucket         *string                            `json:"bucket,omitempty"`
+	Description    *string                            `json:"description,omitempty"`
+	MaxValueSize   *int                               `json:"maxValueSize,omitempty"`
+	History        *int                               `json:"history,omitempty"`
+	TTL            *string                            `json:"ttl,omitempty"`
+	MaxBytes       *int                               `json:"maxBytes,omitempty"`
+	Storage        *string                            `json:"storage,omitempty"`
+	Replicas       *int                               `json:"replicas,omitempty"`
+	Placement      *StreamPlacementApplyConfiguration `json:"placement,omitempty"`
+	RePublish      *RePublishApplyConfiguration       `json:"republish,omitempty"`
+	Mirror         *StreamSourceApplyConfiguration    `json:"mirror,omitempty"`
+	Sources        []*jetstreamv1beta2.StreamSource   `json:"sources,omitempty"`
+	Compression    *bool                              `json:"compression,omitempty"`
+	LimitMarkerTTL *time.Duration                     `json:"limitMarkerTtl,omitempty"`
 }
 
 // KeyValueSpecApplyConfiguration constructs a declarative configuration of the KeyValueSpec type for use with
@@ -149,5 +152,13 @@ func (b *KeyValueSpecApplyConfiguration) WithSources(values ...**jetstreamv1beta
 // If called multiple times, the Compression field is set to the value of the last call.
 func (b *KeyValueSpecApplyConfiguration) WithCompression(value bool) *KeyValueSpecApplyConfiguration {
 	b.Compression = &value
+	return b
+}
+
+// WithLimitMarkerTTL sets the LimitMarkerTTL field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the LimitMarkerTTL field is set to the value of the last call.
+func (b *KeyValueSpecApplyConfiguration) WithLimitMarkerTTL(value time.Duration) *KeyValueSpecApplyConfiguration {
+	b.LimitMarkerTTL = &value
 	return b
 }
