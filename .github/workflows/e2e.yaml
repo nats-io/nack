@@ -26,4 +26,4 @@ jobs:
         uses: azure/setup-helm@v4
 
       - name: run e2e test
-        run: kubectl kuttl test
+        run: make test-e2e
