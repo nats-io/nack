@@ -6,11 +6,12 @@ import (
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:storageversion
 
 // Stream is a specification for a Stream resource
 type Stream struct {
 	k8smeta.TypeMeta   `json:",inline"`
-	k8smeta.ObjectMeta `json:"metadata,omitempty"`
+	k8smeta.ObjectMeta `json:"metadata"`
 
 	Spec   StreamSpec `json:"spec"`
 	Status Status     `json:"status"`
