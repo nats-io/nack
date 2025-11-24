@@ -8,4 +8,4 @@ commands:
     ignoreFailure: true
   - command: helm repo add nats https://nats-io.github.io/k8s/helm/charts
   - command: helm upgrade --install --wait --namespace $NAMESPACE nats nats/nats -f ../nats.yaml
-  - command: helm upgrade --install --wait --namespace $NAMESPACE nack nats/nack -f ../nack.yaml
+  - command: helm upgrade --install --wait --namespace $NAMESPACE nack nats/nack --skip-crds -f ../nack.yaml

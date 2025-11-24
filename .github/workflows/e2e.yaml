@@ -21,9 +21,11 @@ jobs:
 
       - name: create kind cluster
         uses: helm/kind-action@v1.13.0
+        with:
+          install_only: true
 
       - name: set up helm
         uses: azure/setup-helm@v4
 
       - name: run e2e test
-        run: kubectl kuttl test
+        run: make test-e2e
