@@ -218,7 +218,11 @@ test-e2e:
 	kind create cluster
 	docker build -t nack:test -f tests/Dockerfile .
 	kind load docker-image nack:test
-	kubectl kuttl test
+	@echo "\n=== Testing LEGACY controller mode ==="
+	cp tests/nack-legacy.yaml tests/nack.yaml && kubectl kuttl test
+	@echo "\n=== Testing CONTROL-LOOP controller mode ==="
+	cp tests/nack-control-loop.yaml tests/nack.yaml && kubectl kuttl test
+	rm -f tests/nack.yaml
 
 .PHONY: clean
 clean:

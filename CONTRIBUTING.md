@@ -12,7 +12,16 @@ You may run the entire e2e suite with the accompanying updated image using:
 make test-e2e
 ```
 
-It requires that `kind` is installed, which can be installed through `make install-kind`.
+This command will:
+1. Build a local Docker image with your changes
+2. Run the full test suite in **legacy controller mode** (using `controllers/` implementation)
+3. Run the full test suite in **control-loop mode** (using `internal/controller/` implementation with `--control-loop` flag)
+
+This ensures both controller implementations are tested with your changes.
+
+**Requirements:**
+- `kind` must be installed (install via `make install-kind`)
+- `kubectl-kuttl` must be installed (install via `kubectl krew install kuttl`)
 
 # CRD Updates
 

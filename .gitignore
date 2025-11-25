@@ -22,3 +22,6 @@
 /.idea
 
 /kubeconfig
+
+# E2E test generated config
+/tests/nack.yaml
