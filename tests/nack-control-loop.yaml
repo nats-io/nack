@@ -1,0 +1,15 @@
+jetstream:
+  enabled: true
+
+  image:
+    repository: nack
+    tag: test
+
+  # Enable controller-runtime mode
+  additionalArgs:
+    - --control-loop
+
+  nats:
+   url: nats://nats:4222
+
+namespaced: true

@@ -1,6 +1,10 @@
 jetstream:
   enabled: true
 
+  image:
+    repository: nack
+    tag: test
+
   nats:
    url: nats://nats:4222
 
