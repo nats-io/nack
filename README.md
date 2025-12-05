@@ -214,6 +214,8 @@ order 2
 
 ### Getting Started with Accounts
 
+> **Note**: The Account CRD is a **connection profile** for storing NATS server URLs and credentials—it is not related to [NATS Accounts](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/accounts) (the multi-tenancy feature). Think of it as a reusable connection configuration that other resources can reference.
+
 You can create an Account resource with the following CRD. The Account resource
 can be used to specify server and TLS information.
 
