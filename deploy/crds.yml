@@ -562,6 +562,7 @@ spec:
                 - byStartSequence
                 # Requires optStartTime
                 - byStartTime
+                - lastPerSubject
                 default: all
               optStartSeq:
                 type: integer
