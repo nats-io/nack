@@ -61,6 +61,11 @@ type CredsSecret struct {
 	Secret *SecretRef `json:"secret"`
 }
 
+type NKeySecret struct {
+	Seed   string     `json:"seed,omitempty"`
+	Secret *SecretRef `json:"secret"`
+}
+
 type TokenSecret struct {
 	Token  string    `json:"token,omitempty"`
 	Secret SecretRef `json:"secret"`
