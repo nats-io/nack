@@ -606,7 +606,7 @@ func (c *Controller) getAccountOverrides(account string, ns string) (*accountOve
 
 type jsmcSpecOverrides struct {
 	servers []string
-	tls     apis.TLS
+	tls     *apis.TLS
 	creds   string
 	nkey    string
 }
@@ -629,9 +629,11 @@ func (c *Controller) runWithJsmc(jsm jsmClientFunc, acc *accountOverrides, spec 
 	} else if spec.nkey != "" {
 		natsCtx.Nkey = spec.nkey
 	}
-	if spec.tls.ClientCert != "" && spec.tls.ClientKey != "" {
-		natsCtx.TLSCert = spec.tls.ClientCert
-		natsCtx.TLSKey = spec.tls.ClientKey
+	if spec.tls != nil {
+		if spec.tls.ClientCert != "" && spec.tls.ClientKey != "" {
+			natsCtx.TLSCert = spec.tls.ClientCert
+			natsCtx.TLSKey = spec.tls.ClientKey
+		}
 	}
 
 	// Use fetched secrets for the account and server if defined.
@@ -653,7 +655,7 @@ func (c *Controller) runWithJsmc(jsm jsmClientFunc, acc *accountOverrides, spec 
 		natsCtx.Token = acc.token
 	}
 
-	if len(spec.tls.RootCAs) > 0 {
+	if spec.tls != nil && len(spec.tls.RootCAs) > 0 {
 		natsCtx.TLSCAs = spec.tls.RootCAs
 	}
 

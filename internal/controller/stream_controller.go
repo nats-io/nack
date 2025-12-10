@@ -112,7 +112,10 @@ func (r *StreamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		if err := r.Update(ctx, stream); err != nil {
 			return ctrl.Result{}, fmt.Errorf("update stream resource to add finalizer: %w", err)
 		}
-		return ctrl.Result{}, nil
+		// After we have added the finalizer, we need to requeue to make sure we reconcile the
+		// rest of the object. Just updating metadata won't make the API server update generation
+		// so the update above shouldn't trigger a new reconciliation.
+		return ctrl.Result{Requeue: true}, nil
 	}
 
 	// Create or update stream
