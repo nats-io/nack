@@ -55,79 +55,92 @@ helm upgrade nack nats/nack \
   --set jetstream.additionalArgs={--control-loop} --wait
 ```
 
-#### (Optional) Manage multiple NATS
+### Managing Multiple NATS Systems and Accounts
 
-There are a few options to use the controller with multiple JetStream clusters in the same Kubernetes cluster:
-1. Use namespaced controler by setting `--set namespaced=true` and specifying namespace either via helm options or via `--set namespaceOverride=true`. In this case controller only reconsile resources in the namespace it's installed into.
+The are several approaches for managing multiple NATS Systems with NACK within one Kubernetes cluster. These options are not mutually exclusive.
+
+#### 1. Run Multiple Namespaced Controllers
+You can run multiple NACK controllers on the same Kubernetes cluster. Add `--set config.namespaced=true` to your install flags or set `namespaced: true` in your `values.yaml`. When set, the controller will only reconcile resources within its own namespace.
 
 ```sh
-# Install and use in namespace dev-ns
 helm upgrade --install nack nats/nack \
-  --create-namespace --namespace dev-ns \
-  --set jetstream.nats.url=nats://nats.dev-ns.svc.cluster.local:4222 --wait \
-  --set namespaced=true
-
-# Install and use in namespace test-ns
-helm upgrade --install nack nats/nack \
-  --create-namespace --namespace test-ns \
-  --set jetstream.nats.url=nats://nats.test-ns.svc.cluster.local:4222 --wait \
-  --set namespaced=true
+  --create-namespace --namespace nats \
+  --set namespaced=true \
+  --set jetstream.nats.url=nats://nats.nats.svc.cluster.local:4222 --wait
 ```
 
-2. Do not specify NATS URL, so the controller fallbacks to `-crd-connect` option (where NATS urls are defined in custom resources, i.e. Stream's `spec.servers` or Account's `spec.servers`.
-> **Note** In this case the controller will fail to reconcile resources without explicit server URLs defined.
-
-**Install**
-
-```sh
-helm upgrade nack nats/nack \
-  --set jetstream.nats.url=""
-```
-
-**Define a resource with server URL**
-
-```yaml
-apiVersion: jetstream.nats.io/v1beta2
-kind: Stream
-metadata:
-  name: bar
-spec:
-  name: bar
-  subjects: ["bar", "bar.>"]
-  storage: file
-  replicas: 3
-  maxAge: 1h
-  servers:
-    - nats://nats.nats-test.svc.cluster.local:4222
-```
-
-3. If the controller is installed with enabled control loop (see above), then a default URL specified in helm can be overwritten in a resource definition:
-
-**Install**
-
-```sh
-helm upgrade nack nats/nack \
-  --set jetstream.nats.url="nats://nats.nats-dev.svc.cluster.local:4222" \
-  --set jetstream.additionalArgs={--control-loop} --wait
-```
-
-**Define a resource with server URL**
+#### 2. Use the Accounts Resource
+The Accounts resource acts as a connection config for other resources. You may define multiple accounts for the same, or for distinct, NATS Systems.
 
 ```yaml
 ---
-# Create resource in the default cluster `nats.nats-dev.svc.cluster.local`
+apiVersion: jetstream.nats.io/v1beta2
+kind: Account
+metadata:
+  name: a
+spec:
+  name: a
+  creds:
+    secret:
+      name: account-a-creds
+  servers:
+    - nats://nats.nats-a.svc.cluster.local
+---
+apiVersion: jetstream.nats.io/v1beta2
+kind: Account
+metadata:
+  name: b
+spec:
+  name: b
+  creds:
+    secret:
+      name: account-b-creds
+  servers:
+    - nats://nats.nats-b.svc.cluster.local
+---
 apiVersion: jetstream.nats.io/v1beta2
 kind: Stream
 metadata:
-  name: foo
+  name: foo-a
 spec:
   name: foo
   subjects: ["foo", "foo.>"]
   storage: file
   replicas: 3
   maxAge: 1h
+  account: a
 ---
-# Create resource in different cluster `nats.nats-test.svc.cluster.local`
+apiVersion: jetstream.nats.io/v1beta2
+kind: Stream
+metadata:
+  name: foo-b
+spec:
+  name: foo
+  subjects: ["foo", "foo.>"]
+  storage: file
+  replicas: 3
+  maxAge: 1h
+  account: b
+```
+
+The above manifests will define two Account resources, each pulling credentials from a Kubernetes secret. Account `a` is configured to use the NATS Cluster in namspace `nats-a` and Account `b` is configured to use the NATS Cluster in namespace `nats-b`. The NATS clusters do not need to be in Kubernetes, this is just an example.
+
+This will also create an identical stream, `foo`, in each cluster. **Note:** The resource names, `foo-a` and `foo-b`, must be distinct to not conflict as Kubernetes resources, but the stream names themselves are both `foo`.
+
+See more details in the [Getting Started with Accounts](#getting-started-with-accounts) section.
+
+#### 3. Define Connection Config in the CRD Manifest
+You may define some connection options within the resource manifests directly. If not running in the newer `--control-loop` mode, set `--crd-connect`.
+
+If running with `--control-loop`, resource-level connection config will always override any global config.
+
+```sh
+helm upgrade nack nats/nack \
+  --set jetstream.additionalArgs={--crd-connect} --wait // Not required if running with `--control-loop`
+```
+
+#### Example Stream:
+```yaml
 apiVersion: jetstream.nats.io/v1beta2
 kind: Stream
 metadata:
@@ -139,10 +152,10 @@ spec:
   replicas: 3
   maxAge: 1h
   servers:
-    - nats://nats.nats-test.svc.cluster.local:4222
+    - nats://nats.nats.svc.cluster.local:4222
 ```
 
-#### Creating Streams and Consumers
+### Creating NATS Resources
 
 Let's create a a stream and a couple of consumers:
 
@@ -304,7 +317,9 @@ order 2
 You can create an Account resource with the following CRD. The Account resource
 can be used to specify server and TLS information.
 
-> **Note** NACK's account resource doesn't create or manage accounts on server side (use [nsc tool](https://docs.nats.io/using-nats/nats-tools/nsc/basics#creating-an-operator-account-and-user) and [JWT](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/jwt) for that), it's only a client's side configuration that allows to simplify credential and connection management. 
+> **Note** The `Account` resource does not create or manage NATS accounts. It functions as a connection and authentication config for the managed resources.
+
+The [nsc](https://docs.nats.io/using-nats/nats-tools/nsc/basics#creating-an-operator-account-and-user) tool can be used to manage your NATS account configuration on the server-side. You can find more details about NATS decentralized auth in the [docs](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/jwt).
 
 ```yaml
 ---
