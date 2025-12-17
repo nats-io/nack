@@ -710,7 +710,7 @@ func Test_mapobjectstoreSpecToConfig(t *testing.T) {
 						Creds:   "",
 						Nkey:    "",
 						Servers: nil,
-						TLS:     api.TLS{},
+						TLS:     &api.TLS{},
 					},
 				},
 			},

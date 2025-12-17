@@ -372,13 +372,15 @@ func natsConfigFromOpts(opts api.ConnectionOpts) *NatsConfig {
 		natsConfig.NKey = opts.Nkey
 	}
 
-	if len(opts.TLS.RootCAs) > 0 {
-		natsConfig.CAs = opts.TLS.RootCAs
-	}
+	if opts.TLS != nil {
+		if len(opts.TLS.RootCAs) > 0 {
+			natsConfig.CAs = opts.TLS.RootCAs
+		}
 
-	if opts.TLS.ClientCert != "" && opts.TLS.ClientKey != "" {
-		natsConfig.Certificate = opts.TLS.ClientCert
-		natsConfig.Key = opts.TLS.ClientKey
+		if opts.TLS.ClientCert != "" && opts.TLS.ClientKey != "" {
+			natsConfig.Certificate = opts.TLS.ClientCert
+			natsConfig.Key = opts.TLS.ClientKey
+		}
 	}
 
 	if opts.JsDomain != "" {

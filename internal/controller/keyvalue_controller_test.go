@@ -752,7 +752,7 @@ func Test_mapKVSpecToConfig(t *testing.T) {
 						Creds:   "",
 						Nkey:    "",
 						Servers: nil,
-						TLS:     api.TLS{},
+						TLS:     &api.TLS{},
 					},
 				},
 			},

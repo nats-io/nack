@@ -33,7 +33,7 @@ type ConnectionOpts struct {
 	Creds    string   `json:"creds,omitempty"`
 	Nkey     string   `json:"nkey,omitempty"`
 	Servers  []string `json:"servers,omitempty"`
-	TLS      TLS      `json:"tls"`
+	TLS      *TLS     `json:"tls,omitempty"`
 	TLSFirst bool     `json:"tlsFirst,omitempty"`
 	JsDomain string   `json:"jsDomain,omitempty"`
 }
