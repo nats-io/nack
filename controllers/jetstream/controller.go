@@ -482,6 +482,7 @@ type accountOverrides struct {
 	remoteRootCA     string
 	servers          []string
 	userCreds        string
+	nkey             string
 	user             string
 	password         string
 	token            string
@@ -572,6 +573,19 @@ func (c *Controller) getAccountOverrides(account string, ns string) (*accountOve
 		}
 	}
 
+	// Lookup the NKey seed.
+	if acc.Spec.NKey != nil && acc.Spec.NKey.Secret != nil {
+		secretName := acc.Spec.NKey.Secret.Name
+		secret, err := c.ki.Secrets(ns).Get(c.ctx, secretName, k8smeta.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+
+		if nkeyBytes, ok := secret.Data[acc.Spec.NKey.Seed]; ok {
+			overrides.nkey = string(nkeyBytes)
+		}
+	}
+
 	// Lookup the Token.
 	if acc.Spec.Token != nil {
 		secretName := acc.Spec.Token.Secret.Name
@@ -644,6 +658,8 @@ func (c *Controller) runWithJsmc(jsm jsmClientFunc, acc *accountOverrides, spec 
 	}
 	if acc.userCreds != "" {
 		natsCtx.Credentials = acc.userCreds
+	} else if acc.nkey != "" {
+		natsCtx.Nkey = acc.nkey
 	}
 
 	if acc.user != "" && acc.password != "" {

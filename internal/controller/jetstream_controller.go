@@ -302,6 +302,44 @@ func (c *jsController) natsConfigFromOpts(opts api.ConnectionOpts, ns string) (*
 		accountOverlay.Credentials = account.Spec.Creds.File
 	}
 
+	if account.Spec.NKey != nil && account.Spec.NKey.Secret != nil {
+		nkeySecret := &v1.Secret{}
+		err := c.Get(ctx,
+			types.NamespacedName{
+				Name:      account.Spec.NKey.Secret.Name,
+				Namespace: ns,
+			},
+			nkeySecret,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		accDir := filepath.Join(c.cacheDir, ns, opts.Account)
+		if err := os.MkdirAll(accDir, 0o755); err != nil {
+			return nil, err
+		}
+
+		if nkeyBytes, ok := nkeySecret.Data[account.Spec.NKey.Seed]; ok {
+			filePath := filepath.Join(accDir, account.Spec.NKey.Seed)
+			accountOverlay.NKey = filePath
+
+			writeNKey := true
+			if _, err := os.Stat(filePath); err == nil {
+				fileBytes, err := os.ReadFile(filePath)
+				if err == nil && bytes.Equal(fileBytes, nkeyBytes) {
+					writeNKey = false
+				}
+			}
+
+			if writeNKey {
+				if err := os.WriteFile(filePath, nkeyBytes, 0o600); err != nil {
+					return nil, err
+				}
+			}
+		}
+	}
+
 	if account.Spec.User != nil {
 		userSecret := &v1.Secret{}
 		err := c.Get(ctx,
