@@ -165,7 +165,11 @@ func (in *ConnectionOpts) DeepCopyInto(out *ConnectionOpts) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	in.TLS.DeepCopyInto(&out.TLS)
+	if in.TLS != nil {
+		in, out := &in.TLS, &out.TLS
+		*out = new(TLS)
+		(*in).DeepCopyInto(*out)
+	}
 	return
 }
 
