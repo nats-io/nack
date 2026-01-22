@@ -21,6 +21,7 @@ type AccountSpecApplyConfiguration struct {
 	Servers []string                       `json:"servers,omitempty"`
 	TLS     *TLSSecretApplyConfiguration   `json:"tls,omitempty"`
 	Creds   *CredsSecretApplyConfiguration `json:"creds,omitempty"`
+	NKey    *NKeySecretApplyConfiguration  `json:"nkey,omitempty"`
 	Token   *TokenSecretApplyConfiguration `json:"token,omitempty"`
 	User    *UserApplyConfiguration        `json:"user,omitempty"`
 }
@@ -54,6 +55,14 @@ func (b *AccountSpecApplyConfiguration) WithTLS(value *TLSSecretApplyConfigurati
 // If called multiple times, the Creds field is set to the value of the last call.
 func (b *AccountSpecApplyConfiguration) WithCreds(value *CredsSecretApplyConfiguration) *AccountSpecApplyConfiguration {
 	b.Creds = value
+	return b
+}
+
+// WithNKey sets the NKey field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the NKey field is set to the value of the last call.
+func (b *AccountSpecApplyConfiguration) WithNKey(value *NKeySecretApplyConfiguration) *AccountSpecApplyConfiguration {
+	b.NKey = value
 	return b
 }
 
