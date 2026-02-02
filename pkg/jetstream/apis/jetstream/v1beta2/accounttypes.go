@@ -25,6 +25,7 @@ type AccountSpec struct {
 	Servers []string     `json:"servers,omitempty"`
 	TLS     *TLSSecret   `json:"tls,omitempty"`
 	Creds   *CredsSecret `json:"creds,omitempty"`
+	NKey    *NKeySecret  `json:"nkey,omitempty"`
 	Token   *TokenSecret `json:"token,omitempty"`
 	User    *User        `json:"user,omitempty"`
 }

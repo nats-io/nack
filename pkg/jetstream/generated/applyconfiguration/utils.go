@@ -51,6 +51,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &jetstreamv1beta2.KeyValueApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("KeyValueSpec"):
 		return &jetstreamv1beta2.KeyValueSpecApplyConfiguration{}
+	case v1beta2.SchemeGroupVersion.WithKind("NKeySecret"):
+		return &jetstreamv1beta2.NKeySecretApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("ObjectStore"):
 		return &jetstreamv1beta2.ObjectStoreApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("ObjectStoreSpec"):
