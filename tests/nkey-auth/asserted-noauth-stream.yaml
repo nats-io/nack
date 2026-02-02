@@ -1,0 +1,9 @@
+apiVersion: jetstream.nats.io/v1beta2
+kind: Stream
+metadata:
+  name: noauth-stream
+status:
+  conditions:
+    - type: Ready
+      status: "False"
+      # Should fail with an authorization/authentication error

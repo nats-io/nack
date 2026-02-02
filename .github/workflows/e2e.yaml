@@ -2,8 +2,8 @@ name: e2e
 
 on:
   push:
-    branches:
-      - main
+    paths-ignore:
+      - '**.md'
   pull_request:
 
 jobs:

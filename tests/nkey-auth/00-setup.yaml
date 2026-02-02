@@ -1,0 +1,22 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+unitTest: false
+commands:
+  # Clean up any existing installations
+  - command: helm uninstall --namespace $NAMESPACE nats-nkey
+    ignoreFailure: true
+  - command: helm uninstall --namespace $NAMESPACE nack-nkey
+    ignoreFailure: true
+
+  # Add NATS Helm repo
+  - command: helm repo add nats https://nats-io.github.io/k8s/helm/charts --force-update
+
+  # Install NATS with NKey authentication
+  - command: helm upgrade --install --wait --namespace $NAMESPACE nats-nkey nats/nats -f nats-nkey.yaml
+
+  # Install NACK (using the test image built in the pipeline)
+  - command: helm upgrade --install --wait --namespace $NAMESPACE nack-nkey nats/nack --skip-crds -f ../nack.yaml
+
+apply:
+  # Create the Kubernetes Secret containing the NKey seed
+  - nkey-secret.yaml

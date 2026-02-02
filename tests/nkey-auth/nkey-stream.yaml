@@ -1,0 +1,14 @@
+apiVersion: jetstream.nats.io/v1beta2
+kind: Stream
+metadata:
+  name: nkey-orders
+spec:
+  name: nkey-orders
+  subjects:
+    - "nkey.orders.*"
+  storage: memory
+  replicas: 1
+  retention: workqueue
+  discard: old
+  # Reference the Account that uses NKey authentication
+  account: nkey-test-account

@@ -1,0 +1,7 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+unitTest: false
+apply:
+  - nkey-stream.yaml
+assert:
+  - asserted-nkey-stream.yaml

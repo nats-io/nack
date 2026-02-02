@@ -1,0 +1,7 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+unitTest: false
+apply:
+  - noauth-stream.yaml
+assert:
+  - asserted-noauth-stream.yaml

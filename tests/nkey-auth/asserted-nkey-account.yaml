@@ -1,0 +1,8 @@
+apiVersion: jetstream.nats.io/v1beta2
+kind: Account
+metadata:
+  name: nkey-test-account
+status:
+  conditions:
+    - type: Ready
+      status: "True"

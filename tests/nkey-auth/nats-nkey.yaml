@@ -1,0 +1,34 @@
+---
+# NATS Helm values for NKey authentication testing
+global:
+  labels:
+    app: nkey-jetstream
+
+natsBox:
+  enabled: false
+
+config:
+  cluster:
+    enabled: false
+
+  gateway:
+    enabled: false
+
+  jetstream:
+    enabled: true
+
+    memoryStore:
+      enabled: true
+      maxSize: 256Mi
+
+    fileStore:
+      enabled: true
+      pvc:
+        enabled: true
+        size: 256Mi
+
+  # Configure NKey authentication
+  # Users must authenticate with the public key: UBRVHFXNO4F7WZUTY73K6FNF7QRPZ6DYJJ2LA6LKSZCSJ7MRM7ZXTMG6
+  nkeys:
+    users:
+      - nkey: UBRVHFXNO4F7WZUTY73K6FNF7QRPZ6DYJJ2LA6LKSZCSJ7MRM7ZXTMG6

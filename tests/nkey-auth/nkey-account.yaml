@@ -1,0 +1,13 @@
+apiVersion: jetstream.nats.io/v1beta2
+kind: Account
+metadata:
+  name: nkey-test-account
+spec:
+  # Point to the NATS server with NKey authentication
+  servers:
+    - nats://nats-nkey:4222
+  # Reference the NKey secret
+  nkey:
+    secret:
+      name: nkey-user-secret
+    seed: user.nk

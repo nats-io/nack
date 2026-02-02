@@ -1,0 +1,14 @@
+apiVersion: jetstream.nats.io/v1beta2
+kind: Stream
+metadata:
+  name: noauth-stream
+spec:
+  name: noauth-stream
+  subjects:
+    - "noauth.*"
+  storage: memory
+  replicas: 1
+  # Intentionally NOT referencing the NKey account
+  # This should fail because the NATS server requires NKey authentication
+  servers:
+    - nats://nats-nkey:4222
