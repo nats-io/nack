@@ -20,7 +20,7 @@ jobs:
 
       - name: install kuttl
         run: |
-          curl -L https://github.com/kudobuilder/kuttl/releases/download/v0.15.0/kubectl-kuttl_0.15.0_linux_x86_64 -o /usr/local/bin/kubectl-kuttl
+          curl -L https://github.com/kudobuilder/kuttl/releases/download/v0.24.0/kubectl-kuttl_0.24.0_linux_x86_64 -o /usr/local/bin/kubectl-kuttl
           chmod +x /usr/local/bin/kubectl-kuttl
 
       - name: create kind cluster

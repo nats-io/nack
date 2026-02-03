@@ -634,7 +634,7 @@ func TestReloaderPollingModeFileDeletion(t *testing.T) {
 
 		// Modify the first config file to ensure we can still detect changes
 		t.Logf("Modifying remaining config file: %s", configFile1Path)
-		if err := os.WriteFile(configFile1Path, []byte(newConfigContents), 0644); err != nil {
+		if err := os.WriteFile(configFile1Path, []byte(newConfigContents), 0o644); err != nil {
 			t.Logf("Failed to write config: %v", err)
 			return
 		}
