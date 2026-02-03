@@ -74,8 +74,9 @@ func run() error {
 	cleanupPeriod := flag.Duration("cleanup-period", 30*time.Second, "Period to run object cleanup")
 	readOnly := flag.Bool("read-only", false, "Starts the controller without causing changes to the NATS resources")
 	cacheDir := flag.String("cache-dir", "", "Directory to store cached credential and TLS files")
-	controlLoop := flag.Bool("control-loop", false, "Experimental: Run controller with a full reconciliation control loop.")
+	controlLoop := flag.Bool("control-loop", false, "Experimental: Run controller with a full reconciliation control loop")
 	controlLoopSyncInterval := flag.Duration("sync-interval", time.Minute, "Interval to perform scheduled reconcile")
+	healthProbeBindAddress := flag.String("health-probe-bind-address", ":8081", "The address the probe endpoint binds to")
 
 	flag.Parse()
 
@@ -112,10 +113,11 @@ func run() error {
 		}
 
 		controllerCfg := &controller.Config{
-			ReadOnly:        *readOnly,
-			Namespace:       *namespace,
-			CacheDir:        *cacheDir,
-			RequeueInterval: *controlLoopSyncInterval,
+			ReadOnly:               *readOnly,
+			Namespace:              *namespace,
+			CacheDir:               *cacheDir,
+			RequeueInterval:        *controlLoopSyncInterval,
+			HealthProbeBindAddress: *healthProbeBindAddress,
 		}
 
 		return runControlLoop(config, natsCfg, controllerCfg)
@@ -173,8 +175,9 @@ func runControlLoop(config *rest.Config, natsCfg *controller.NatsConfig, control
 	log.SetLogger(klog.NewKlogr())
 
 	ctrlOpts := ctrl.Options{
-		Scheme: scheme,
-		Logger: log.Log,
+		Scheme:                 scheme,
+		Logger:                 log.Log,
+		HealthProbeBindAddress: controllerCfg.HealthProbeBindAddress,
 	}
 
 	if controllerCfg.Namespace != "" {

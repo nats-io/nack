@@ -15,9 +15,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Configure Git
         run: |
@@ -48,17 +49,22 @@ jobs:
         name: Tag
         run: |
           commit="$(git rev-parse HEAD)"
-          git fetch origin refs/tags/"${{ steps.tag.outputs.old-ref-name }}"
-          git checkout -b deps "${{ steps.tag.outputs.old-ref-name }}"
+          git fetch origin refs/tags/"${STEPS_TAG_OUTPUTS_OLD_REF_NAME}"
+          git checkout -b deps "${STEPS_TAG_OUTPUTS_OLD_REF_NAME}"
           git restore --source="$commit" ./cicd ./.github/workflows/release.yaml
           git add ./cicd ./.github/workflows/release.yaml
-          if git commit -m "bump dependency release to ${{ steps.tag.outputs.new-version }}"; then
-            git tag "${{ steps.tag.outputs.new-ref-name }}"
-            git push origin "${{ steps.tag.outputs.new-ref-name }}"
+          if git commit -m "bump dependency release to ${STEPS_TAG_OUTPUTS_NEW_VERSION}"; then
+            git tag "${STEPS_TAG_OUTPUTS_NEW_REF_NAME}"
+            git push origin "${STEPS_TAG_OUTPUTS_NEW_REF_NAME}"
           fi
+        env:
+          STEPS_TAG_OUTPUTS_OLD_REF_NAME: ${{ steps.tag.outputs.old-ref-name }}
+          STEPS_TAG_OUTPUTS_NEW_VERSION: ${{ steps.tag.outputs.new-version }}
+          STEPS_TAG_OUTPUTS_NEW_REF_NAME: ${{ steps.tag.outputs.new-ref-name }}
 
       - if: ${{ fromJSON(steps.tag.outputs.create) }}
         name: Trigger Release
-        run: gh workflow run release.yaml --ref "${{ steps.tag.outputs.new-ref-name }}"
+        run: gh workflow run release.yaml --ref "${STEPS_TAG_OUTPUTS_NEW_REF_NAME}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          STEPS_TAG_OUTPUTS_NEW_REF_NAME: ${{ steps.tag.outputs.new-ref-name }}
