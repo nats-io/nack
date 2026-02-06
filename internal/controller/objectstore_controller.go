@@ -114,7 +114,7 @@ func (r *ObjectStoreReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		if err := r.Update(ctx, objectStore); err != nil {
 			return ctrl.Result{}, fmt.Errorf("update objectstore resource to add finalizer: %w", err)
 		}
-		return ctrl.Result{}, nil
+		return ctrl.Result{Requeue: true}, nil
 	}
 
 	// Create or update ObjectStore
