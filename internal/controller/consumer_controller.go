@@ -113,7 +113,7 @@ func (r *ConsumerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		if err := r.Update(ctx, consumer); err != nil {
 			return ctrl.Result{}, fmt.Errorf("update consumer resource to add finalizer: %w", err)
 		}
-		return ctrl.Result{}, nil
+		return ctrl.Result{Requeue: true}, nil
 	}
 
 	// Create or update stream
