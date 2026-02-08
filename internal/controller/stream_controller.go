@@ -82,6 +82,11 @@ func (r *StreamReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		stream.Status.Conditions = updateReadyCondition(stream.Status.Conditions, v1.ConditionUnknown, stateReconciling, "Starting reconciliation")
 		err := r.Status().Update(ctx, stream)
 		if err != nil {
+			// If we get a conflict error, another reconciliation has already updated the status.
+			// Just requeue and let the next reconciliation handle it.
+			if apierrors.IsConflict(err) {
+				return ctrl.Result{Requeue: true}, nil
+			}
 			return ctrl.Result{}, fmt.Errorf("set condition unknown: %w", err)
 		}
 		return ctrl.Result{Requeue: true}, nil

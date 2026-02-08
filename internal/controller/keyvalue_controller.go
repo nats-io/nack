@@ -83,6 +83,11 @@ func (r *KeyValueReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		keyValue.Status.Conditions = updateReadyCondition(keyValue.Status.Conditions, v1.ConditionUnknown, stateReconciling, "Starting reconciliation")
 		err := r.Status().Update(ctx, keyValue)
 		if err != nil {
+			// If we get a conflict error, another reconciliation has already updated the status.
+			// Just requeue and let the next reconciliation handle it.
+			if apierrors.IsConflict(err) {
+				return ctrl.Result{Requeue: true}, nil
+			}
 			return ctrl.Result{}, fmt.Errorf("set condition unknown: %w", err)
 		}
 		return ctrl.Result{Requeue: true}, nil
@@ -113,7 +118,10 @@ func (r *KeyValueReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		if err := r.Update(ctx, keyValue); err != nil {
 			return ctrl.Result{}, fmt.Errorf("update keyvalue resource to add finalizer: %w", err)
 		}
-		return ctrl.Result{}, nil
+		// After we have added the finalizer, we need to requeue to make sure we reconcile the
+		// rest of the object. Just updating metadata won't make the API server update generation
+		// so the update above shouldn't trigger a new reconciliation.
+		return ctrl.Result{Requeue: true}, nil
 	}
 
 	// Create or update KeyValue
