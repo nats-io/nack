@@ -1,0 +1,27 @@
+name: Claude Code
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  id-token: write
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  pull_request_target:
+    types: [opened, reopened]
+
+jobs:
+  claude:
+    uses: synadia-io/ai-workflows/.github/workflows/claude.yml@v1
+    with:
+      review_focus: |
+        Additionally focus on:
+        - Kubernetes controller reconciliation correctness (idempotency, status updates, error handling)
+        - Proper use of controller-runtime patterns (watches, predicates, ownership references)
+        - Go error handling (wrapped errors, sentinel errors, no swallowed errors)
+    secrets:
+      claude_oauth_token: ${{ secrets.CLAUDE_OAUTH_TOKEN }}
