@@ -7,6 +7,18 @@
 
 [NATS](https://nats.io) Controllers for Kubernetes (NACK)
 
+## Table of Contents
+
+- [JetStream Controller](#jetstream-controller)
+  - [Controller Modes](#controller-modes)
+  - [Getting Started](#getting-started)
+  - [Managing Multiple NATS Systems and Accounts](#managing-multiple-nats-systems-and-accounts)
+  - [Creating NATS Resources](#creating-nats-resources)
+  - [Getting Started with Accounts](#getting-started-with-accounts)
+  - [Local Development](#local-development)
+- [NATS Server Config Reloader](#nats-server-config-reloader)
+- [NATS Boot Config](#nats-boot-config)
+
 ## JetStream Controller
 
 The JetStream controllers allows you to manage [NATS JetStream](https://docs.nats.io/nats-concepts/jetstream) resources via Kubernetes CRDs.
@@ -26,11 +38,13 @@ Resources managed by NACK controllers are expected to _exclusively_ be managed b
 
 ## [API Reference](docs/api.md)
 
+The API reference documents all available CRD fields for Streams, Consumers, KeyValue, ObjectStore, and Account resources.
+
 ### Getting started
 
 Install with Helm:
 
-```
+```sh
 helm repo add nats https://nats-io.github.io/k8s/helm/charts/
 helm repo update
 
@@ -49,7 +63,7 @@ helm upgrade --install nack nats/nack \
 >
 > The `jetstream-controller` logs will contain a diff of any changes the controller has made.
 
-```
+```sh
 helm upgrade nack nats/nack \
   --set jetstream.nats.url=nats://nats.default.svc.cluster.local:4222 \
   --set jetstream.additionalArgs={--control-loop} --wait
@@ -57,7 +71,7 @@ helm upgrade nack nats/nack \
 
 ### Managing Multiple NATS Systems and Accounts
 
-The are several approaches for managing multiple NATS Systems with NACK within one Kubernetes cluster. These options are not mutually exclusive.
+There are several approaches for managing multiple NATS Systems with NACK within one Kubernetes cluster. These options are not mutually exclusive.
 
 #### 1. Run Multiple Namespaced Controllers
 You can run multiple NACK controllers on the same Kubernetes cluster. Add `--set config.namespaced=true` to your install flags or set `namespaced: true` in your `values.yaml`. When set, the controller will only reconcile resources within its own namespace.
@@ -123,7 +137,7 @@ spec:
   account: b
 ```
 
-The above manifests will define two Account resources, each pulling credentials from a Kubernetes secret. Account `a` is configured to use the NATS Cluster in namspace `nats-a` and Account `b` is configured to use the NATS Cluster in namespace `nats-b`. The NATS clusters do not need to be in Kubernetes, this is just an example.
+The above manifests will define two Account resources, each pulling credentials from a Kubernetes secret. Account `a` is configured to use the NATS Cluster in namespace `nats-a` and Account `b` is configured to use the NATS Cluster in namespace `nats-b`. The NATS clusters do not need to be in Kubernetes, this is just an example.
 
 This will also create an identical stream, `foo`, in each cluster. **Note:** The resource names, `foo-a` and `foo-b`, must be distinct to not conflict as Kubernetes resources, but the stream names themselves are both `foo`.
 
@@ -134,9 +148,11 @@ You may define some connection options within the resource manifests directly. I
 
 If running with `--control-loop`, resource-level connection config will always override any global config.
 
+> **Note**: The `--crd-connect` flag is not required if running with `--control-loop`.
+
 ```sh
 helm upgrade nack nats/nack \
-  --set jetstream.additionalArgs={--crd-connect} --wait // Not required if running with `--control-loop`
+  --set jetstream.additionalArgs={--crd-connect} --wait
 ```
 
 #### Example Stream:
@@ -157,7 +173,7 @@ spec:
 
 ### Creating NATS Resources
 
-Let's create a a stream and a couple of consumers:
+Let's create a stream and a couple of consumers:
 
 ```yaml
 ---
@@ -465,7 +481,7 @@ configuration file.
 For more information see the
 [Chart repo](https://github.com/nats-io/k8s/tree/main/helm/charts/nats).
 
-```
+```sh
 helm repo add nats https://nats-io.github.io/k8s/helm/charts/
 helm upgrade --install nats nats/nats
 ```
@@ -497,12 +513,14 @@ make nats-server-config-reloader-docker ver=1.2.3
 
 ## NATS Boot Config
 
+A helper utility used during NATS server pod initialization to generate and manage boot-time configuration.
+
 ### Installing with Helm
 
 For more information see the
-[Chart repo](https://github.com/nats-io/k8s/tree/master/helm/charts/nats).
+[Chart repo](https://github.com/nats-io/k8s/tree/main/helm/charts/nats).
 
-```
+```sh
 helm repo add nats https://nats-io.github.io/k8s/helm/charts/
 helm upgrade --install nats nats/nats
 ```
