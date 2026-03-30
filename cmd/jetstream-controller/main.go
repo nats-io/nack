@@ -57,6 +57,9 @@ func main() {
 
 func run() error {
 	klog.InitFlags(nil)
+	// Opt into fixed stderrthreshold behavior (kubernetes/klog#212).
+	_ = flag.Set("legacy_stderr_threshold_behavior", "false")
+	_ = flag.Set("stderrthreshold", "INFO")
 
 	// Explicitly register controller-runtime flags
 	ctrl.RegisterFlags(nil)
