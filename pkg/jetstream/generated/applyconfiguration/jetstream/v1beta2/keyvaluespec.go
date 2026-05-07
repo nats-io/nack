@@ -23,21 +23,24 @@ import (
 
 // KeyValueSpecApplyConfiguration represents a declarative configuration of the KeyValueSpec type for use
 // with apply.
+//
+// KeyValueSpec is the spec for a KeyValue resource
 type KeyValueSpecApplyConfiguration struct {
-	Bucket         *string                            `json:"bucket,omitempty"`
-	Description    *string                            `json:"description,omitempty"`
-	MaxValueSize   *int                               `json:"maxValueSize,omitempty"`
-	History        *int                               `json:"history,omitempty"`
-	TTL            *string                            `json:"ttl,omitempty"`
-	MaxBytes       *int                               `json:"maxBytes,omitempty"`
-	Storage        *string                            `json:"storage,omitempty"`
-	Replicas       *int                               `json:"replicas,omitempty"`
-	Placement      *StreamPlacementApplyConfiguration `json:"placement,omitempty"`
-	RePublish      *RePublishApplyConfiguration       `json:"republish,omitempty"`
-	Mirror         *StreamSourceApplyConfiguration    `json:"mirror,omitempty"`
-	Sources        []*jetstreamv1beta2.StreamSource   `json:"sources,omitempty"`
-	Compression    *bool                              `json:"compression,omitempty"`
-	LimitMarkerTTL *time.Duration                     `json:"limitMarkerTtl,omitempty"`
+	Bucket       *string                            `json:"bucket,omitempty"`
+	Description  *string                            `json:"description,omitempty"`
+	MaxValueSize *int                               `json:"maxValueSize,omitempty"`
+	History      *int                               `json:"history,omitempty"`
+	TTL          *string                            `json:"ttl,omitempty"`
+	MaxBytes     *int                               `json:"maxBytes,omitempty"`
+	Storage      *string                            `json:"storage,omitempty"`
+	Replicas     *int                               `json:"replicas,omitempty"`
+	Placement    *StreamPlacementApplyConfiguration `json:"placement,omitempty"`
+	RePublish    *RePublishApplyConfiguration       `json:"republish,omitempty"`
+	Mirror       *StreamSourceApplyConfiguration    `json:"mirror,omitempty"`
+	Sources      []*jetstreamv1beta2.StreamSource   `json:"sources,omitempty"`
+	Compression  *bool                              `json:"compression,omitempty"`
+	// LimitMarkerTTL is how long the bucket keeps markers when keys are removed by the TTL setting, 0 meaning markers are not supported
+	LimitMarkerTTL *time.Duration `json:"limitMarkerTtl,omitempty"`
 }
 
 // KeyValueSpecApplyConfiguration constructs a declarative configuration of the KeyValueSpec type for use with

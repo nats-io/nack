@@ -1009,6 +1009,18 @@ func Test_consumerSpecToConfig(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 		},
+		{
+			name: "ack policy flow_control",
+			spec: &api.ConsumerSpec{
+				DurableName: "test-consumer",
+				AckPolicy:   "flow_control",
+			},
+			want: &jsmapi.ConsumerConfig{
+				Durable:   "test-consumer",
+				AckPolicy: jsmapi.AckFlowControl,
+			},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

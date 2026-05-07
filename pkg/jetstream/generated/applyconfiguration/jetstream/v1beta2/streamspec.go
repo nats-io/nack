@@ -21,6 +21,8 @@ import (
 
 // StreamSpecApplyConfiguration represents a declarative configuration of the StreamSpec type for use
 // with apply.
+//
+// StreamSpec is the spec for a Stream resource
 type StreamSpecApplyConfiguration struct {
 	Name                   *string                             `json:"name,omitempty"`
 	Description            *string                             `json:"description,omitempty"`
@@ -58,6 +60,7 @@ type StreamSpecApplyConfiguration struct {
 	AllowMsgCounter        *bool                               `json:"allowMsgCounter,omitempty"`
 	AllowAtomicPublish     *bool                               `json:"allowAtomicPublish,omitempty"`
 	AllowMsgSchedules      *bool                               `json:"allowMsgSchedules,omitempty"`
+	AllowBatched           *bool                               `json:"allowBatched,omitempty"`
 	PersistMode            *string                             `json:"persistMode,omitempty"`
 }
 
@@ -365,6 +368,14 @@ func (b *StreamSpecApplyConfiguration) WithAllowAtomicPublish(value bool) *Strea
 // If called multiple times, the AllowMsgSchedules field is set to the value of the last call.
 func (b *StreamSpecApplyConfiguration) WithAllowMsgSchedules(value bool) *StreamSpecApplyConfiguration {
 	b.AllowMsgSchedules = &value
+	return b
+}
+
+// WithAllowBatched sets the AllowBatched field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the AllowBatched field is set to the value of the last call.
+func (b *StreamSpecApplyConfiguration) WithAllowBatched(value bool) *StreamSpecApplyConfiguration {
+	b.AllowBatched = &value
 	return b
 }
 

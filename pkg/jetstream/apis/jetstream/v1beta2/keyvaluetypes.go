@@ -9,7 +9,7 @@ import (
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// Stream is a specification for a Stream resource
+// KeyValue is a specification for a KeyValue resource
 type KeyValue struct {
 	k8smeta.TypeMeta   `json:",inline"`
 	k8smeta.ObjectMeta `json:"metadata,omitempty"`
@@ -22,7 +22,7 @@ func (s *KeyValue) GetSpec() interface{} {
 	return s.Spec
 }
 
-// StreamSpec is the spec for a Stream resource
+// KeyValueSpec is the spec for a KeyValue resource
 type KeyValueSpec struct {
 	Bucket       string           `json:"bucket"`
 	Description  string           `json:"description,omitempty"`
@@ -46,7 +46,7 @@ type KeyValueSpec struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// KeyValueList is a list of Stream resources
+// KeyValueList is a list of KeyValue resources
 type KeyValueList struct {
 	k8smeta.TypeMeta `json:",inline"`
 	k8smeta.ListMeta `json:"metadata"`

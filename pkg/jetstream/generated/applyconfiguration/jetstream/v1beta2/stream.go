@@ -23,6 +23,8 @@ import (
 
 // StreamApplyConfiguration represents a declarative configuration of the Stream type for use
 // with apply.
+//
+// Stream is a specification for a Stream resource
 type StreamApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
@@ -40,6 +42,7 @@ func Stream(name, namespace string) *StreamApplyConfiguration {
 	b.WithAPIVersion("jetstream.nats.io/v1beta2")
 	return b
 }
+
 func (b StreamApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

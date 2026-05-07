@@ -17,6 +17,8 @@ package v1beta2
 
 // ObjectStoreSpecApplyConfiguration represents a declarative configuration of the ObjectStoreSpec type for use
 // with apply.
+//
+// ObjectStoreSpec is the spec for an ObjectStore resource
 type ObjectStoreSpecApplyConfiguration struct {
 	Bucket      *string                            `json:"bucket,omitempty"`
 	Description *string                            `json:"description,omitempty"`

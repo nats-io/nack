@@ -17,6 +17,8 @@ package v1beta2
 
 // ConsumerSpecApplyConfiguration represents a declarative configuration of the ConsumerSpec type for use
 // with apply.
+//
+// ConsumerSpec is the spec for a Consumer resource
 type ConsumerSpecApplyConfiguration struct {
 	Description        *string           `json:"description,omitempty"`
 	AckPolicy          *string           `json:"ackPolicy,omitempty"`

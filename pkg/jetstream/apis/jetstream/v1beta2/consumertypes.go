@@ -28,32 +28,32 @@ type ConsumerSpec struct {
 	DeliverPolicy      string            `json:"deliverPolicy,omitempty"`
 	DeliverSubject     string            `json:"deliverSubject,omitempty"`
 	DeliverGroup       string            `json:"deliverGroup,omitempty"`
-	DurableName        string            `json:"durableName,omitempty"` // Maps to Durable
+	DurableName        string            `json:"durableName,omitempty"`
 	FilterSubject      string            `json:"filterSubject,omitempty"`
 	FilterSubjects     []string          `json:"filterSubjects,omitempty"`
 	FlowControl        bool              `json:"flowControl,omitempty"`
-	HeartbeatInterval  string            `json:"heartbeatInterval,omitempty"` // Maps to IdleHeartbeat
+	HeartbeatInterval  string            `json:"heartbeatInterval,omitempty"`
 	MaxAckPending      int               `json:"maxAckPending,omitempty"`
 	MaxDeliver         int               `json:"maxDeliver,omitempty"`
 	BackOff            []string          `json:"backoff,omitempty"`
 	MaxWaiting         int               `json:"maxWaiting,omitempty"`
 	OptStartSeq        int               `json:"optStartSeq,omitempty"`
 	OptStartTime       string            `json:"optStartTime,omitempty"`
-	RateLimitBps       int               `json:"rateLimitBps,omitempty"` // Maps to RateLimit
+	RateLimitBps       int               `json:"rateLimitBps,omitempty"`
 	ReplayPolicy       string            `json:"replayPolicy,omitempty"`
-	SampleFreq         string            `json:"sampleFreq,omitempty"` // Maps to SampleFrequency
+	SampleFreq         string            `json:"sampleFreq,omitempty"`
 	HeadersOnly        bool              `json:"headersOnly,omitempty"`
 	MaxRequestBatch    int               `json:"maxRequestBatch,omitempty"`
 	MaxRequestExpires  string            `json:"maxRequestExpires,omitempty"`
 	MaxRequestMaxBytes int               `json:"maxRequestMaxBytes,omitempty"`
 	InactiveThreshold  string            `json:"inactiveThreshold,omitempty"`
 	Replicas           int               `json:"replicas,omitempty"`
-	MemStorage         bool              `json:"memStorage,omitempty"` // Maps to MemoryStorage
+	MemStorage         bool              `json:"memStorage,omitempty"`
 	Metadata           map[string]string `json:"metadata,omitempty"`
-	PauseUntil         string            `json:"pauseUntil,omitempty"`     // RFC3339 timestamp for pausing consumer
-	PriorityPolicy     string            `json:"priorityPolicy,omitempty"` // Priority policy: none, pinned_client, overflow, prioritized
-	PinnedTTL          string            `json:"pinnedTtl,omitempty"`      // Duration for pinned client timeout
-	PriorityGroups     []string          `json:"priorityGroups,omitempty"` // List of priority groups
+	PauseUntil         string            `json:"pauseUntil,omitempty"`
+	PriorityPolicy     string            `json:"priorityPolicy,omitempty"`
+	PinnedTTL          string            `json:"pinnedTtl,omitempty"`
+	PriorityGroups     []string          `json:"priorityGroups,omitempty"`
 
 	StreamName string `json:"streamName"`
 	BaseStreamConfig

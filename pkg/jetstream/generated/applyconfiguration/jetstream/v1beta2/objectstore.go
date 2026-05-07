@@ -23,6 +23,8 @@ import (
 
 // ObjectStoreApplyConfiguration represents a declarative configuration of the ObjectStore type for use
 // with apply.
+//
+// ObjectStore is a specification for an ObjectStore resource
 type ObjectStoreApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
@@ -40,6 +42,7 @@ func ObjectStore(name, namespace string) *ObjectStoreApplyConfiguration {
 	b.WithAPIVersion("jetstream.nats.io/v1beta2")
 	return b
 }
+
 func (b ObjectStoreApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

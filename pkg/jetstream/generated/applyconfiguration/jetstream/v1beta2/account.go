@@ -23,6 +23,8 @@ import (
 
 // AccountApplyConfiguration represents a declarative configuration of the Account type for use
 // with apply.
+//
+// Account is a specification for a Account resource.
 type AccountApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
@@ -40,6 +42,7 @@ func Account(name, namespace string) *AccountApplyConfiguration {
 	b.WithAPIVersion("jetstream.nats.io/v1beta2")
 	return b
 }
+
 func (b AccountApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

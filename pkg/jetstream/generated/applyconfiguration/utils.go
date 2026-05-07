@@ -69,6 +69,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &jetstreamv1beta2.StreamPlacementApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("StreamSource"):
 		return &jetstreamv1beta2.StreamSourceApplyConfiguration{}
+	case v1beta2.SchemeGroupVersion.WithKind("StreamSourceConsumer"):
+		return &jetstreamv1beta2.StreamSourceConsumerApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("StreamSpec"):
 		return &jetstreamv1beta2.StreamSpecApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("SubjectTransform"):

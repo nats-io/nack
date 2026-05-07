@@ -17,6 +17,8 @@ package v1beta2
 
 // AccountSpecApplyConfiguration represents a declarative configuration of the AccountSpec type for use
 // with apply.
+//
+// AccountSpec is the spec for a Account resource
 type AccountSpecApplyConfiguration struct {
 	Servers []string                       `json:"servers,omitempty"`
 	TLS     *TLSSecretApplyConfiguration   `json:"tls,omitempty"`

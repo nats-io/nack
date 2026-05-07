@@ -358,6 +358,13 @@ func createStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 		})
 	}
 
+	if spec.AllowBatched {
+		opts = append(opts, func(o *jsmapi.StreamConfig) error {
+			o.AllowBatchPublish = true
+			return nil
+		})
+	}
+
 	if spec.PersistMode == "async" {
 		opts = append(opts, func(o *jsmapi.StreamConfig) error {
 			o.PersistMode = jsmapi.AsyncPersistMode
@@ -441,6 +448,7 @@ func updateStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 		AllowMsgCounter:        spec.AllowMsgCounter,
 		AllowAtomicPublish:     spec.AllowAtomicPublish,
 		AllowMsgSchedules:      spec.AllowMsgSchedules,
+		AllowBatchPublish:      spec.AllowBatched,
 	}
 	if spec.RePublish != nil {
 		config.RePublish = &jsmapi.RePublish{
@@ -651,6 +659,13 @@ func getStreamSource(ss *apis.StreamSource) (*jsmapi.StreamSource, error) {
 			Source:      transform.Source,
 			Destination: transform.Dest,
 		})
+	}
+
+	if ss.Consumer != nil && ss.Consumer.Name != "" {
+		jss.Consumer = &jsmapi.StreamConsumerSource{
+			Name:           ss.Consumer.Name,
+			DeliverSubject: ss.Consumer.DeliverSubject,
+		}
 	}
 
 	return jss, nil

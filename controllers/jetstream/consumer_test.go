@@ -415,6 +415,16 @@ func TestConsumerSpecToOpts(t *testing.T) {
 				require.Contains(t, err.Error(), "invalid value for 'ackPolicy': 'invalid'")
 			},
 		},
+		"ack policy flow_control": {
+			given: apis.ConsumerSpec{
+				DurableName: "my-consumer",
+				AckPolicy:   "flow_control",
+			},
+			expected: jsmapi.ConsumerConfig{
+				Durable:   "my-consumer",
+				AckPolicy: jsmapi.AckFlowControl,
+			},
+		},
 		"invalid replay policy": {
 			given: apis.ConsumerSpec{
 				DurableName:  "my-consumer",

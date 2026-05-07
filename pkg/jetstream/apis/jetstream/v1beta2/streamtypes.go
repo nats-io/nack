@@ -36,7 +36,7 @@ type StreamSpec struct {
 	Discard                string            `json:"discard,omitempty"`
 	Replicas               int               `json:"replicas,omitempty"`
 	NoAck                  bool              `json:"noAck,omitempty"`
-	DuplicateWindow        string            `json:"duplicateWindow,omitempty"` // Maps to Duplicates
+	DuplicateWindow        string            `json:"duplicateWindow,omitempty"`
 	Placement              *StreamPlacement  `json:"placement,omitempty"`
 	Mirror                 *StreamSource     `json:"mirror,omitempty"`
 	Sources                []*StreamSource   `json:"sources,omitempty"`
@@ -47,10 +47,10 @@ type StreamSpec struct {
 	DenyDelete             bool              `json:"denyDelete,omitempty"`
 	DenyPurge              bool              `json:"denyPurge,omitempty"`
 	AllowDirect            bool              `json:"allowDirect,omitempty"`
-	AllowRollup            bool              `json:"allowRollup,omitempty"` // Maps to RollupAllowed
+	AllowRollup            bool              `json:"allowRollup,omitempty"`
 	MirrorDirect           bool              `json:"mirrorDirect,omitempty"`
-	DiscardPerSubject      bool              `json:"discardPerSubject,omitempty"` // Maps to DiscardNewPer
-	FirstSequence          uint64            `json:"firstSequence,omitempty"`     // Maps to FirstSeq
+	DiscardPerSubject      bool              `json:"discardPerSubject,omitempty"`
+	FirstSequence          uint64            `json:"firstSequence,omitempty"`
 	Metadata               map[string]string `json:"metadata,omitempty"`
 	ConsumerLimits         *ConsumerLimits   `json:"consumerLimits,omitempty"`
 	AllowMsgTTL            bool              `json:"allowMsgTtl,omitempty"`
@@ -58,6 +58,7 @@ type StreamSpec struct {
 	AllowMsgCounter        bool              `json:"allowMsgCounter,omitempty"`
 	AllowAtomicPublish     bool              `json:"allowAtomicPublish,omitempty"`
 	AllowMsgSchedules      bool              `json:"allowMsgSchedules,omitempty"`
+	AllowBatched           bool              `json:"allowBatched,omitempty"`
 	PersistMode            string            `json:"persistMode,omitempty"`
 	BaseStreamConfig
 }
@@ -81,7 +82,15 @@ type StreamSource struct {
 	ExternalAPIPrefix     string `json:"externalApiPrefix,omitempty"`
 	ExternalDeliverPrefix string `json:"externalDeliverPrefix,omitempty"`
 
-	SubjectTransforms []*SubjectTransform `json:"subjectTransforms,omitempty"`
+	SubjectTransforms []*SubjectTransform   `json:"subjectTransforms,omitempty"`
+	Consumer          *StreamSourceConsumer `json:"consumer,omitempty"`
+}
+
+// StreamSourceConsumer references a durable consumer for stream sourcing
+// or mirroring (nats-server 2.14+).
+type StreamSourceConsumer struct {
+	Name           string `json:"name,omitempty"`
+	DeliverSubject string `json:"deliverSubject,omitempty"`
 }
 
 type RePublish struct {

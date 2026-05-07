@@ -22,13 +22,14 @@ import (
 // StreamSourceApplyConfiguration represents a declarative configuration of the StreamSource type for use
 // with apply.
 type StreamSourceApplyConfiguration struct {
-	Name                  *string                              `json:"name,omitempty"`
-	OptStartSeq           *int                                 `json:"optStartSeq,omitempty"`
-	OptStartTime          *string                              `json:"optStartTime,omitempty"`
-	FilterSubject         *string                              `json:"filterSubject,omitempty"`
-	ExternalAPIPrefix     *string                              `json:"externalApiPrefix,omitempty"`
-	ExternalDeliverPrefix *string                              `json:"externalDeliverPrefix,omitempty"`
-	SubjectTransforms     []*jetstreamv1beta2.SubjectTransform `json:"subjectTransforms,omitempty"`
+	Name                  *string                                 `json:"name,omitempty"`
+	OptStartSeq           *int                                    `json:"optStartSeq,omitempty"`
+	OptStartTime          *string                                 `json:"optStartTime,omitempty"`
+	FilterSubject         *string                                 `json:"filterSubject,omitempty"`
+	ExternalAPIPrefix     *string                                 `json:"externalApiPrefix,omitempty"`
+	ExternalDeliverPrefix *string                                 `json:"externalDeliverPrefix,omitempty"`
+	SubjectTransforms     []*jetstreamv1beta2.SubjectTransform    `json:"subjectTransforms,omitempty"`
+	Consumer              *StreamSourceConsumerApplyConfiguration `json:"consumer,omitempty"`
 }
 
 // StreamSourceApplyConfiguration constructs a declarative configuration of the StreamSource type for use with
@@ -95,5 +96,13 @@ func (b *StreamSourceApplyConfiguration) WithSubjectTransforms(values ...**jetst
 		}
 		b.SubjectTransforms = append(b.SubjectTransforms, *values[i])
 	}
+	return b
+}
+
+// WithConsumer sets the Consumer field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Consumer field is set to the value of the last call.
+func (b *StreamSourceApplyConfiguration) WithConsumer(value *StreamSourceConsumerApplyConfiguration) *StreamSourceApplyConfiguration {
+	b.Consumer = value
 	return b
 }

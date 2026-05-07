@@ -494,6 +494,7 @@ var _ = Describe("Stream Controller", func() {
 			stream.Spec.AllowMsgCounter = true
 			stream.Spec.AllowAtomicPublish = true
 			stream.Spec.AllowMsgSchedules = true
+			stream.Spec.AllowBatched = true
 			stream.Spec.AllowRollup = true
 			stream.Spec.Retention = "limits"
 			// Note: PersistMode "async" is not compatible with AllowAtomicPublish
@@ -517,6 +518,37 @@ var _ = Describe("Stream Controller", func() {
 			Expect(streamInfo.Config.AllowMsgCounter).To(BeTrue())
 			Expect(streamInfo.Config.AllowAtomicPublish).To(BeTrue())
 			Expect(streamInfo.Config.AllowMsgSchedules).To(BeTrue())
+			Expect(streamInfo.Config.AllowBatchPublish).To(BeTrue())
+		})
+
+		It("should disable allowBatched when toggled off after being enabled", func(ctx SpecContext) {
+			By("enabling allowBatched")
+			Expect(k8sClient.Get(ctx, typeNamespacedName, stream)).To(Succeed())
+			stream.Spec.AllowBatched = true
+			Expect(k8sClient.Update(ctx, stream)).To(Succeed())
+
+			_, err := controller.Reconcile(ctx, reconcile.Request{NamespacedName: typeNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+
+			natsStream, err := jsClient.Stream(ctx, streamName)
+			Expect(err).NotTo(HaveOccurred())
+			info, err := natsStream.Info(ctx)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(info.Config.AllowBatchPublish).To(BeTrue())
+
+			By("flipping allowBatched back to false")
+			Expect(k8sClient.Get(ctx, typeNamespacedName, stream)).To(Succeed())
+			stream.Spec.AllowBatched = false
+			Expect(k8sClient.Update(ctx, stream)).To(Succeed())
+
+			_, err = controller.Reconcile(ctx, reconcile.Request{NamespacedName: typeNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+
+			natsStream, err = jsClient.Stream(ctx, streamName)
+			Expect(err).NotTo(HaveOccurred())
+			info, err = natsStream.Info(ctx)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(info.Config.AllowBatchPublish).To(BeFalse())
 		})
 
 		It("should set an error state when the nats server is not available", func(ctx SpecContext) {
@@ -772,6 +804,10 @@ func Test_mapSpecToConfig(t *testing.T) {
 						Source: "transform-source",
 						Dest:   "transform-dest",
 					}},
+					Consumer: &api.StreamSourceConsumer{
+						Name:           "mirror-consumer",
+						DeliverSubject: "deliver.mirror",
+					},
 				},
 				NoAck: true,
 				Placement: &api.StreamPlacement{
@@ -805,6 +841,10 @@ func Test_mapSpecToConfig(t *testing.T) {
 						Source: "transform-source",
 						Dest:   "transform-dest",
 					}},
+					Consumer: &api.StreamSourceConsumer{
+						Name:           "src-consumer",
+						DeliverSubject: "deliver.src",
+					},
 				}},
 				Storage:                "file",
 				Subjects:               []string{"orders.*"},
@@ -813,6 +853,7 @@ func Test_mapSpecToConfig(t *testing.T) {
 				AllowMsgCounter:        true,
 				AllowAtomicPublish:     true,
 				AllowMsgSchedules:      true,
+				AllowBatched:           true,
 				PersistMode:            "async",
 				BaseStreamConfig: api.BaseStreamConfig{
 					PreventDelete: false,
@@ -859,6 +900,10 @@ func Test_mapSpecToConfig(t *testing.T) {
 						ApiPrefix:     "api",
 						DeliverPrefix: "deliver",
 					},
+					Consumer: &jsmapi.StreamConsumerSource{
+						Name:           "mirror-consumer",
+						DeliverSubject: "deliver.mirror",
+					},
 				},
 				Sources: []*jsmapi.StreamSource{{
 					Name:          "source",
@@ -872,6 +917,10 @@ func Test_mapSpecToConfig(t *testing.T) {
 					External: &jsmapi.ExternalStream{
 						ApiPrefix:     "api",
 						DeliverPrefix: "deliver",
+					},
+					Consumer: &jsmapi.StreamConsumerSource{
+						Name:           "src-consumer",
+						DeliverSubject: "deliver.src",
 					},
 				}},
 				Sealed:        false,
@@ -897,11 +946,11 @@ func Test_mapSpecToConfig(t *testing.T) {
 				AllowMsgCounter:        true,
 				AllowAtomicPublish:     true,
 				AllowMsgSchedules:      true,
+				AllowBatchPublish:      true,
 				PersistMode:            jsmapi.AsyncPersistMode,
 				Metadata: map[string]string{
 					"meta": "data",
 				},
-				Template: "",
 			},
 			wantErr: false,
 		},

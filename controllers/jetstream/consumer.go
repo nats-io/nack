@@ -244,9 +244,11 @@ func consumerSpecToOpts(spec apis.ConsumerSpec) ([]jsm.ConsumerOption, error) {
 		opts = append(opts, jsm.AcknowledgeAll())
 	case "explicit":
 		opts = append(opts, jsm.AcknowledgeExplicit())
+	case "flow_control":
+		opts = append(opts, jsm.AcknowledgeFlowControl())
 	case "":
 	default:
-		return nil, fmt.Errorf("invalid value for 'ackPolicy': '%s'. Must be one of 'none', 'all', 'explicit'", spec.AckPolicy)
+		return nil, fmt.Errorf("invalid value for 'ackPolicy': '%s'. Must be one of 'none', 'all', 'explicit', 'flow_control'", spec.AckPolicy)
 	}
 
 	if spec.AckWait != "" {

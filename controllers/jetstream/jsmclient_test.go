@@ -43,10 +43,11 @@ func (m *mockConsumer) Delete() error {
 type mockJsmClient struct {
 	connectErr error
 
-	loadStream    jsmStream
-	loadStreamErr error
-	newStream     jsmStream
-	newStreamErr  error
+	loadStream      jsmStream
+	loadStreamErr   error
+	newStream       jsmStream
+	newStreamErr    error
+	newStreamConfig *jsmapi.StreamConfig
 
 	loadConsumer    jsmConsumer
 	loadConsumerErr error
@@ -65,6 +66,13 @@ func (c *mockJsmClient) LoadStream(ctx context.Context, name string) (jsmStream,
 }
 
 func (c *mockJsmClient) NewStream(ctx context.Context, name string, opt []jsm.StreamOption) (jsmStream, error) {
+	if c.newStreamConfig != nil {
+		for _, o := range opt {
+			if err := o(c.newStreamConfig); err != nil {
+				return nil, err
+			}
+		}
+	}
 	return c.newStream, c.newStreamErr
 }
 

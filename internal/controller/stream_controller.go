@@ -559,6 +559,12 @@ func streamSpecToConfig(spec *api.StreamSpec, currentConfig *jsmapi.StreamConfig
 		})
 	}
 
+	// allowBatched — always set so toggling false on the CR resets the flag on update
+	opts = append(opts, func(o *jsmapi.StreamConfig) error {
+		o.AllowBatchPublish = spec.AllowBatched
+		return nil
+	})
+
 	// persistMode
 	if spec.PersistMode == "async" {
 		opts = append(opts, func(o *jsmapi.StreamConfig) error {
@@ -607,6 +613,13 @@ func mapStreamSource(ss *api.StreamSource) (*jetstream.StreamSource, error) {
 		})
 	}
 
+	if ss.Consumer != nil && ss.Consumer.Name != "" {
+		jss.Consumer = &jetstream.StreamConsumerSource{
+			Name:           ss.Consumer.Name,
+			DeliverSubject: ss.Consumer.DeliverSubject,
+		}
+	}
+
 	return jss, nil
 }
 
@@ -640,6 +653,13 @@ func mapJSMStreamSource(ss *api.StreamSource) (*jsmapi.StreamSource, error) {
 			Source:      transform.Source,
 			Destination: transform.Dest,
 		})
+	}
+
+	if ss.Consumer != nil && ss.Consumer.Name != "" {
+		jss.Consumer = &jsmapi.StreamConsumerSource{
+			Name:           ss.Consumer.Name,
+			DeliverSubject: ss.Consumer.DeliverSubject,
+		}
 	}
 
 	return jss, nil

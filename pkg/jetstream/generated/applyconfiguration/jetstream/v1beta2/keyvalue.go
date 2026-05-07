@@ -23,6 +23,8 @@ import (
 
 // KeyValueApplyConfiguration represents a declarative configuration of the KeyValue type for use
 // with apply.
+//
+// KeyValue is a specification for a KeyValue resource
 type KeyValueApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
@@ -40,6 +42,7 @@ func KeyValue(name, namespace string) *KeyValueApplyConfiguration {
 	b.WithAPIVersion("jetstream.nats.io/v1beta2")
 	return b
 }
+
 func (b KeyValueApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

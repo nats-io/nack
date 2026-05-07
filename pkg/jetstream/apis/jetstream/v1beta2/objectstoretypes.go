@@ -7,7 +7,7 @@ import (
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// Stream is a specification for a Stream resource
+// ObjectStore is a specification for an ObjectStore resource
 type ObjectStore struct {
 	k8smeta.TypeMeta   `json:",inline"`
 	k8smeta.ObjectMeta `json:"metadata,omitempty"`
@@ -20,7 +20,7 @@ func (s *ObjectStore) GetSpec() interface{} {
 	return s.Spec
 }
 
-// StreamSpec is the spec for a Stream resource
+// ObjectStoreSpec is the spec for an ObjectStore resource
 type ObjectStoreSpec struct {
 	Bucket      string            `json:"bucket"`
 	Description string            `json:"description,omitempty"`
@@ -36,7 +36,7 @@ type ObjectStoreSpec struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ObjectStoreList is a list of Stream resources
+// ObjectStoreList is a list of ObjectStore resources
 type ObjectStoreList struct {
 	k8smeta.TypeMeta `json:",inline"`
 	k8smeta.ListMeta `json:"metadata"`
