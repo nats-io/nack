@@ -551,6 +551,76 @@ var _ = Describe("Stream Controller", func() {
 			Expect(info.Config.AllowBatchPublish).To(BeFalse())
 		})
 
+		It("should disable togglable bool flags when toggled off after being enabled", func(ctx SpecContext) {
+			// Only flags the server permits toggling on update are covered here.
+			// Server-side one-way (cannot change post-create) — kept as conditional
+			// "enable-only" appends in streamSpecToConfig: DenyDelete, DenyPurge,
+			// Sealed, AllowMsgCounter, AllowAtomicPublish, AllowMsgSchedules, PersistMode.
+			// AllowRollup conflicts with DenyPurge and lives in its own It block.
+			By("enabling togglable feature flags")
+			Expect(k8sClient.Get(ctx, typeNamespacedName, stream)).To(Succeed())
+			stream.Spec.AllowDirect = true
+			stream.Spec.AllowBatched = true
+			stream.Spec.Retention = "limits"
+			Expect(k8sClient.Update(ctx, stream)).To(Succeed())
+
+			_, err := controller.Reconcile(ctx, reconcile.Request{NamespacedName: typeNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+
+			natsStream, err := jsClient.Stream(ctx, streamName)
+			Expect(err).NotTo(HaveOccurred())
+			info, err := natsStream.Info(ctx)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(info.Config.AllowDirect).To(BeTrue())
+			Expect(info.Config.AllowBatchPublish).To(BeTrue())
+
+			By("flipping togglable flags back to false")
+			Expect(k8sClient.Get(ctx, typeNamespacedName, stream)).To(Succeed())
+			stream.Spec.AllowDirect = false
+			stream.Spec.AllowBatched = false
+			Expect(k8sClient.Update(ctx, stream)).To(Succeed())
+
+			_, err = controller.Reconcile(ctx, reconcile.Request{NamespacedName: typeNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+
+			natsStream, err = jsClient.Stream(ctx, streamName)
+			Expect(err).NotTo(HaveOccurred())
+			info, err = natsStream.Info(ctx)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(info.Config.AllowDirect).To(BeFalse())
+			Expect(info.Config.AllowBatchPublish).To(BeFalse())
+		})
+
+		It("should disable allowRollup when toggled off after being enabled", func(ctx SpecContext) {
+			By("enabling allowRollup")
+			Expect(k8sClient.Get(ctx, typeNamespacedName, stream)).To(Succeed())
+			stream.Spec.AllowRollup = true
+			Expect(k8sClient.Update(ctx, stream)).To(Succeed())
+
+			_, err := controller.Reconcile(ctx, reconcile.Request{NamespacedName: typeNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+
+			natsStream, err := jsClient.Stream(ctx, streamName)
+			Expect(err).NotTo(HaveOccurred())
+			info, err := natsStream.Info(ctx)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(info.Config.AllowRollup).To(BeTrue())
+
+			By("flipping allowRollup back to false")
+			Expect(k8sClient.Get(ctx, typeNamespacedName, stream)).To(Succeed())
+			stream.Spec.AllowRollup = false
+			Expect(k8sClient.Update(ctx, stream)).To(Succeed())
+
+			_, err = controller.Reconcile(ctx, reconcile.Request{NamespacedName: typeNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+
+			natsStream, err = jsClient.Stream(ctx, streamName)
+			Expect(err).NotTo(HaveOccurred())
+			info, err = natsStream.Info(ctx)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(info.Config.AllowRollup).To(BeFalse())
+		})
+
 		It("should set an error state when the nats server is not available", func(ctx SpecContext) {
 			By("setting up controller with unavailable nats server")
 			// Setup client for not running server
@@ -1132,4 +1202,72 @@ func TestStreamUpdateWithoutPlacement(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, 3, info.Config.Replicas, "Replicas should be scaled to 3")
 	})
+}
+
+// Test_streamSpecToConfig_togglesOff verifies that flipping a togglable bool field
+// from true to false in the CR spec actually clears the corresponding field on the
+// resulting StreamConfig — even when the previous server state had it set to true.
+// Without this, UpdateConfiguration uses serverState as a base and any field whose
+// option-builder is gated on `if spec.X` would silently keep the server's true value.
+//
+// Excluded fields are server-side one-way ("stream configuration update can not
+// change ...") or have server-imposed coupling that prevents standalone toggling:
+// NoAck, DenyDelete, DenyPurge, Sealed, AllowMsgCounter, AllowAtomicPublish,
+// AllowMsgSchedules, PersistMode, MirrorDirect.
+func Test_streamSpecToConfig_togglesOff(t *testing.T) {
+	type fieldCase struct {
+		name      string
+		setSpec   func(s *api.StreamSpec, on bool)
+		readField func(c *jsmapi.StreamConfig) bool
+	}
+	cases := []fieldCase{
+		{"AllowDirect", func(s *api.StreamSpec, on bool) { s.AllowDirect = on }, func(c *jsmapi.StreamConfig) bool { return c.AllowDirect }},
+		{"AllowRollup", func(s *api.StreamSpec, on bool) { s.AllowRollup = on }, func(c *jsmapi.StreamConfig) bool { return c.RollupAllowed }},
+		{"AllowBatched", func(s *api.StreamSpec, on bool) { s.AllowBatched = on }, func(c *jsmapi.StreamConfig) bool { return c.AllowBatchPublish }},
+	}
+
+	apply := func(spec *api.StreamSpec, base *jsmapi.StreamConfig) (*jsmapi.StreamConfig, error) {
+		opts, err := streamSpecToConfig(spec, base)
+		if err != nil {
+			return nil, err
+		}
+		out := *base
+		for _, o := range opts {
+			if err := o(&out); err != nil {
+				return nil, err
+			}
+		}
+		return &out, nil
+	}
+
+	for _, c := range cases {
+		t.Run(c.name+"/enable_then_disable", func(t *testing.T) {
+			// 1. Spec on, base zero — should yield true.
+			specOn := &api.StreamSpec{Storage: "memory", Retention: "limits"}
+			c.setSpec(specOn, true)
+			gotOn, err := apply(specOn, &jsmapi.StreamConfig{})
+			assert.NoError(t, err)
+			assert.Truef(t, c.readField(gotOn), "%s should be true when spec sets it true", c.name)
+
+			// 2. Spec off, base has field already true (simulates serverState after enable).
+			specOff := &api.StreamSpec{Storage: "memory", Retention: "limits"}
+			c.setSpec(specOff, false)
+			base := &jsmapi.StreamConfig{}
+			// Mark base with field=true to simulate server state.
+			func() {
+				dummy := &api.StreamSpec{Storage: "memory", Retention: "limits"}
+				c.setSpec(dummy, true)
+				seeded, err := apply(dummy, &jsmapi.StreamConfig{})
+				if err != nil {
+					t.Fatal(err)
+				}
+				*base = *seeded
+			}()
+			assert.Truef(t, c.readField(base), "%s base seed must be true", c.name)
+
+			gotOff, err := apply(specOff, base)
+			assert.NoError(t, err)
+			assert.Falsef(t, c.readField(gotOff), "%s should be false after toggling spec off (was true on server)", c.name)
+		})
+	}
 }

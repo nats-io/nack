@@ -380,11 +380,6 @@ func streamSpecToConfig(spec *api.StreamSpec, currentConfig *jsmapi.StreamConfig
 		opts = append(opts, jsm.DiscardNew())
 	}
 
-	// noAck
-	if spec.NoAck {
-		opts = append(opts, jsm.NoAck())
-	}
-
 	// duplicateWindow
 	if spec.DuplicateWindow != "" {
 		d, err := time.ParseDuration(spec.DuplicateWindow)
@@ -470,32 +465,15 @@ func streamSpecToConfig(spec *api.StreamSpec, currentConfig *jsmapi.StreamConfig
 		})
 	}
 
-	// denyDelete
-	if spec.DenyDelete {
-		opts = append(opts, jsm.DenyDelete())
-	}
+	// allowDirect, allowRollup handled by the bulk setter at the end of this function
+	// so flipping any of them off propagates on update.
 
-	// denyPurge
-	if spec.DenyPurge {
-		opts = append(opts, jsm.DenyPurge())
-	}
-
-	// allowDirect
-	if spec.AllowDirect {
-		opts = append(opts, jsm.AllowDirect())
-	}
-
-	// allowRollup
-	if spec.AllowRollup {
-		opts = append(opts, jsm.AllowRollup())
-	}
-
-	// mirrorDirect
+	// mirrorDirect — leave conditional: legacy controller doesn't toggle this on update either.
 	if spec.MirrorDirect {
 		opts = append(opts, jsm.MirrorDirect())
 	}
 
-	// discardPerSubject
+	// discardPerSubject — keep helper for the side effect of forcing Discard=DiscardNew when enabled.
 	if spec.DiscardPerSubject {
 		opts = append(opts, jsm.DiscardNewPerSubject())
 	}
@@ -521,7 +499,7 @@ func streamSpecToConfig(spec *api.StreamSpec, currentConfig *jsmapi.StreamConfig
 		opts = append(opts, jsm.ConsumerLimits(cl))
 	}
 
-	// allowMsgTtl
+	// allowMsgTTL — server forbids disabling on update; emit only when enabling.
 	if spec.AllowMsgTTL {
 		opts = append(opts, jsm.AllowMsgTTL())
 	}
@@ -535,7 +513,41 @@ func streamSpecToConfig(spec *api.StreamSpec, currentConfig *jsmapi.StreamConfig
 		opts = append(opts, jsm.SubjectDeleteMarkerTTL(d))
 	}
 
-	// allowMsgCounter
+	// Bulk setter for togglable bool fields. Always-set so flipping the CR back to false
+	// propagates on update (UpdateConfiguration uses serverState as the base; opts that
+	// don't touch a field leave its previous value intact).
+	//
+	// Only flags the NATS server permits toggling post-create are listed here.
+	// Server-side one-way ("stream configuration update can not change ...",
+	// "... can not be disabled", "... can not cancel ..."): NoAck, DenyDelete, DenyPurge,
+	// Sealed, AllowMsgTTL, AllowMsgCounter, PersistMode — kept conditional below as
+	// enable-only setters. AllowAtomicPublish and AllowMsgSchedules are also kept
+	// conditional pending confirmation of server toggle-semantics. MirrorDirect mirrors
+	// legacy behavior (not toggled on update).
+	opts = append(opts, func(o *jsmapi.StreamConfig) error {
+		o.AllowDirect = spec.AllowDirect
+		o.RollupAllowed = spec.AllowRollup
+		o.AllowBatchPublish = spec.AllowBatched
+		return nil
+	})
+
+	// noAck — keep conditional (server-side toggle semantics not confirmed; matches
+	// legacy enable-only behavior in the new controller).
+	if spec.NoAck {
+		opts = append(opts, jsm.NoAck())
+	}
+
+	// denyDelete — server forbids cancelling on update; emit only when enabling.
+	if spec.DenyDelete {
+		opts = append(opts, jsm.DenyDelete())
+	}
+
+	// denyPurge — server forbids cancelling on update; emit only when enabling.
+	if spec.DenyPurge {
+		opts = append(opts, jsm.DenyPurge())
+	}
+
+	// allowMsgCounter — server forbids changing post-create; emit only when enabling.
 	if spec.AllowMsgCounter {
 		opts = append(opts, func(o *jsmapi.StreamConfig) error {
 			o.AllowMsgCounter = true
@@ -543,7 +555,7 @@ func streamSpecToConfig(spec *api.StreamSpec, currentConfig *jsmapi.StreamConfig
 		})
 	}
 
-	// allowAtomicPublish
+	// allowAtomicPublish — emit only when enabling (toggle-off semantics not confirmed).
 	if spec.AllowAtomicPublish {
 		opts = append(opts, func(o *jsmapi.StreamConfig) error {
 			o.AllowAtomicPublish = true
@@ -551,7 +563,7 @@ func streamSpecToConfig(spec *api.StreamSpec, currentConfig *jsmapi.StreamConfig
 		})
 	}
 
-	// allowMsgSchedules
+	// allowMsgSchedules — emit only when enabling (server requires AllowRollup; toggle-off semantics not confirmed).
 	if spec.AllowMsgSchedules {
 		opts = append(opts, func(o *jsmapi.StreamConfig) error {
 			o.AllowMsgSchedules = true
@@ -559,19 +571,14 @@ func streamSpecToConfig(spec *api.StreamSpec, currentConfig *jsmapi.StreamConfig
 		})
 	}
 
-	// allowBatched — always set so toggling false on the CR resets the flag on update
-	opts = append(opts, func(o *jsmapi.StreamConfig) error {
-		o.AllowBatchPublish = spec.AllowBatched
-		return nil
-	})
-
-	// persistMode
-	if spec.PersistMode == "async" {
+	// persistMode — server forbids changing post-create; emit only the explicit values.
+	switch spec.PersistMode {
+	case "async":
 		opts = append(opts, func(o *jsmapi.StreamConfig) error {
 			o.PersistMode = jsmapi.AsyncPersistMode
 			return nil
 		})
-	} else if spec.PersistMode == "default" {
+	case "default":
 		opts = append(opts, func(o *jsmapi.StreamConfig) error {
 			o.PersistMode = jsmapi.DefaultPersistMode
 			return nil
