@@ -323,6 +323,17 @@ func getServerStreamState(jsm *jsm.Manager, stream *api.Stream) (*jsmapi.StreamC
 	return &streamCfg, nil
 }
 
+// parseDurationOrZero parses a CRD duration string, treating an empty value as 0.
+// Mirrors the v1beta1 controller's getDurationFromString so an omitted maxAge
+// reconciles to 0 (unlimited) instead of silently inheriting jsm.DefaultStream's
+// 1-year default or a stale server value. See https://github.com/nats-io/nack/issues/377.
+func parseDurationOrZero(v string) (time.Duration, error) {
+	if v == "" {
+		return 0, nil
+	}
+	return time.ParseDuration(v)
+}
+
 func streamSpecToConfig(spec *api.StreamSpec, currentConfig *jsmapi.StreamConfig) ([]jsm.StreamOption, error) {
 	opts := []jsm.StreamOption{
 		jsm.StreamDescription(spec.Description),
@@ -355,9 +366,11 @@ func streamSpecToConfig(spec *api.StreamSpec, currentConfig *jsmapi.StreamConfig
 		})
 	}
 
-	// maxAge
-	if spec.MaxAge != "" {
-		d, err := time.ParseDuration(spec.MaxAge)
+	// maxAge — empty means unlimited (0). Always emit so an omitted value overrides
+	// jsm.DefaultStream's 1-year default on create and resets a previously-set value
+	// on update (UpdateConfiguration uses serverState as the base). See nats-io/nack#377.
+	{
+		d, err := parseDurationOrZero(spec.MaxAge)
 		if err != nil {
 			return nil, fmt.Errorf("parse max age: %w", err)
 		}
