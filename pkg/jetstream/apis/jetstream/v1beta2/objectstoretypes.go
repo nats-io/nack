@@ -24,7 +24,7 @@ func (s *ObjectStore) GetSpec() interface{} {
 type ObjectStoreSpec struct {
 	Bucket      string            `json:"bucket"`
 	Description string            `json:"description,omitempty"`
-	TTL         string            `json:"ttl,omitempty"`
+	TTL         k8smeta.Duration  `json:"ttl,omitempty"`
 	MaxBytes    int               `json:"maxBytes,omitempty"`
 	Storage     string            `json:"storage,omitempty"`
 	Replicas    int               `json:"replicas,omitempty"`
