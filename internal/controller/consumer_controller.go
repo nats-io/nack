@@ -74,7 +74,7 @@ func (r *ConsumerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	log = log.WithValues(
 		"streamName", consumer.Spec.StreamName,
-		"consumerName", consumer.Spec.DurableName,
+		"consumerName", consumer.Spec.ConsumerName(),
 	)
 
 	// Update ready status to unknown when no status is set
@@ -158,7 +158,7 @@ func (r *ConsumerReconciler) deleteConsumer(ctx context.Context, log logr.Logger
 				return nil
 			}
 
-			return js.DeleteConsumer(consumer.Spec.StreamName, consumer.Spec.DurableName)
+			return js.DeleteConsumer(consumer.Spec.StreamName, consumer.Spec.ConsumerName())
 		})
 		switch {
 		case jsm.IsNatsError(err, JSConsumerNotFoundErr):
@@ -176,7 +176,7 @@ func (r *ConsumerReconciler) deleteConsumer(ctx context.Context, log logr.Logger
 		}
 	} else {
 		log.Info("Skipping consumer deletion.",
-			"consumerName", consumer.Spec.DurableName,
+			"consumerName", consumer.Spec.ConsumerName(),
 			"preventDelete", consumer.Spec.PreventDelete,
 			"read-only", r.ReadOnly(),
 		)
@@ -243,7 +243,7 @@ func (r *ConsumerReconciler) createOrUpdate(ctx context.Context, log klog.Logger
 			}
 		} else if !consumer.Spec.PreventUpdate {
 			log.Info("Updating Consumer.")
-			c, err := js.LoadConsumer(consumer.Spec.StreamName, consumer.Spec.DurableName)
+			c, err := js.LoadConsumer(consumer.Spec.StreamName, consumer.Spec.ConsumerName())
 			if err != nil {
 				return fmt.Errorf("loading consumer: %w", err)
 			}
@@ -253,7 +253,7 @@ func (r *ConsumerReconciler) createOrUpdate(ctx context.Context, log klog.Logger
 				return fmt.Errorf("updating the consumer configuration: %w", err)
 			}
 
-			updatedConsumer, err = js.LoadConsumer(consumer.Spec.StreamName, consumer.Spec.DurableName)
+			updatedConsumer, err = js.LoadConsumer(consumer.Spec.StreamName, consumer.Spec.ConsumerName())
 			if err != nil {
 				return fmt.Errorf("loading updated consumer: %w", err)
 			}
@@ -323,7 +323,7 @@ func getStoredConsumerState(consumer *api.Consumer) (*jsmapi.ConsumerConfig, err
 // Fetch the current state of the consumer from the server.
 // ErrConsumerNotFound is considered a valid response and does not return error
 func getServerConsumerState(js *jsm.Manager, consumer *api.Consumer) (*jsmapi.ConsumerConfig, error) {
-	c, err := js.LoadConsumer(consumer.Spec.StreamName, consumer.Spec.DurableName)
+	c, err := js.LoadConsumer(consumer.Spec.StreamName, consumer.Spec.ConsumerName())
 	if jsm.IsNatsError(err, JSConsumerNotFoundErr) {
 		return nil, nil
 	}
@@ -336,11 +336,17 @@ func getServerConsumerState(js *jsm.Manager, consumer *api.Consumer) (*jsmapi.Co
 }
 
 func consumerSpecToConfig(spec *api.ConsumerSpec) ([]jsm.ConsumerOption, error) {
+	if spec.Name == "" && spec.DurableName == "" {
+		return nil, errors.New("consumer name or durableName is required")
+	}
+	if spec.Name != "" && spec.DurableName != "" && spec.Name != spec.DurableName {
+		return nil, errors.New("consumer name and durableName must match when both are set")
+	}
+
 	opts := []jsm.ConsumerOption{
 		jsm.ConsumerDescription(spec.Description),
 		jsm.DeliverySubject(spec.DeliverSubject),
 		jsm.DeliverGroup(spec.DeliverGroup),
-		jsm.DurableName(spec.DurableName),
 		jsm.MaxAckPending(uint(spec.MaxAckPending)),
 		jsm.MaxWaiting(uint(spec.MaxWaiting)),
 		jsm.RateLimitBitsPerSecond(uint64(spec.RateLimitBps)),
@@ -348,6 +354,12 @@ func consumerSpecToConfig(spec *api.ConsumerSpec) ([]jsm.ConsumerOption, error) 
 		jsm.MaxRequestMaxBytes(spec.MaxRequestMaxBytes),
 		jsm.ConsumerOverrideReplicas(spec.Replicas),
 		jsm.ConsumerMetadata(spec.Metadata),
+	}
+	if spec.Name != "" {
+		opts = append(opts, jsm.ConsumerName(spec.Name))
+	}
+	if spec.DurableName != "" {
+		opts = append(opts, jsm.DurableName(spec.DurableName))
 	}
 
 	// ackPolicy

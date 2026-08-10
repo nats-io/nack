@@ -22,12 +22,13 @@ func (c *Account) GetSpec() interface{} {
 
 // AccountSpec is the spec for a Account resource
 type AccountSpec struct {
-	Servers []string     `json:"servers,omitempty"`
-	TLS     *TLSSecret   `json:"tls,omitempty"`
-	Creds   *CredsSecret `json:"creds,omitempty"`
-	NKey    *NKeySecret  `json:"nkey,omitempty"`
-	Token   *TokenSecret `json:"token,omitempty"`
-	User    *User        `json:"user,omitempty"`
+	Servers  []string     `json:"servers,omitempty"`
+	TLS      *TLSSecret   `json:"tls,omitempty"`
+	TLSFirst bool         `json:"tlsFirst,omitempty"`
+	Creds    *CredsSecret `json:"creds,omitempty"`
+	NKey     *NKeySecret  `json:"nkey,omitempty"`
+	Token    *TokenSecret `json:"token,omitempty"`
+	User     *User        `json:"user,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

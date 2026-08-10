@@ -22,6 +22,7 @@ func (c *Consumer) GetSpec() interface{} {
 
 // ConsumerSpec is the spec for a Consumer resource
 type ConsumerSpec struct {
+	Name               string            `json:"name,omitempty"`
 	Description        string            `json:"description,omitempty"`
 	AckPolicy          string            `json:"ackPolicy,omitempty"`
 	AckWait            string            `json:"ackWait,omitempty"`
@@ -57,6 +58,14 @@ type ConsumerSpec struct {
 
 	StreamName string `json:"streamName"`
 	BaseStreamConfig
+}
+
+// ConsumerName returns the name used to manage the consumer.
+func (s ConsumerSpec) ConsumerName() string {
+	if s.Name != "" {
+		return s.Name
+	}
+	return s.DurableName
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

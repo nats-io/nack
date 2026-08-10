@@ -736,8 +736,18 @@ func Test_consumerSpecToConfig(t *testing.T) {
 		{
 			name:    "empty spec",
 			spec:    &api.ConsumerSpec{},
-			want:    &jsmapi.ConsumerConfig{},
-			wantErr: false,
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "named ephemeral consumer",
+			spec: &api.ConsumerSpec{Name: "test-consumer"},
+			want: &jsmapi.ConsumerConfig{Name: "test-consumer"},
+		},
+		{
+			name:    "different name and durable name",
+			spec:    &api.ConsumerSpec{Name: "ephemeral", DurableName: "durable"},
+			wantErr: true,
 		},
 		{
 			name: "full spec",

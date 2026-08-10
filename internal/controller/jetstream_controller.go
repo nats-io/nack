@@ -168,6 +168,7 @@ func (c *jsController) natsConfigFromOpts(opts api.ConnectionOpts, ns string) (*
 	if len(account.Spec.Servers) > 0 {
 		accountOverlay.ServerURL = strings.Join(account.Spec.Servers, ",")
 	}
+	accountOverlay.TLSFirst = account.Spec.TLSFirst
 
 	c.cacheLock.Lock()
 	defer c.cacheLock.Unlock()

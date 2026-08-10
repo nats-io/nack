@@ -52,6 +52,25 @@ var _ = Describe("Account Controller", func() {
 			}
 		})
 
+		It("applies account TLS-first to dependent connections", func(ctx SpecContext) {
+			account := &api.Account{
+				ObjectMeta: metav1.ObjectMeta{Name: "tls-first-account", Namespace: "default"},
+				Spec: api.AccountSpec{
+					Servers:  []string{"nats://nats.io"},
+					TLSFirst: true,
+				},
+			}
+			Expect(k8sClient.Create(ctx, account)).To(Succeed())
+			DeferCleanup(func(ctx SpecContext) {
+				Expect(k8sClient.Delete(ctx, account)).To(Succeed())
+			})
+
+			jsController := baseController.(*jsController)
+			config, err := jsController.natsConfigFromOpts(api.ConnectionOpts{Account: account.Name}, account.Namespace)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(config.TLSFirst).To(BeTrue())
+		})
+
 		When("the resource is marked for deletion", func() {
 			var stream *api.Stream
 			var streamName types.NamespacedName

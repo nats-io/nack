@@ -375,6 +375,18 @@ func TestConsumerSpecToOpts(t *testing.T) {
 				Durable: "my-consumer",
 			},
 		},
+		"named ephemeral consumer": {
+			given: apis.ConsumerSpec{Name: "my-consumer"},
+			expected: jsmapi.ConsumerConfig{
+				Name: "my-consumer",
+			},
+		},
+		"different name and durable name": {
+			given: apis.ConsumerSpec{Name: "ephemeral", DurableName: "durable"},
+			errCheck: func(t *testing.T, err error) {
+				require.EqualError(t, err, "consumer name and durableName must match when both are set")
+			},
+		},
 		"invalid deliver policy value": {
 			given: apis.ConsumerSpec{
 				DurableName:   "my-consumer",
