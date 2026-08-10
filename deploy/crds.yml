@@ -340,7 +340,7 @@ spec:
                     items:
                       type: string
               tlsFirst:
-                description: When true, the KV Store will initiate TLS before server INFO.
+                description: When true, the Stream connection will initiate TLS before server INFO.
                 type: boolean
                 default: false
               jsDomain:
@@ -573,7 +573,12 @@ spec:
             type: object
             properties:
               durableName:
-                description: The name of the Consumer.
+                description: The durable name of the Consumer.
+                type: string
+                pattern: '^[^.*>]+$'
+                minLength: 1
+              name:
+                description: The name of an ephemeral Consumer. It must match durableName when both fields are set.
                 type: string
                 pattern: '^[^.*>]+$'
                 minLength: 1
@@ -749,7 +754,7 @@ spec:
                     items:
                       type: string
               tlsFirst:
-                description: When true, the KV Store will initiate TLS before server INFO.
+                description: When true, the Consumer connection will initiate TLS before server INFO.
                 type: boolean
                 default: false
               jsDomain:
@@ -1162,7 +1167,7 @@ spec:
                     description: Key in the secret that contains the password.
                     type: string
               tlsFirst:
-                description: When true, the KV Store will initiate TLS before server INFO.
+                description: When true, the Account connection will initiate TLS before server INFO.
                 type: boolean
                 default: false
           status:
@@ -1296,9 +1301,26 @@ spec:
                         dest:
                           description: Destination subject.
                           type: string
+                  consumer:
+                    description: Reference a durable consumer when sourcing or mirroring (nats-server 2.14+).
+                    type: object
+                    required:
+                    - name
+                    properties:
+                      name:
+                        description: Durable consumer name on the source stream.
+                        type: string
+                      deliverSubject:
+                        description: Deliver subject for the durable push consumer.
+                        type: string
               compression:
                 description: KV Store compression.
                 type: boolean
+              metadata:
+                description: Additional KV Store metadata.
+                type: object
+                additionalProperties:
+                  type: string
               sources:
                 description: A KV Store's sources.
                 type: array
@@ -1331,6 +1353,18 @@ spec:
                           dest:
                             description: Destination subject.
                             type: string
+                    consumer:
+                      description: Reference a durable consumer when sourcing or mirroring (nats-server 2.14+).
+                      type: object
+                      required:
+                      - name
+                      properties:
+                        name:
+                          description: Durable consumer name on the source stream.
+                          type: string
+                        deliverSubject:
+                          description: Deliver subject for the durable push consumer.
+                          type: string
               account:
                 description: Name of the account to which the Stream belongs.
                 type: string
