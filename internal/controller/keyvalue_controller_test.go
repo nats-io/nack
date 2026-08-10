@@ -731,6 +731,9 @@ func Test_mapKVSpecToConfig(t *testing.T) {
 					HeadersOnly: true,
 				},
 				Compression: true,
+				Metadata: map[string]string{
+					"environment": "test",
+				},
 				Sources: []*api.StreamSource{{
 					Name:                  "source",
 					OptStartSeq:           5,
@@ -801,6 +804,9 @@ func Test_mapKVSpecToConfig(t *testing.T) {
 					Domain: "",
 				}},
 				Compression: true,
+				Metadata: map[string]string{
+					"environment": "test",
+				},
 				RePublish: &jetstream.RePublish{
 					Source:      "re-publish-source",
 					Destination: "re-publish-dest",

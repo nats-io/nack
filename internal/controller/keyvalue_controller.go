@@ -334,6 +334,7 @@ func keyValueSpecToConfig(spec *api.KeyValueSpec) (jetstream.KeyValueConfig, err
 		History:        uint8(spec.History),
 		MaxBytes:       int64(spec.MaxBytes),
 		MaxValueSize:   int32(spec.MaxValueSize),
+		Metadata:       spec.Metadata,
 		Replicas:       spec.Replicas,
 		LimitMarkerTTL: spec.LimitMarkerTTL,
 	}

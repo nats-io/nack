@@ -24,19 +24,20 @@ func (s *KeyValue) GetSpec() interface{} {
 
 // KeyValueSpec is the spec for a KeyValue resource
 type KeyValueSpec struct {
-	Bucket       string           `json:"bucket"`
-	Description  string           `json:"description,omitempty"`
-	MaxValueSize int              `json:"maxValueSize,omitempty"`
-	History      int              `json:"history,omitempty"`
-	TTL          string           `json:"ttl,omitempty"`
-	MaxBytes     int              `json:"maxBytes,omitempty"`
-	Storage      string           `json:"storage,omitempty"`
-	Replicas     int              `json:"replicas,omitempty"`
-	Placement    *StreamPlacement `json:"placement,omitempty"`
-	RePublish    *RePublish       `json:"republish,omitempty"`
-	Mirror       *StreamSource    `json:"mirror,omitempty"`
-	Sources      []*StreamSource  `json:"sources,omitempty"`
-	Compression  bool             `json:"compression,omitempty"`
+	Bucket       string            `json:"bucket"`
+	Description  string            `json:"description,omitempty"`
+	MaxValueSize int               `json:"maxValueSize,omitempty"`
+	History      int               `json:"history,omitempty"`
+	TTL          string            `json:"ttl,omitempty"`
+	MaxBytes     int               `json:"maxBytes,omitempty"`
+	Storage      string            `json:"storage,omitempty"`
+	Replicas     int               `json:"replicas,omitempty"`
+	Placement    *StreamPlacement  `json:"placement,omitempty"`
+	RePublish    *RePublish        `json:"republish,omitempty"`
+	Mirror       *StreamSource     `json:"mirror,omitempty"`
+	Sources      []*StreamSource   `json:"sources,omitempty"`
+	Compression  bool              `json:"compression,omitempty"`
+	Metadata     map[string]string `json:"metadata,omitempty"`
 	// LimitMarkerTTL is how long the bucket keeps markers when keys are removed by the TTL setting, 0 meaning markers are not supported
 	// +optional
 	LimitMarkerTTL time.Duration `json:"limitMarkerTtl,omitempty"`
