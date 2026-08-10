@@ -17,7 +17,7 @@ on:
 
 jobs:
   claude:
-    uses: synadia-io/ai-workflows/.github/workflows/claude.yml@v2
+    uses: synadia-io/ai-workflows/.github/workflows/claude.yml@d24bb93f1890ac4b40da926829031dab26c4c41e # v2.3.1
     with:
       gh_app_id: ${{ vars.CLAUDE_GH_APP_ID }}
       checkout_mode: 'base'
