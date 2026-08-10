@@ -1,6 +1,6 @@
 # This Dockerfile enables straight-forward building of the jetstream-controller
 # This is currently not used in the CI/CD pipeline but can be used for local builds of the controller image
-FROM golang:1.26.5-trixie@sha256:87ffdb09b6a2e29ff910748b745395e8a0299aa80b7c0551cdca9b55e3fd2b3e
+FROM golang:1.26.5-trixie@sha256:87ffdb09b6a2e29ff910748b745395e8a0299aa80b7c0551cdca9b55e3fd2b3e AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
