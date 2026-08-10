@@ -486,12 +486,36 @@ var _ = Describe("Stream Controller", func() {
 			Expect(streamInfo.Config.Subjects).To(Equal([]string{"tests.*"}))
 		})
 
-		It("should create stream with new feature flags on the server", func(ctx SpecContext) {
-			By("updating the stream spec with new feature flags")
+		It("should create a counter stream", func(ctx SpecContext) {
+			By("enabling message counters")
 			err := k8sClient.Get(ctx, typeNamespacedName, stream)
 			Expect(err).NotTo(HaveOccurred())
 
 			stream.Spec.AllowMsgCounter = true
+			stream.Spec.Retention = "limits"
+			Expect(k8sClient.Update(ctx, stream)).To(Succeed())
+
+			By("reconciling the updated resource")
+			result, err := controller.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result.IsZero()).To(BeTrue())
+
+			By("fetching the updated stream from NATS")
+			natsStream, err := jsClient.Stream(ctx, streamName)
+			Expect(err).NotTo(HaveOccurred())
+
+			streamInfo, err := natsStream.Info(ctx)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(streamInfo.Config.AllowMsgCounter).To(BeTrue())
+		})
+
+		It("should create a stream with publish and scheduling features", func(ctx SpecContext) {
+			By("updating the stream spec with compatible feature flags")
+			err := k8sClient.Get(ctx, typeNamespacedName, stream)
+			Expect(err).NotTo(HaveOccurred())
+
 			stream.Spec.AllowAtomicPublish = true
 			stream.Spec.AllowMsgSchedules = true
 			stream.Spec.AllowBatched = true
@@ -515,7 +539,6 @@ var _ = Describe("Stream Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("verifying new feature flags are set on server")
-			Expect(streamInfo.Config.AllowMsgCounter).To(BeTrue())
 			Expect(streamInfo.Config.AllowAtomicPublish).To(BeTrue())
 			Expect(streamInfo.Config.AllowMsgSchedules).To(BeTrue())
 			Expect(streamInfo.Config.AllowBatchPublish).To(BeTrue())
