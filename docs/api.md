@@ -96,6 +96,42 @@ Resource Types:
         </td>
         <td>false</td>
       </tr><tr>
+        <td><b>allowAtomicPublish</b></td>
+        <td>boolean</td>
+        <td>
+          Allow atomic batch publishing into the Stream.<br/>
+          <br/>
+            <i>Default</i>: false<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>allowBatched</b></td>
+        <td>boolean</td>
+        <td>
+          Allow fast batch publishing into the Stream. Requires nats-server 2.14 or later.<br/>
+          <br/>
+            <i>Default</i>: false<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>allowMsgCounter</b></td>
+        <td>boolean</td>
+        <td>
+          Allow the Stream to store counter CRDT messages.<br/>
+          <br/>
+            <i>Default</i>: false<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>allowMsgSchedules</b></td>
+        <td>boolean</td>
+        <td>
+          Allow scheduled messages in the Stream.<br/>
+          <br/>
+            <i>Default</i>: false<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
         <td><b>allowRollup</b></td>
         <td>boolean</td>
         <td>
@@ -329,6 +365,15 @@ Resource Types:
         </td>
         <td>false</td>
       </tr><tr>
+        <td><b>persistMode</b></td>
+        <td>enum</td>
+        <td>
+          Persistence mode for Stream writes.<br/>
+          <br/>
+            <i>Enum</i>: default, async<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
         <td><b>preventUpdate</b></td>
         <td>boolean</td>
         <td>
@@ -424,7 +469,7 @@ Resource Types:
         <td><b>tlsFirst</b></td>
         <td>boolean</td>
         <td>
-          When true, the KV Store will initiate TLS before server INFO.<br/>
+          When true, the Stream connection will initiate TLS before server INFO.<br/>
           <br/>
             <i>Default</i>: false<br/>
         </td>
@@ -478,6 +523,13 @@ A stream mirror.
         </tr>
     </thead>
     <tbody><tr>
+        <td><b>consumer</b></td>
+        <td>object</td>
+        <td>
+          Durable source consumer. Fields are <code>name</code> and <code>deliverSubject</code>. Requires nats-server 2.14 or later.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
         <td><b>externalApiPrefix</b></td>
         <td>string</td>
         <td>
@@ -639,6 +691,13 @@ Republish configuration of the stream.
         </tr>
     </thead>
     <tbody><tr>
+        <td><b>consumer</b></td>
+        <td>object</td>
+        <td>
+          Durable source consumer. Fields are <code>name</code> and <code>deliverSubject</code>. Requires nats-server 2.14 or later.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
         <td><b>externalApiPrefix</b></td>
         <td>string</td>
         <td>
@@ -947,7 +1006,7 @@ A client's TLS certs and keys.
         <td>
           How messages should be acknowledged.<br/>
           <br/>
-            <i>Enum</i>: none, all, explicit<br/>
+            <i>Enum</i>: none, all, explicit, flow_control<br/>
             <i>Default</i>: none<br/>
         </td>
         <td>false</td>
@@ -1009,7 +1068,14 @@ A client's TLS certs and keys.
         <td><b>durableName</b></td>
         <td>string</td>
         <td>
-          The name of the Consumer.<br/>
+          The durable name of the Consumer.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>
+          The name of an ephemeral Consumer. It must match durableName when both fields are set.<br/>
         </td>
         <td>false</td>
       </tr><tr>
@@ -1140,6 +1206,36 @@ A client's TLS certs and keys.
         </td>
         <td>false</td>
       </tr><tr>
+        <td><b>pauseUntil</b></td>
+        <td>string</td>
+        <td>
+          RFC3339 time until which the Consumer is paused.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>pinnedTtl</b></td>
+        <td>string</td>
+        <td>
+          Timeout for a pinned client.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>priorityGroups</b></td>
+        <td>[]string</td>
+        <td>
+          Priority groups supported by the Consumer.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>priorityPolicy</b></td>
+        <td>enum</td>
+        <td>
+          Priority policy for the Consumer.<br/>
+          <br/>
+            <i>Enum</i>: none, pinned_client, overflow, prioritized<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
         <td><b>preventDelete</b></td>
         <td>boolean</td>
         <td>
@@ -1215,7 +1311,7 @@ A client's TLS certs and keys.
         <td><b>tlsFirst</b></td>
         <td>boolean</td>
         <td>
-          When true, the KV Store will initiate TLS before server INFO.<br/>
+          When true, the Consumer connection will initiate TLS before server INFO.<br/>
           <br/>
             <i>Default</i>: false<br/>
         </td>
@@ -1435,7 +1531,7 @@ A client's TLS certs and keys.
         <td><b>tlsFirst</b></td>
         <td>boolean</td>
         <td>
-          When true, the KV Store will initiate TLS before server INFO.<br/>
+          When true, the Account connection will initiate TLS before server INFO.<br/>
           <br/>
             <i>Default</i>: false<br/>
         </td>
@@ -1900,6 +1996,13 @@ The user and password to be used to connect to the NATS Service.
         </td>
         <td>false</td>
       </tr><tr>
+        <td><b>metadata</b></td>
+        <td>map[string]string</td>
+        <td>
+          Additional KV Store metadata.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
         <td><b><a href="#keyvaluespecmirror">mirror</a></b></td>
         <td>object</td>
         <td>
@@ -2032,6 +2135,13 @@ A KV Store mirror.
         </tr>
     </thead>
     <tbody><tr>
+        <td><b>consumer</b></td>
+        <td>object</td>
+        <td>
+          Durable source consumer. Fields are <code>name</code> and <code>deliverSubject</code>. Requires nats-server 2.14 or later.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
         <td><b>externalApiPrefix</b></td>
         <td>string</td>
         <td>
@@ -2193,6 +2303,13 @@ Republish configuration for the KV Store.
         </tr>
     </thead>
     <tbody><tr>
+        <td><b>consumer</b></td>
+        <td>object</td>
+        <td>
+          Durable source consumer. Fields are <code>name</code> and <code>deliverSubject</code>. Requires nats-server 2.14 or later.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
         <td><b>externalApiPrefix</b></td>
         <td>string</td>
         <td>
@@ -2583,7 +2700,7 @@ A client's TLS certs and keys.
         <td><b>tlsFirst</b></td>
         <td>boolean</td>
         <td>
-          When true, the KV Store will initiate TLS before server INFO.<br/>
+          When true, the Object Store connection will initiate TLS before server INFO.<br/>
           <br/>
             <i>Default</i>: false<br/>
         </td>

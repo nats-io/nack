@@ -431,6 +431,13 @@ func (in *KeyValueSpec) DeepCopyInto(out *KeyValueSpec) {
 			}
 		}
 	}
+	if in.Metadata != nil {
+		in, out := &in.Metadata, &out.Metadata
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	in.BaseStreamConfig.DeepCopyInto(&out.BaseStreamConfig)
 	return
 }

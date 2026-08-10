@@ -39,6 +39,7 @@ type KeyValueSpecApplyConfiguration struct {
 	Mirror       *StreamSourceApplyConfiguration    `json:"mirror,omitempty"`
 	Sources      []*jetstreamv1beta2.StreamSource   `json:"sources,omitempty"`
 	Compression  *bool                              `json:"compression,omitempty"`
+	Metadata     map[string]string                  `json:"metadata,omitempty"`
 	// LimitMarkerTTL is how long the bucket keeps markers when keys are removed by the TTL setting, 0 meaning markers are not supported
 	LimitMarkerTTL *time.Duration `json:"limitMarkerTtl,omitempty"`
 }
@@ -155,6 +156,20 @@ func (b *KeyValueSpecApplyConfiguration) WithSources(values ...**jetstreamv1beta
 // If called multiple times, the Compression field is set to the value of the last call.
 func (b *KeyValueSpecApplyConfiguration) WithCompression(value bool) *KeyValueSpecApplyConfiguration {
 	b.Compression = &value
+	return b
+}
+
+// WithMetadata puts the entries into the Metadata field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the entries provided by each call will be put on the Metadata field,
+// overwriting an existing map entries in Metadata field with the same key.
+func (b *KeyValueSpecApplyConfiguration) WithMetadata(entries map[string]string) *KeyValueSpecApplyConfiguration {
+	if b.Metadata == nil && len(entries) > 0 {
+		b.Metadata = make(map[string]string, len(entries))
+	}
+	for k, v := range entries {
+		b.Metadata[k] = v
+	}
 	return b
 }
 

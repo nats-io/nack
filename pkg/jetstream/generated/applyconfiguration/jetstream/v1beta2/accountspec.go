@@ -20,12 +20,13 @@ package v1beta2
 //
 // AccountSpec is the spec for a Account resource
 type AccountSpecApplyConfiguration struct {
-	Servers []string                       `json:"servers,omitempty"`
-	TLS     *TLSSecretApplyConfiguration   `json:"tls,omitempty"`
-	Creds   *CredsSecretApplyConfiguration `json:"creds,omitempty"`
-	NKey    *NKeySecretApplyConfiguration  `json:"nkey,omitempty"`
-	Token   *TokenSecretApplyConfiguration `json:"token,omitempty"`
-	User    *UserApplyConfiguration        `json:"user,omitempty"`
+	Servers  []string                       `json:"servers,omitempty"`
+	TLS      *TLSSecretApplyConfiguration   `json:"tls,omitempty"`
+	TLSFirst *bool                          `json:"tlsFirst,omitempty"`
+	Creds    *CredsSecretApplyConfiguration `json:"creds,omitempty"`
+	NKey     *NKeySecretApplyConfiguration  `json:"nkey,omitempty"`
+	Token    *TokenSecretApplyConfiguration `json:"token,omitempty"`
+	User     *UserApplyConfiguration        `json:"user,omitempty"`
 }
 
 // AccountSpecApplyConfiguration constructs a declarative configuration of the AccountSpec type for use with
@@ -49,6 +50,14 @@ func (b *AccountSpecApplyConfiguration) WithServers(values ...string) *AccountSp
 // If called multiple times, the TLS field is set to the value of the last call.
 func (b *AccountSpecApplyConfiguration) WithTLS(value *TLSSecretApplyConfiguration) *AccountSpecApplyConfiguration {
 	b.TLS = value
+	return b
+}
+
+// WithTLSFirst sets the TLSFirst field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the TLSFirst field is set to the value of the last call.
+func (b *AccountSpecApplyConfiguration) WithTLSFirst(value bool) *AccountSpecApplyConfiguration {
+	b.TLSFirst = &value
 	return b
 }
 
