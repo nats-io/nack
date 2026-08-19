@@ -28,9 +28,21 @@ function "get_tags" {
   result = [for tag in split(",", TAGS) : join("/", compact([REGISTRY, "${image}:${tag}"]))]
 }
 
+function "get_tags_suffix" {
+  params = [image, suffix]
+  result = [for tag in split(",", TAGS) : join("/", compact([REGISTRY, "${image}:${tag}${suffix}"]))]
+}
+
 function "get_platforms_multiarch" {
   params = []
   result = (CI || PUSH) ? ["linux/amd64", "linux/arm/v6", "linux/arm/v7", "linux/arm64"] : []
+}
+
+# FIPS builds are limited to platforms with CMVP-validated operating
+# environments for the Go Cryptographic Module (no 32-bit ARM).
+function "get_platforms_fips" {
+  params = []
+  result = (CI || PUSH) ? ["linux/amd64", "linux/arm64"] : []
 }
 
 function "get_output" {
@@ -45,6 +57,7 @@ function "get_output" {
 group "default" {
   targets = [
     "jetstream-controller",
+    "jetstream-controller-fips",
     "nats-boot-config",
     "nats-server-config-reloader"
   ]
@@ -77,6 +90,36 @@ target "jetstream-controller" {
   dockerfile  = "cicd/Dockerfile"
   platforms   = get_platforms_multiarch()
   tags        = get_tags("jetstream-controller")
+  output      = get_output()
+}
+
+target "jetstream-controller-fips-base" {
+  contexts = {
+    build   = "target:goreleaser"
+    assets  = "cicd/assets"
+  }
+  args = {
+    GO_APP = "jetstream-controller-fips"
+  }
+  dockerfile  = "cicd/Dockerfile"
+  platforms   = get_platforms_fips()
+}
+
+target "jetstream-controller-fips" {
+  inherits = ["jetstream-controller-fips-base"]
+  contexts = {
+    base = "target:jetstream-controller-fips-base"
+  }
+
+  dockerfile-inline = <<EOT
+ARG GO_APP
+FROM base
+RUN ln -s /usr/local/bin/$GO_APP /usr/local/bin/jetstream-controller && \
+    ln -s /usr/local/bin/$GO_APP /jetstream-controller
+EOT
+
+  platforms   = get_platforms_fips()
+  tags        = get_tags_suffix("jetstream-controller", "-fips")
   output      = get_output()
 }
 
