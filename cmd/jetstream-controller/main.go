@@ -73,6 +73,7 @@ func run() error {
 	cert := flag.String("tlscert", "", "NATS TLS public certificate")
 	key := flag.String("tlskey", "", "NATS TLS private key")
 	ca := flag.String("tlsca", "", "NATS TLS certificate authority chain")
+	tokenFile := flag.String("token-file", "", "File to read an auth_token from")
 	tlsfirst := flag.Bool("tlsfirst", false, "If enabled, forces explicit TLS without waiting for Server INFO")
 	server := flag.String("s", "", "NATS Server URL")
 	crdConnect := flag.Bool("crd-connect", false, "If true, then NATS connections will be made from CRD config, not global config. Ignored if running with control loop, CRD options will always override global config")
@@ -111,6 +112,7 @@ func run() error {
 			Certificate: *cert,
 			Key:         *key,
 			TLSFirst:    *tlsfirst,
+			TokenFile:   *tokenFile,
 		}
 
 		if *ca != "" {
