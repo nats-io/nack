@@ -347,10 +347,20 @@ func streamSpecToConfig(spec *api.StreamSpec, currentConfig *jsmapi.StreamConfig
 		opts = append(opts, jsm.WorkQueueRetention())
 	}
 
-	// maxMsgsPerSubject
-	if spec.MaxMsgsPerSubject > 0 {
+	// maxMsgsPerSubject — unset means unlimited, which the server spells -1, not 0.
+	// Always emit the option: on update UpdateConfiguration uses serverState as the
+	// base, so skipping it leaves a previously-set limit in place and the field can
+	// never be reset to unlimited. Emitting -1 rather than 0 also matches how the
+	// other numeric limits are handled and satisfies pedantic mode, which rejects a
+	// 0 ("max_msgs_per_subject must be set to -1") instead of coercing it.
+	// See https://github.com/nats-io/nack/issues/377.
+	{
+		maxMsgsPer := int64(spec.MaxMsgsPerSubject)
+		if maxMsgsPer <= 0 {
+			maxMsgsPer = -1
+		}
 		opts = append(opts, func(o *jsmapi.StreamConfig) error {
-			o.MaxMsgsPer = int64(spec.MaxMsgsPerSubject)
+			o.MaxMsgsPer = maxMsgsPer
 			return nil
 		})
 	}
