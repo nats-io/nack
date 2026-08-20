@@ -176,15 +176,8 @@ func createStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 		}
 	}()
 
-	maxAge, err := getDurationFromString(spec.MaxAge)
-	if err != nil {
-		return err
-	}
-
-	duplicates, err := getDuplicates(spec.DuplicateWindow)
-	if err != nil {
-		return err
-	}
+	maxAge := spec.MaxAge.Duration
+	duplicates := spec.DuplicateWindow.Duration
 
 	opts := []jsm.StreamOption{
 		jsm.Subjects(spec.Subjects...),
@@ -329,11 +322,7 @@ func createStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 		opts = append(opts, jsm.AllowMsgTTL())
 	}
 
-	if spec.SubjectDeleteMarkerTTL != "" {
-		d, err := time.ParseDuration(spec.SubjectDeleteMarkerTTL)
-		if err != nil {
-			return fmt.Errorf("parse subject delete marker TTL: %w", err)
-		}
+	if d := spec.SubjectDeleteMarkerTTL.Duration; d > 0 {
 		opts = append(opts, jsm.SubjectDeleteMarkerTTL(d))
 	}
 
@@ -393,24 +382,14 @@ func updateStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 		return err
 	}
 
-	maxAge, err := getDurationFromString(spec.MaxAge)
-	if err != nil {
-		return err
-	}
-
-	subjectDeleteMarkerTTL, err := getDurationFromString(spec.SubjectDeleteMarkerTTL)
-	if err != nil {
-		return err
-	}
+	maxAge := spec.MaxAge.Duration
+	subjectDeleteMarkerTTL := spec.SubjectDeleteMarkerTTL.Duration
 
 	retention := getRetention(spec.Retention)
 	storage := getStorage(spec.Storage)
 	discard := getDiscard(spec.Discard)
 
-	duplicates, err := getDuplicates(spec.DuplicateWindow)
-	if err != nil {
-		return err
-	}
+	duplicates := spec.DuplicateWindow
 
 	var subjectTransform *jsmapi.SubjectTransformConfig
 	if spec.SubjectTransform != nil {
@@ -436,7 +415,7 @@ func updateStream(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err e
 		DiscardNewPer:          spec.DiscardPerSubject,
 		Replicas:               spec.Replicas,
 		NoAck:                  spec.NoAck,
-		Duplicates:             duplicates,
+		Duplicates:             duplicates.Duration,
 		AllowDirect:            spec.AllowDirect,
 		DenyDelete:             spec.DenyDelete,
 		DenyPurge:              spec.DenyPurge,
@@ -621,14 +600,6 @@ func getDiscard(v string) jsmapi.DiscardPolicy {
 		discard = jsmapi.DiscardNew
 	}
 	return discard
-}
-
-func getDuplicates(v string) (time.Duration, error) {
-	if v == "" {
-		return time.Duration(0), nil
-	}
-
-	return time.ParseDuration(v)
 }
 
 func getStreamSource(ss *apis.StreamSource) (*jsmapi.StreamSource, error) {
