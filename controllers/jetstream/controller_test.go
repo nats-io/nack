@@ -9,10 +9,12 @@ import (
 
 	jsmapi "github.com/nats-io/jsm.go/api"
 	apis "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
+	clientsetfake "github.com/nats-io/nack/pkg/jetstream/generated/clientset/versioned/fake"
 
 	k8sapis "k8s.io/api/core/v1"
 	k8smeta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	k8sclientsetfake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/util/workqueue"
 )
 
@@ -23,6 +25,197 @@ func TestMain(m *testing.M) {
 	}
 
 	os.Exit(m.Run())
+}
+
+func TestGetAccountOverridesRejectsInvalidAuth(t *testing.T) {
+	authSecret := &apis.SecretRef{Name: "account-auth"}
+	tests := []struct {
+		name       string
+		spec       apis.AccountSpec
+		secretData map[string][]byte
+		wantErr    string
+	}{
+		{
+			name: "empty credentials",
+			spec: apis.AccountSpec{Creds: &apis.CredsSecret{
+				File:   "user.creds",
+				Secret: authSecret,
+			}},
+			secretData: map[string][]byte{"user.creds": {}},
+			wantErr:    `account "test-account" credentials key "user.creds" in secret "account-auth" is empty`,
+		},
+		{
+			name: "missing nkey seed",
+			spec: apis.AccountSpec{NKey: &apis.NKeySecret{
+				Seed:   "seed",
+				Secret: authSecret,
+			}},
+			secretData: map[string][]byte{},
+			wantErr:    `account "test-account" nkey seed key "seed" not found in secret "account-auth"`,
+		},
+		{
+			name: "empty token",
+			spec: apis.AccountSpec{Token: &apis.TokenSecret{
+				Token:  "token",
+				Secret: *authSecret,
+			}},
+			secretData: map[string][]byte{"token": {}},
+			wantErr:    `account "test-account" token key "token" in secret "account-auth" is empty`,
+		},
+		{
+			name: "missing password",
+			spec: apis.AccountSpec{User: &apis.User{
+				User:     "username",
+				Password: "password",
+				Secret:   *authSecret,
+			}},
+			secretData: map[string][]byte{"username": []byte("user")},
+			wantErr:    `account "test-account" password key "password" not found in secret "account-auth"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			account := &apis.Account{
+				ObjectMeta: k8smeta.ObjectMeta{Name: "test-account", Namespace: "default"},
+				Spec:       tt.spec,
+			}
+			secret := &k8sapis.Secret{
+				ObjectMeta: k8smeta.ObjectMeta{Name: authSecret.Name, Namespace: account.Namespace},
+				Data:       tt.secretData,
+			}
+			controller := &Controller{
+				ctx:      context.Background(),
+				opts:     Options{CRDConnect: true},
+				ji:       clientsetfake.NewSimpleClientset(account).JetstreamV1beta2(),
+				ki:       k8sclientsetfake.NewSimpleClientset(secret).CoreV1(),
+				cacheDir: t.TempDir(),
+			}
+
+			overrides, err := controller.getAccountOverrides(account.Name, account.Namespace)
+
+			if overrides != nil {
+				t.Fatalf("got overrides %v; want nil", overrides)
+			}
+			if err == nil || err.Error() != tt.wantErr {
+				t.Fatalf("got error %v; want %q", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestGetAccountOverridesWritesNKeySeedFile(t *testing.T) {
+	seed := []byte("SUABCDEFGHIJKLMNOP")
+	account := &apis.Account{
+		ObjectMeta: k8smeta.ObjectMeta{Name: "test-account", Namespace: "default"},
+		Spec: apis.AccountSpec{NKey: &apis.NKeySecret{
+			Seed:   "seed",
+			Secret: &apis.SecretRef{Name: "account-auth"},
+		}},
+	}
+	secret := &k8sapis.Secret{
+		ObjectMeta: k8smeta.ObjectMeta{Name: "account-auth", Namespace: account.Namespace},
+		Data:       map[string][]byte{"seed": seed},
+	}
+	controller := &Controller{
+		ctx:      context.Background(),
+		opts:     Options{CRDConnect: true},
+		ji:       clientsetfake.NewSimpleClientset(account).JetstreamV1beta2(),
+		ki:       k8sclientsetfake.NewSimpleClientset(secret).CoreV1(),
+		cacheDir: t.TempDir(),
+	}
+
+	overrides, err := controller.getAccountOverrides(account.Name, account.Namespace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writtenSeed, err := os.ReadFile(overrides.nkey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(writtenSeed) != string(seed) {
+		t.Fatalf("got seed %q; want %q", writtenSeed, seed)
+	}
+	info, err := os.Stat(overrides.nkey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o600 {
+		t.Fatalf("got nkey mode %o; want 600", info.Mode().Perm())
+	}
+}
+
+func TestGetAccountOverridesAllowsEmptyPassword(t *testing.T) {
+	tests := []struct {
+		name        string
+		passwordKey string
+		secretData  map[string][]byte
+	}{
+		{
+			name:       "omitted password selector",
+			secretData: map[string][]byte{"username": []byte("user")},
+		},
+		{
+			name:        "empty password secret value",
+			passwordKey: "password",
+			secretData:  map[string][]byte{"username": []byte("user"), "password": {}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			account := &apis.Account{
+				ObjectMeta: k8smeta.ObjectMeta{Name: "test-account", Namespace: "default"},
+				Spec: apis.AccountSpec{User: &apis.User{
+					User:     "username",
+					Password: tt.passwordKey,
+					Secret:   apis.SecretRef{Name: "account-auth"},
+				}},
+			}
+			secret := &k8sapis.Secret{
+				ObjectMeta: k8smeta.ObjectMeta{Name: "account-auth", Namespace: account.Namespace},
+				Data:       tt.secretData,
+			}
+			controller := &Controller{
+				ctx:      context.Background(),
+				opts:     Options{CRDConnect: true},
+				ji:       clientsetfake.NewSimpleClientset(account).JetstreamV1beta2(),
+				ki:       k8sclientsetfake.NewSimpleClientset(secret).CoreV1(),
+				cacheDir: t.TempDir(),
+			}
+
+			overrides, err := controller.getAccountOverrides(account.Name, account.Namespace)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if overrides.user != "user" || overrides.password != "" {
+				t.Fatalf("got user/password %q/%q; want user with empty password", overrides.user, overrides.password)
+			}
+		})
+	}
+}
+
+func TestRunWithJsmcAllowsEmptyAccountPassword(t *testing.T) {
+	controller := &Controller{opts: Options{CRDConnect: true}}
+	var got *natsContext
+	jsm := func(ctx *natsContext) (jsmClient, error) {
+		got = ctx
+		return &mockJsmClient{}, nil
+	}
+
+	err := controller.runWithJsmc(
+		jsm,
+		&accountOverrides{user: "user"},
+		&jsmcSpecOverrides{},
+		nil,
+		func(jsmClient) error { return nil },
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Username != "user" || got.Password != "" {
+		t.Fatalf("got user/password %q/%q; want user with empty password", got.Username, got.Password)
+	}
 }
 
 func TestGetStorageType(t *testing.T) {
