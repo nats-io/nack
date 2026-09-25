@@ -30,13 +30,13 @@ type StreamSpec struct {
 	MaxMsgsPerSubject      int               `json:"maxMsgsPerSubject,omitempty"`
 	MaxMsgs                int               `json:"maxMsgs,omitempty"`
 	MaxBytes               int               `json:"maxBytes,omitempty"`
-	MaxAge                 string            `json:"maxAge,omitempty"`
+	MaxAge                 k8smeta.Duration  `json:"maxAge,omitempty"`
 	MaxMsgSize             int               `json:"maxMsgSize,omitempty"`
 	Storage                string            `json:"storage,omitempty"`
 	Discard                string            `json:"discard,omitempty"`
 	Replicas               int               `json:"replicas,omitempty"`
 	NoAck                  bool              `json:"noAck,omitempty"`
-	DuplicateWindow        string            `json:"duplicateWindow,omitempty"`
+	DuplicateWindow        k8smeta.Duration  `json:"duplicateWindow,omitempty"`
 	Placement              *StreamPlacement  `json:"placement,omitempty"`
 	Mirror                 *StreamSource     `json:"mirror,omitempty"`
 	Sources                []*StreamSource   `json:"sources,omitempty"`
@@ -54,7 +54,7 @@ type StreamSpec struct {
 	Metadata               map[string]string `json:"metadata,omitempty"`
 	ConsumerLimits         *ConsumerLimits   `json:"consumerLimits,omitempty"`
 	AllowMsgTTL            bool              `json:"allowMsgTtl,omitempty"`
-	SubjectDeleteMarkerTTL string            `json:"subjectDeleteMarkerTtl,omitempty"`
+	SubjectDeleteMarkerTTL k8smeta.Duration  `json:"subjectDeleteMarkerTtl,omitempty"`
 	AllowMsgCounter        bool              `json:"allowMsgCounter,omitempty"`
 	AllowAtomicPublish     bool              `json:"allowAtomicPublish,omitempty"`
 	AllowMsgSchedules      bool              `json:"allowMsgSchedules,omitempty"`

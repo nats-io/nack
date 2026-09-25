@@ -480,11 +480,7 @@ func consumerSpecToConfig(spec *api.ConsumerSpec) ([]jsm.ConsumerOption, error) 
 	}
 
 	// inactiveThreshold
-	if spec.InactiveThreshold != "" {
-		d, err := time.ParseDuration(spec.InactiveThreshold)
-		if err != nil {
-			return nil, fmt.Errorf("invalid inactive threshold: %w", err)
-		}
+	if d := spec.InactiveThreshold.Duration; d > 0 {
 		opts = append(opts, jsm.InactiveThreshold(d))
 	}
 
@@ -505,11 +501,7 @@ func consumerSpecToConfig(spec *api.ConsumerSpec) ([]jsm.ConsumerOption, error) 
 	case "", "none":
 		// Default is none, no need to set
 	case "pinned_client":
-		if spec.PinnedTTL != "" {
-			dur, err := time.ParseDuration(spec.PinnedTTL)
-			if err != nil {
-				return nil, fmt.Errorf("invalid pinnedTTL duration: %w", err)
-			}
+		if dur := spec.PinnedTTL.Duration; dur > 0 {
 			opts = append(opts, jsm.PinnedClientPriorityGroups(dur, spec.PriorityGroups...))
 		}
 	case "overflow":

@@ -73,7 +73,7 @@ var _ = Describe("KeyValue Controller", func() {
 					Bucket:      keyValueName,
 					Replicas:    1,
 					History:     10,
-					TTL:         "5m",
+					TTL:         mustParseDuration("5m"),
 					Compression: true,
 					Description: "test keyvalue",
 					Storage:     "file",
@@ -175,7 +175,7 @@ var _ = Describe("KeyValue Controller", func() {
 					Bucket:      alternateResource,
 					Replicas:    1,
 					History:     10,
-					TTL:         "5m",
+					TTL:         mustParseDuration("5m"),
 					Compression: true,
 					Description: "keyvalue in alternate namespace",
 					Storage:     "file",
@@ -446,7 +446,7 @@ var _ = Describe("KeyValue Controller", func() {
 			By("updating the resource")
 			keyValue.Spec.Description = "new description"
 			keyValue.Spec.History = 50
-			keyValue.Spec.TTL = "1h"
+			keyValue.Spec.TTL = mustParseDuration("1h")
 			Expect(k8sClient.Update(ctx, keyValue)).To(Succeed())
 
 			By("reconciling the updated resource")
@@ -705,8 +705,8 @@ func Test_mapKVSpecToConfig(t *testing.T) {
 				History:        20,
 				MaxValueSize:   1024,
 				MaxBytes:       1048576,
-				TTL:            "1h",
-				LimitMarkerTTL: 2 * time.Hour,
+				TTL:            mustParseDuration("1h"),
+				LimitMarkerTTL: metav1.Duration{Duration: 2 * time.Hour},
 				Mirror: &api.StreamSource{
 					Name:                  "mirror",
 					OptStartSeq:           5,

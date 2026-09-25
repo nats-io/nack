@@ -37,6 +37,16 @@ import (
 	api "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
 )
 
+func mustParseDuration(s string) metav1.Duration {
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		panic(err)
+	}
+	return metav1.Duration{
+		Duration: d,
+	}
+}
+
 var _ = Describe("Consumer Controller", func() {
 	Context("When reconciling a resource", func() {
 		const resourceName = "test-consumer"
@@ -400,9 +410,9 @@ var _ = Describe("Consumer Controller", func() {
 				err := k8sClient.Get(ctx, typeNamespacedName, consumer)
 				Expect(err).NotTo(HaveOccurred())
 
-				consumer.Spec.InactiveThreshold = "30s"
+				consumer.Spec.InactiveThreshold = mustParseDuration("30s")
 				consumer.Spec.PriorityPolicy = "pinned_client"
-				consumer.Spec.PinnedTTL = "5m"
+				consumer.Spec.PinnedTTL = mustParseDuration("5m")
 				consumer.Spec.PriorityGroups = []string{"high", "medium"}
 				Expect(k8sClient.Update(ctx, consumer)).To(Succeed())
 
@@ -769,7 +779,7 @@ func Test_consumerSpecToConfig(t *testing.T) {
 				Replicas:           9,
 				SampleFreq:         "25%",
 				StreamName:         "",
-				InactiveThreshold:  "30s",
+				InactiveThreshold:  mustParseDuration("30s"),
 				Metadata: map[string]string{
 					"meta": "data",
 				},
@@ -843,7 +853,7 @@ func Test_consumerSpecToConfig(t *testing.T) {
 				Replicas:           9,
 				SampleFreq:         "30%",
 				StreamName:         "",
-				InactiveThreshold:  "1m",
+				InactiveThreshold:  mustParseDuration("1m"),
 				Metadata: map[string]string{
 					"meta": "data",
 				},
@@ -905,7 +915,7 @@ func Test_consumerSpecToConfig(t *testing.T) {
 			name: "inactive threshold valid duration",
 			spec: &api.ConsumerSpec{
 				DurableName:       "test-consumer",
-				InactiveThreshold: "2h30m",
+				InactiveThreshold: mustParseDuration("2h30m"),
 			},
 			want: &jsmapi.ConsumerConfig{
 				Durable:           "test-consumer",
@@ -917,7 +927,7 @@ func Test_consumerSpecToConfig(t *testing.T) {
 			name: "inactive threshold empty string",
 			spec: &api.ConsumerSpec{
 				DurableName:       "test-consumer",
-				InactiveThreshold: "",
+				InactiveThreshold: metav1.Duration{},
 			},
 			want: &jsmapi.ConsumerConfig{
 				Durable:           "test-consumer",
@@ -926,20 +936,11 @@ func Test_consumerSpecToConfig(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "inactive threshold invalid duration",
-			spec: &api.ConsumerSpec{
-				DurableName:       "test-consumer",
-				InactiveThreshold: "not-a-duration",
-			},
-			want:    nil,
-			wantErr: true,
-		},
-		{
 			name: "priority policy pinned_client with ttl",
 			spec: &api.ConsumerSpec{
 				DurableName:    "test-consumer",
 				PriorityPolicy: "pinned_client",
-				PinnedTTL:      "10m",
+				PinnedTTL:      mustParseDuration("10m"),
 				PriorityGroups: []string{"gold", "silver"},
 			},
 			want: &jsmapi.ConsumerConfig{
@@ -994,17 +995,6 @@ func Test_consumerSpecToConfig(t *testing.T) {
 			spec: &api.ConsumerSpec{
 				DurableName:    "test-consumer",
 				PriorityPolicy: "invalid_policy",
-			},
-			want:    nil,
-			wantErr: true,
-		},
-		{
-			name: "priority policy pinned_client invalid ttl",
-			spec: &api.ConsumerSpec{
-				DurableName:    "test-consumer",
-				PriorityPolicy: "pinned_client",
-				PinnedTTL:      "not-a-duration",
-				PriorityGroups: []string{"gold"},
 			},
 			want:    nil,
 			wantErr: true,

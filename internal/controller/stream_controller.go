@@ -356,11 +356,7 @@ func streamSpecToConfig(spec *api.StreamSpec, currentConfig *jsmapi.StreamConfig
 	}
 
 	// maxAge
-	if spec.MaxAge != "" {
-		d, err := time.ParseDuration(spec.MaxAge)
-		if err != nil {
-			return nil, fmt.Errorf("parse max age: %w", err)
-		}
+	if d := spec.MaxAge.Duration; d > 0 {
 		opts = append(opts, jsm.MaxAge(d))
 	}
 
@@ -381,11 +377,7 @@ func streamSpecToConfig(spec *api.StreamSpec, currentConfig *jsmapi.StreamConfig
 	}
 
 	// duplicateWindow
-	if spec.DuplicateWindow != "" {
-		d, err := time.ParseDuration(spec.DuplicateWindow)
-		if err != nil {
-			return nil, fmt.Errorf("parse duplicate window: %w", err)
-		}
+	if d := spec.DuplicateWindow.Duration; d > 0 {
 		opts = append(opts, jsm.DuplicateWindow(d))
 	}
 
@@ -505,11 +497,7 @@ func streamSpecToConfig(spec *api.StreamSpec, currentConfig *jsmapi.StreamConfig
 	}
 
 	// subjectDeleteMarkerTtl
-	if spec.SubjectDeleteMarkerTTL != "" {
-		d, err := time.ParseDuration(spec.SubjectDeleteMarkerTTL)
-		if err != nil {
-			return nil, fmt.Errorf("parse subject delete marker TTL: %w", err)
-		}
+	if d := spec.SubjectDeleteMarkerTTL.Duration; d > 0 {
 		opts = append(opts, jsm.SubjectDeleteMarkerTTL(d))
 	}
 
