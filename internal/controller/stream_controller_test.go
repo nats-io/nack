@@ -866,6 +866,8 @@ func Test_mapSpecToConfig(t *testing.T) {
 			spec: &api.StreamSpec{},
 			want: jsmapi.StreamConfig{
 				// Placement will be nil when no current config is provided
+				// An unset maxMsgsPerSubject maps to -1 (unlimited), see nats-io/nack#377
+				MaxMsgsPer: -1,
 			},
 			wantErr: false,
 		},
@@ -1057,6 +1059,8 @@ func Test_mapSpecToConfig(t *testing.T) {
 			},
 			want: jsmapi.StreamConfig{
 				PersistMode: jsmapi.DefaultPersistMode,
+				// An unset maxMsgsPerSubject maps to -1 (unlimited), see nats-io/nack#377
+				MaxMsgsPer: -1,
 			},
 			wantErr: false,
 		},
@@ -1291,6 +1295,46 @@ func Test_streamSpecToConfig_togglesOff(t *testing.T) {
 			gotOff, err := apply(specOff, base)
 			assert.NoError(t, err)
 			assert.Falsef(t, c.readField(gotOff), "%s should be false after toggling spec off (was true on server)", c.name)
+		})
+	}
+}
+
+// Test_streamSpecToConfig_maxMsgsPerSubject verifies that an unset
+// maxMsgsPerSubject emits an explicit -1 (unlimited) that overrides a limit already
+// present on the server, rather than being skipped and leaving it intact. On create
+// jsm.DefaultStream already supplies -1, so the gap is on the update path, where
+// UpdateConfiguration uses the live server config as its base. Emitting -1 rather
+// than 0 also keeps pedantic mode happy, since the server rejects a 0 there.
+// Regression test for nats-io/nack#377.
+func Test_streamSpecToConfig_maxMsgsPerSubject(t *testing.T) {
+	tests := []struct {
+		name string
+		spec int
+		base int64
+		want int64
+	}{
+		{name: "unset resets a server-side limit to unlimited", spec: 0, base: 10_000, want: -1},
+		{name: "explicit -1 stays unlimited", spec: -1, base: 10_000, want: -1},
+		{name: "explicit value is applied over the base", spec: 500, base: 10_000, want: 500},
+		{name: "explicit value is applied over an unlimited base", spec: 500, base: -1, want: 500},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			base := &jsmapi.StreamConfig{MaxMsgsPer: test.base}
+			opts, err := streamSpecToConfig(&api.StreamSpec{
+				Storage:           "memory",
+				Retention:         "limits",
+				MaxMsgsPerSubject: test.spec,
+			}, base)
+			assert.NoError(t, err)
+
+			out := *base
+			for _, o := range opts {
+				assert.NoError(t, o(&out))
+			}
+			assert.EqualValuesf(t, test.want, out.MaxMsgsPer,
+				"spec %d over base %d", test.spec, test.base)
 		})
 	}
 }
