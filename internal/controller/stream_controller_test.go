@@ -322,6 +322,24 @@ var _ = Describe("Stream Controller", func() {
 			Expect(streamInfo.Created).To(BeTemporally("~", time.Now(), time.Second))
 		})
 
+		It("should create a stream with unlimited maxAge when maxAge is unset", func(ctx SpecContext) {
+			// Regression test for nats-io/nack#377: the resource created in the
+			// suite BeforeEach has no maxAge, so the created stream must come up
+			// with MaxAge 0 (unlimited) rather than inheriting jsm DefaultStream's
+			// 1-year (8760h) MaxAge.
+			By("running Reconcile")
+			result, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: typeNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result.IsZero()).To(BeTrue())
+
+			By("checking the created stream has no maxAge limit")
+			natsStream, err := jsClient.Stream(ctx, streamName)
+			Expect(err).NotTo(HaveOccurred())
+			streamInfo, err := natsStream.Info(ctx)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(streamInfo.Config.MaxAge).To(BeZero())
+		})
+
 		When("sealed is true", func() {
 			BeforeEach(func(ctx SpecContext) {
 				By("setting sealed to true")
@@ -1293,4 +1311,22 @@ func Test_streamSpecToConfig_togglesOff(t *testing.T) {
 			assert.Falsef(t, c.readField(gotOff), "%s should be false after toggling spec off (was true on server)", c.name)
 		})
 	}
+}
+
+// Test_streamSpecToConfig_maxAgeUnsetResetsToZero verifies that an empty maxAge
+// makes the controller emit an explicit MaxAge(0) option that overrides a non-zero
+// base (jsm.DefaultStream on create / serverState on update) instead of leaving it
+// intact. Regression test for nats-io/nack#377 at the config-mapping layer; the
+// end-to-end create-path behavior is covered by the "unlimited maxAge when maxAge
+// is unset" integration case in the controller suite above.
+func Test_streamSpecToConfig_maxAgeUnsetResetsToZero(t *testing.T) {
+	base := &jsmapi.StreamConfig{MaxAge: 365 * 24 * time.Hour}
+	opts, err := streamSpecToConfig(&api.StreamSpec{Storage: "memory", Retention: "limits"}, base)
+	assert.NoError(t, err)
+
+	out := *base
+	for _, o := range opts {
+		assert.NoError(t, o(&out))
+	}
+	assert.Zerof(t, out.MaxAge, "empty maxAge should reset to 0, base held %v", base.MaxAge)
 }
