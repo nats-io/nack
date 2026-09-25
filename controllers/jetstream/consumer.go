@@ -46,11 +46,6 @@ func (c *Controller) processConsumerObject(cns *apis.Consumer, jsm jsmClientFunc
 	spec := cns.Spec
 	ifc := c.ji.Consumers(ns)
 
-	acc, err := c.getAccountOverrides(spec.Account, ns)
-	if err != nil {
-		return err
-	}
-
 	defer func() {
 		if err == nil {
 			return
@@ -60,6 +55,11 @@ func (c *Controller) processConsumerObject(cns *apis.Consumer, jsm jsmClientFunc
 			err = fmt.Errorf("%s: %w", err, serr)
 		}
 	}()
+
+	acc, err := c.getAccountOverrides(spec.Account, ns)
+	if err != nil {
+		return err
+	}
 
 	type operator func(ctx context.Context, c jsmClient, spec apis.ConsumerSpec) (err error)
 

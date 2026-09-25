@@ -263,9 +263,17 @@ func (c *jsController) natsConfigFromOpts(opts api.ConnectionOpts, ns string) (*
 
 	if account.Spec.Creds != nil && account.Spec.Creds.Secret != nil {
 		credsSecret := &v1.Secret{}
+		secretName := account.Spec.Creds.Secret.Name
+		if secretName == "" {
+			return nil, fmt.Errorf("account %q credentials secret name is empty", opts.Account)
+		}
+		credsKey := account.Spec.Creds.File
+		if credsKey == "" {
+			return nil, fmt.Errorf("account %q credentials key is empty", opts.Account)
+		}
 		err := c.Get(ctx,
 			types.NamespacedName{
-				Name:      account.Spec.Creds.Secret.Name,
+				Name:      secretName,
 				Namespace: ns,
 			},
 			credsSecret,
@@ -274,39 +282,60 @@ func (c *jsController) natsConfigFromOpts(opts api.ConnectionOpts, ns string) (*
 			return nil, err
 		}
 
+		credsBytes, ok := credsSecret.Data[credsKey]
+		if !ok {
+			return nil, fmt.Errorf("account %q credentials key %q not found in secret %q", opts.Account, credsKey, secretName)
+		}
+		if len(bytes.TrimSpace(credsBytes)) == 0 {
+			return nil, fmt.Errorf("account %q credentials key %q in secret %q is empty", opts.Account, credsKey, secretName)
+		}
+
 		accDir := filepath.Join(c.cacheDir, ns, opts.Account)
 		if err := os.MkdirAll(accDir, 0o755); err != nil {
 			return nil, err
 		}
 
-		if credsBytes, ok := credsSecret.Data[account.Spec.Creds.File]; ok {
-			filePath := filepath.Join(accDir, account.Spec.Creds.File)
-			accountOverlay.Credentials = filePath
+		filePath := filepath.Join(accDir, credsKey)
+		accountOverlay.Credentials = filePath
 
-			writeCreds := true
-			if _, err := os.Stat(filePath); err == nil {
-				fileBytes, err := os.ReadFile(filePath)
-				// Skip disk write if data is unchanged
-				if err == nil && bytes.Equal(fileBytes, credsBytes) {
-					writeCreds = false
-				}
+		writeCreds := true
+		if _, err := os.Stat(filePath); err == nil {
+			fileBytes, err := os.ReadFile(filePath)
+			// Skip disk write if data is unchanged
+			if err == nil && bytes.Equal(fileBytes, credsBytes) {
+				writeCreds = false
 			}
+		}
 
-			if writeCreds {
-				if err := os.WriteFile(filePath, credsBytes, 0o600); err != nil {
-					return nil, err
-				}
+		if writeCreds {
+			if err := os.WriteFile(filePath, credsBytes, 0o600); err != nil {
+				return nil, err
 			}
 		}
 	} else if account.Spec.Creds != nil {
+		if account.Spec.Creds.File == "" {
+			return nil, fmt.Errorf("account %q credentials file is empty", opts.Account)
+		}
 		accountOverlay.Credentials = account.Spec.Creds.File
 	}
 
-	if account.Spec.NKey != nil && account.Spec.NKey.Secret != nil {
+	if account.Spec.NKey != nil {
+		if account.Spec.NKey.Secret == nil {
+			return nil, fmt.Errorf("account %q nkey secret is required", opts.Account)
+		}
+		secretName := account.Spec.NKey.Secret.Name
+		if secretName == "" {
+			return nil, fmt.Errorf("account %q nkey secret name is empty", opts.Account)
+		}
+		seedKey := account.Spec.NKey.Seed
+		if seedKey == "" {
+			return nil, fmt.Errorf("account %q nkey seed key is empty", opts.Account)
+		}
+
 		nkeySecret := &v1.Secret{}
 		err := c.Get(ctx,
 			types.NamespacedName{
-				Name:      account.Spec.NKey.Secret.Name,
+				Name:      secretName,
 				Namespace: ns,
 			},
 			nkeySecret,
@@ -315,36 +344,52 @@ func (c *jsController) natsConfigFromOpts(opts api.ConnectionOpts, ns string) (*
 			return nil, err
 		}
 
+		nkeyBytes, ok := nkeySecret.Data[seedKey]
+		if !ok {
+			return nil, fmt.Errorf("account %q nkey seed key %q not found in secret %q", opts.Account, seedKey, secretName)
+		}
+		if len(bytes.TrimSpace(nkeyBytes)) == 0 {
+			return nil, fmt.Errorf("account %q nkey seed key %q in secret %q is empty", opts.Account, seedKey, secretName)
+		}
+
 		accDir := filepath.Join(c.cacheDir, ns, opts.Account)
 		if err := os.MkdirAll(accDir, 0o755); err != nil {
 			return nil, err
 		}
 
-		if nkeyBytes, ok := nkeySecret.Data[account.Spec.NKey.Seed]; ok {
-			filePath := filepath.Join(accDir, account.Spec.NKey.Seed)
-			accountOverlay.NKey = filePath
+		filePath := filepath.Join(accDir, seedKey)
+		accountOverlay.NKey = filePath
 
-			writeNKey := true
-			if _, err := os.Stat(filePath); err == nil {
-				fileBytes, err := os.ReadFile(filePath)
-				if err == nil && bytes.Equal(fileBytes, nkeyBytes) {
-					writeNKey = false
-				}
+		writeNKey := true
+		if _, err := os.Stat(filePath); err == nil {
+			fileBytes, err := os.ReadFile(filePath)
+			if err == nil && bytes.Equal(fileBytes, nkeyBytes) {
+				writeNKey = false
 			}
+		}
 
-			if writeNKey {
-				if err := os.WriteFile(filePath, nkeyBytes, 0o600); err != nil {
-					return nil, err
-				}
+		if writeNKey {
+			if err := os.WriteFile(filePath, nkeyBytes, 0o600); err != nil {
+				return nil, err
 			}
 		}
 	}
 
 	if account.Spec.User != nil {
+		secretName := account.Spec.User.Secret.Name
+		if secretName == "" {
+			return nil, fmt.Errorf("account %q user secret name is empty", opts.Account)
+		}
+		userKey := account.Spec.User.User
+		if userKey == "" {
+			return nil, fmt.Errorf("account %q username key is empty", opts.Account)
+		}
+		passwordKey := account.Spec.User.Password
+
 		userSecret := &v1.Secret{}
 		err := c.Get(ctx,
 			types.NamespacedName{
-				Name:      account.Spec.User.Secret.Name,
+				Name:      secretName,
 				Namespace: ns,
 			},
 			userSecret,
@@ -353,20 +398,37 @@ func (c *jsController) natsConfigFromOpts(opts api.ConnectionOpts, ns string) (*
 			return nil, err
 		}
 
-		userName := userSecret.Data[account.Spec.User.User]
-		userPassword := userSecret.Data[account.Spec.User.Password]
-
-		if userName != nil && userPassword != nil {
-			accountOverlay.User = string(userName)
+		userName, ok := userSecret.Data[userKey]
+		if !ok {
+			return nil, fmt.Errorf("account %q username key %q not found in secret %q", opts.Account, userKey, secretName)
+		}
+		if len(userName) == 0 {
+			return nil, fmt.Errorf("account %q username key %q in secret %q is empty", opts.Account, userKey, secretName)
+		}
+		accountOverlay.User = string(userName)
+		if passwordKey != "" {
+			userPassword, ok := userSecret.Data[passwordKey]
+			if !ok {
+				return nil, fmt.Errorf("account %q password key %q not found in secret %q", opts.Account, passwordKey, secretName)
+			}
 			accountOverlay.Password = string(userPassword)
 		}
 	}
 
 	if account.Spec.Token != nil {
+		secretName := account.Spec.Token.Secret.Name
+		if secretName == "" {
+			return nil, fmt.Errorf("account %q token secret name is empty", opts.Account)
+		}
+		tokenKey := account.Spec.Token.Token
+		if tokenKey == "" {
+			return nil, fmt.Errorf("account %q token key is empty", opts.Account)
+		}
+
 		tokenSecret := &v1.Secret{}
 		err := c.Get(ctx,
 			types.NamespacedName{
-				Name:      account.Spec.Token.Secret.Name,
+				Name:      secretName,
 				Namespace: ns,
 			},
 			tokenSecret,
@@ -375,9 +437,14 @@ func (c *jsController) natsConfigFromOpts(opts api.ConnectionOpts, ns string) (*
 			return nil, err
 		}
 
-		if token := tokenSecret.Data[account.Spec.Token.Token]; token != nil {
-			accountOverlay.Token = string(token)
+		token, ok := tokenSecret.Data[tokenKey]
+		if !ok {
+			return nil, fmt.Errorf("account %q token key %q not found in secret %q", opts.Account, tokenKey, secretName)
 		}
+		if len(token) == 0 {
+			return nil, fmt.Errorf("account %q token key %q in secret %q is empty", opts.Account, tokenKey, secretName)
+		}
+		accountOverlay.Token = string(token)
 	}
 
 	// Overlay Account Config

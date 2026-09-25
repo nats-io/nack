@@ -59,11 +59,6 @@ func (c *Controller) processStreamObject(str *apis.Stream, jsm jsmClientFunc) (e
 	ns := str.Namespace
 	readOnly := c.opts.ReadOnly
 
-	acc, err := c.getAccountOverrides(spec.Account, ns)
-	if err != nil {
-		return err
-	}
-
 	defer func() {
 		if err == nil {
 			return
@@ -73,6 +68,11 @@ func (c *Controller) processStreamObject(str *apis.Stream, jsm jsmClientFunc) (e
 			err = fmt.Errorf("%s: %w", err, serr)
 		}
 	}()
+
+	acc, err := c.getAccountOverrides(spec.Account, ns)
+	if err != nil {
+		return err
+	}
 
 	type operator func(ctx context.Context, c jsmClient, spec apis.StreamSpec) (err error)
 

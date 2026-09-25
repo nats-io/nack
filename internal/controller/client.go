@@ -127,14 +127,14 @@ func (o *NatsConfig) Overlay(overlay *NatsConfig) {
 		o.NKey = overlay.NKey
 	} else if overlay.Token != "" {
 		o.Token = overlay.Token
-	} else if overlay.User != "" && overlay.Password != "" {
+	} else if overlay.User != "" {
 		o.User = overlay.User
 		o.Password = overlay.Password
 	}
 }
 
 func (o *NatsConfig) HasAuth() bool {
-	return o.Credentials != "" || o.NKey != "" || o.Token != "" || (o.User != "" && o.Password != "")
+	return o.Credentials != "" || o.NKey != "" || o.Token != "" || o.User != ""
 }
 
 func (o *NatsConfig) UnsetAuth() {
@@ -185,7 +185,7 @@ func (o *NatsConfig) buildOptions() ([]nats.Option, error) {
 		opts = append(opts, nats.Token(o.Token))
 	}
 
-	if o.User != "" && o.Password != "" {
+	if o.User != "" {
 		opts = append(opts, nats.UserInfo(o.User, o.Password))
 	}
 
