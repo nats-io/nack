@@ -31,11 +31,39 @@ import (
 )
 
 // AccountInformer provides access to a shared informer and lister for
-// Accounts.
+// Accounts. Prefer using the type-safe variant (see [TypedAccountInformer]).
 type AccountInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() jetstreamv1beta2.AccountLister
 }
+
+// TypedAccountInformer provides access to a shared informer and lister for
+// Accounts, including the type-safe TypedInformer variant.
+// It is a superset of AccountInformer.
+type TypedAccountInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() AccountIndexInformer
+	Lister() jetstreamv1beta2.AccountLister
+}
+
+// AccountIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type AccountIndexInformer cache.TypedSharedIndexInformer[*apisjetstreamv1beta2.Account]
+
+// AccountHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for Account.
+type AccountHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apisjetstreamv1beta2.Account]
+
+// AccountDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for Account.
+type AccountDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apisjetstreamv1beta2.Account]
+
+// AccountFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for Account.
+type AccountFilteringHandler = cache.TypedFilteringResourceEventHandler[*apisjetstreamv1beta2.Account]
+
+// AccountIndexers is a specialization of [cache.TypedIndexers] for Account.
+type AccountIndexers = cache.TypedIndexers[*apisjetstreamv1beta2.Account]
+
+// DeletedAccount is a specialization of [cache.DeletedObject] for Account.
+type DeletedAccount = cache.DeletedObject[*apisjetstreamv1beta2.Account]
 
 type accountInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -46,25 +74,49 @@ type accountInformer struct {
 // NewAccountInformer constructs a new informer for Account type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedAccountInformer]).
 func NewAccountInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
 	return NewAccountInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedAccountInformer constructs a new informer for Account type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedAccountInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers AccountIndexers) AccountIndexInformer {
+	return NewTypedAccountInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredAccountInformer constructs a new informer for Account type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredAccountInformer]).
 func NewFilteredAccountInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewAccountInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedAccountInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredAccountInformer constructs a new informer for Account type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredAccountInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers AccountIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) AccountIndexInformer {
+	return NewTypedAccountInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
 }
 
 // NewAccountInformerWithOptions constructs a new informer for Account type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedAccountInformerWithOptions]).
 func NewAccountInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedAccountInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedAccountInformerWithOptions constructs a new informer for Account type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedAccountInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) AccountIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "jetstream.nats.io", Version: "v1beta2", Resource: "accounts"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.NewTypedSharedIndexInformer[*apisjetstreamv1beta2.Account](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -97,17 +149,57 @@ func NewAccountInformerWithOptions(client versioned.Interface, namespace string,
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *accountInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewAccountInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedAccountInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *accountInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apisjetstreamv1beta2.Account{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *accountInformer) TypedInformer() AccountIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apisjetstreamv1beta2.Account](f.factory.InformerFor(&apisjetstreamv1beta2.Account{}, f.defaultInformer))
 }
 
 func (f *accountInformer) Lister() jetstreamv1beta2.AccountLister {
 	return jetstreamv1beta2.NewAccountLister(f.Informer().GetIndexer())
+}
+
+// ToTypedAccountInformer converts an untyped informer into a TypedAccountInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *Account. If that is not the case, calling type-safe methods of the returned
+// TypedAccountInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedAccountInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedAccountInformer(informer AccountInformer) TypedAccountInformer {
+	if informer, ok := informer.(TypedAccountInformer); ok {
+		return informer
+	}
+	return &accountTypedInformerAdapter{informer}
+}
+
+type accountTypedInformerAdapter struct {
+	AccountInformer
+}
+
+func (a *accountTypedInformerAdapter) TypedInformer() AccountIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apisjetstreamv1beta2.Account](a.Informer())
+}
+
+// ToAccountIndexInformer converts an untyped informer into a AccountIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *Account. If that is not the case, calling type-safe methods of the returned
+// AccountIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a AccountIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToAccountIndexInformer(informer cache.SharedIndexInformer) AccountIndexInformer {
+	if informer, ok := informer.(AccountIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apisjetstreamv1beta2.Account](informer)
 }

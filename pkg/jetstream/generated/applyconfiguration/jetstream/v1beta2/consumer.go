@@ -26,7 +26,7 @@ import (
 //
 // Consumer is a specification for a Consumer resource
 type ConsumerApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration    `json:""`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                             *ConsumerSpecApplyConfiguration `json:"spec,omitempty"`
 	Status                           *StatusApplyConfiguration       `json:"status,omitempty"`

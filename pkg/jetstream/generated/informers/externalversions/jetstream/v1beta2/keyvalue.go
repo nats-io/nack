@@ -31,11 +31,39 @@ import (
 )
 
 // KeyValueInformer provides access to a shared informer and lister for
-// KeyValues.
+// KeyValues. Prefer using the type-safe variant (see [TypedKeyValueInformer]).
 type KeyValueInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() jetstreamv1beta2.KeyValueLister
 }
+
+// TypedKeyValueInformer provides access to a shared informer and lister for
+// KeyValues, including the type-safe TypedInformer variant.
+// It is a superset of KeyValueInformer.
+type TypedKeyValueInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() KeyValueIndexInformer
+	Lister() jetstreamv1beta2.KeyValueLister
+}
+
+// KeyValueIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type KeyValueIndexInformer cache.TypedSharedIndexInformer[*apisjetstreamv1beta2.KeyValue]
+
+// KeyValueHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for KeyValue.
+type KeyValueHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apisjetstreamv1beta2.KeyValue]
+
+// KeyValueDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for KeyValue.
+type KeyValueDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apisjetstreamv1beta2.KeyValue]
+
+// KeyValueFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for KeyValue.
+type KeyValueFilteringHandler = cache.TypedFilteringResourceEventHandler[*apisjetstreamv1beta2.KeyValue]
+
+// KeyValueIndexers is a specialization of [cache.TypedIndexers] for KeyValue.
+type KeyValueIndexers = cache.TypedIndexers[*apisjetstreamv1beta2.KeyValue]
+
+// DeletedKeyValue is a specialization of [cache.DeletedObject] for KeyValue.
+type DeletedKeyValue = cache.DeletedObject[*apisjetstreamv1beta2.KeyValue]
 
 type keyValueInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -46,25 +74,49 @@ type keyValueInformer struct {
 // NewKeyValueInformer constructs a new informer for KeyValue type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedKeyValueInformer]).
 func NewKeyValueInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
 	return NewKeyValueInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedKeyValueInformer constructs a new informer for KeyValue type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedKeyValueInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers KeyValueIndexers) KeyValueIndexInformer {
+	return NewTypedKeyValueInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredKeyValueInformer constructs a new informer for KeyValue type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredKeyValueInformer]).
 func NewFilteredKeyValueInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewKeyValueInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedKeyValueInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredKeyValueInformer constructs a new informer for KeyValue type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredKeyValueInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers KeyValueIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) KeyValueIndexInformer {
+	return NewTypedKeyValueInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
 }
 
 // NewKeyValueInformerWithOptions constructs a new informer for KeyValue type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedKeyValueInformerWithOptions]).
 func NewKeyValueInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedKeyValueInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedKeyValueInformerWithOptions constructs a new informer for KeyValue type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedKeyValueInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) KeyValueIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "jetstream.nats.io", Version: "v1beta2", Resource: "keyvalues"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.NewTypedSharedIndexInformer[*apisjetstreamv1beta2.KeyValue](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -97,17 +149,57 @@ func NewKeyValueInformerWithOptions(client versioned.Interface, namespace string
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *keyValueInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewKeyValueInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedKeyValueInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *keyValueInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apisjetstreamv1beta2.KeyValue{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *keyValueInformer) TypedInformer() KeyValueIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apisjetstreamv1beta2.KeyValue](f.factory.InformerFor(&apisjetstreamv1beta2.KeyValue{}, f.defaultInformer))
 }
 
 func (f *keyValueInformer) Lister() jetstreamv1beta2.KeyValueLister {
 	return jetstreamv1beta2.NewKeyValueLister(f.Informer().GetIndexer())
+}
+
+// ToTypedKeyValueInformer converts an untyped informer into a TypedKeyValueInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *KeyValue. If that is not the case, calling type-safe methods of the returned
+// TypedKeyValueInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedKeyValueInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedKeyValueInformer(informer KeyValueInformer) TypedKeyValueInformer {
+	if informer, ok := informer.(TypedKeyValueInformer); ok {
+		return informer
+	}
+	return &keyValueTypedInformerAdapter{informer}
+}
+
+type keyValueTypedInformerAdapter struct {
+	KeyValueInformer
+}
+
+func (a *keyValueTypedInformerAdapter) TypedInformer() KeyValueIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apisjetstreamv1beta2.KeyValue](a.Informer())
+}
+
+// ToKeyValueIndexInformer converts an untyped informer into a KeyValueIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *KeyValue. If that is not the case, calling type-safe methods of the returned
+// KeyValueIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a KeyValueIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToKeyValueIndexInformer(informer cache.SharedIndexInformer) KeyValueIndexInformer {
+	if informer, ok := informer.(KeyValueIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apisjetstreamv1beta2.KeyValue](informer)
 }

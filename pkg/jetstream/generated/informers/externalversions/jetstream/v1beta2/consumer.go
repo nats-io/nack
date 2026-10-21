@@ -31,11 +31,39 @@ import (
 )
 
 // ConsumerInformer provides access to a shared informer and lister for
-// Consumers.
+// Consumers. Prefer using the type-safe variant (see [TypedConsumerInformer]).
 type ConsumerInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() jetstreamv1beta2.ConsumerLister
 }
+
+// TypedConsumerInformer provides access to a shared informer and lister for
+// Consumers, including the type-safe TypedInformer variant.
+// It is a superset of ConsumerInformer.
+type TypedConsumerInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() ConsumerIndexInformer
+	Lister() jetstreamv1beta2.ConsumerLister
+}
+
+// ConsumerIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type ConsumerIndexInformer cache.TypedSharedIndexInformer[*apisjetstreamv1beta2.Consumer]
+
+// ConsumerHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for Consumer.
+type ConsumerHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apisjetstreamv1beta2.Consumer]
+
+// ConsumerDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for Consumer.
+type ConsumerDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apisjetstreamv1beta2.Consumer]
+
+// ConsumerFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for Consumer.
+type ConsumerFilteringHandler = cache.TypedFilteringResourceEventHandler[*apisjetstreamv1beta2.Consumer]
+
+// ConsumerIndexers is a specialization of [cache.TypedIndexers] for Consumer.
+type ConsumerIndexers = cache.TypedIndexers[*apisjetstreamv1beta2.Consumer]
+
+// DeletedConsumer is a specialization of [cache.DeletedObject] for Consumer.
+type DeletedConsumer = cache.DeletedObject[*apisjetstreamv1beta2.Consumer]
 
 type consumerInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -46,25 +74,49 @@ type consumerInformer struct {
 // NewConsumerInformer constructs a new informer for Consumer type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedConsumerInformer]).
 func NewConsumerInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
 	return NewConsumerInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedConsumerInformer constructs a new informer for Consumer type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedConsumerInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers ConsumerIndexers) ConsumerIndexInformer {
+	return NewTypedConsumerInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredConsumerInformer constructs a new informer for Consumer type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredConsumerInformer]).
 func NewFilteredConsumerInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewConsumerInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedConsumerInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredConsumerInformer constructs a new informer for Consumer type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredConsumerInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers ConsumerIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) ConsumerIndexInformer {
+	return NewTypedConsumerInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
 }
 
 // NewConsumerInformerWithOptions constructs a new informer for Consumer type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedConsumerInformerWithOptions]).
 func NewConsumerInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedConsumerInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedConsumerInformerWithOptions constructs a new informer for Consumer type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedConsumerInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) ConsumerIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "jetstream.nats.io", Version: "v1beta2", Resource: "consumers"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.NewTypedSharedIndexInformer[*apisjetstreamv1beta2.Consumer](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -97,17 +149,57 @@ func NewConsumerInformerWithOptions(client versioned.Interface, namespace string
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *consumerInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewConsumerInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedConsumerInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *consumerInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apisjetstreamv1beta2.Consumer{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *consumerInformer) TypedInformer() ConsumerIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apisjetstreamv1beta2.Consumer](f.factory.InformerFor(&apisjetstreamv1beta2.Consumer{}, f.defaultInformer))
 }
 
 func (f *consumerInformer) Lister() jetstreamv1beta2.ConsumerLister {
 	return jetstreamv1beta2.NewConsumerLister(f.Informer().GetIndexer())
+}
+
+// ToTypedConsumerInformer converts an untyped informer into a TypedConsumerInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *Consumer. If that is not the case, calling type-safe methods of the returned
+// TypedConsumerInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedConsumerInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedConsumerInformer(informer ConsumerInformer) TypedConsumerInformer {
+	if informer, ok := informer.(TypedConsumerInformer); ok {
+		return informer
+	}
+	return &consumerTypedInformerAdapter{informer}
+}
+
+type consumerTypedInformerAdapter struct {
+	ConsumerInformer
+}
+
+func (a *consumerTypedInformerAdapter) TypedInformer() ConsumerIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apisjetstreamv1beta2.Consumer](a.Informer())
+}
+
+// ToConsumerIndexInformer converts an untyped informer into a ConsumerIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *Consumer. If that is not the case, calling type-safe methods of the returned
+// ConsumerIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a ConsumerIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToConsumerIndexInformer(informer cache.SharedIndexInformer) ConsumerIndexInformer {
+	if informer, ok := informer.(ConsumerIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apisjetstreamv1beta2.Consumer](informer)
 }

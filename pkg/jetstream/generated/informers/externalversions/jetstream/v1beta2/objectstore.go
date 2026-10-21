@@ -31,11 +31,39 @@ import (
 )
 
 // ObjectStoreInformer provides access to a shared informer and lister for
-// ObjectStores.
+// ObjectStores. Prefer using the type-safe variant (see [TypedObjectStoreInformer]).
 type ObjectStoreInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() jetstreamv1beta2.ObjectStoreLister
 }
+
+// TypedObjectStoreInformer provides access to a shared informer and lister for
+// ObjectStores, including the type-safe TypedInformer variant.
+// It is a superset of ObjectStoreInformer.
+type TypedObjectStoreInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() ObjectStoreIndexInformer
+	Lister() jetstreamv1beta2.ObjectStoreLister
+}
+
+// ObjectStoreIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type ObjectStoreIndexInformer cache.TypedSharedIndexInformer[*apisjetstreamv1beta2.ObjectStore]
+
+// ObjectStoreHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for ObjectStore.
+type ObjectStoreHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apisjetstreamv1beta2.ObjectStore]
+
+// ObjectStoreDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for ObjectStore.
+type ObjectStoreDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apisjetstreamv1beta2.ObjectStore]
+
+// ObjectStoreFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for ObjectStore.
+type ObjectStoreFilteringHandler = cache.TypedFilteringResourceEventHandler[*apisjetstreamv1beta2.ObjectStore]
+
+// ObjectStoreIndexers is a specialization of [cache.TypedIndexers] for ObjectStore.
+type ObjectStoreIndexers = cache.TypedIndexers[*apisjetstreamv1beta2.ObjectStore]
+
+// DeletedObjectStore is a specialization of [cache.DeletedObject] for ObjectStore.
+type DeletedObjectStore = cache.DeletedObject[*apisjetstreamv1beta2.ObjectStore]
 
 type objectStoreInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -46,25 +74,49 @@ type objectStoreInformer struct {
 // NewObjectStoreInformer constructs a new informer for ObjectStore type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedObjectStoreInformer]).
 func NewObjectStoreInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
 	return NewObjectStoreInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedObjectStoreInformer constructs a new informer for ObjectStore type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedObjectStoreInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers ObjectStoreIndexers) ObjectStoreIndexInformer {
+	return NewTypedObjectStoreInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredObjectStoreInformer constructs a new informer for ObjectStore type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredObjectStoreInformer]).
 func NewFilteredObjectStoreInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewObjectStoreInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedObjectStoreInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredObjectStoreInformer constructs a new informer for ObjectStore type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredObjectStoreInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers ObjectStoreIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) ObjectStoreIndexInformer {
+	return NewTypedObjectStoreInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
 }
 
 // NewObjectStoreInformerWithOptions constructs a new informer for ObjectStore type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedObjectStoreInformerWithOptions]).
 func NewObjectStoreInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedObjectStoreInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedObjectStoreInformerWithOptions constructs a new informer for ObjectStore type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedObjectStoreInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) ObjectStoreIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "jetstream.nats.io", Version: "v1beta2", Resource: "objectstores"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.NewTypedSharedIndexInformer[*apisjetstreamv1beta2.ObjectStore](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -97,17 +149,57 @@ func NewObjectStoreInformerWithOptions(client versioned.Interface, namespace str
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *objectStoreInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewObjectStoreInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedObjectStoreInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *objectStoreInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apisjetstreamv1beta2.ObjectStore{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *objectStoreInformer) TypedInformer() ObjectStoreIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apisjetstreamv1beta2.ObjectStore](f.factory.InformerFor(&apisjetstreamv1beta2.ObjectStore{}, f.defaultInformer))
 }
 
 func (f *objectStoreInformer) Lister() jetstreamv1beta2.ObjectStoreLister {
 	return jetstreamv1beta2.NewObjectStoreLister(f.Informer().GetIndexer())
+}
+
+// ToTypedObjectStoreInformer converts an untyped informer into a TypedObjectStoreInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *ObjectStore. If that is not the case, calling type-safe methods of the returned
+// TypedObjectStoreInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedObjectStoreInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedObjectStoreInformer(informer ObjectStoreInformer) TypedObjectStoreInformer {
+	if informer, ok := informer.(TypedObjectStoreInformer); ok {
+		return informer
+	}
+	return &objectStoreTypedInformerAdapter{informer}
+}
+
+type objectStoreTypedInformerAdapter struct {
+	ObjectStoreInformer
+}
+
+func (a *objectStoreTypedInformerAdapter) TypedInformer() ObjectStoreIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apisjetstreamv1beta2.ObjectStore](a.Informer())
+}
+
+// ToObjectStoreIndexInformer converts an untyped informer into a ObjectStoreIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *ObjectStore. If that is not the case, calling type-safe methods of the returned
+// ObjectStoreIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a ObjectStoreIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToObjectStoreIndexInformer(informer cache.SharedIndexInformer) ObjectStoreIndexInformer {
+	if informer, ok := informer.(ObjectStoreIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apisjetstreamv1beta2.ObjectStore](informer)
 }
