@@ -32,6 +32,9 @@ default:
 
 generate: fetch-modules pkg/k8scodegen/file-header.txt
 	rm -rf pkg/jetstream/generated
+	# kube_codegen.sh builds the generators from the code-generator module, which may
+	# select an older toolchain than ours that cannot parse our toolchain's stdlib.
+	export GOTOOLCHAIN="$$(go env GOVERSION)"; \
 	D="$(codeGeneratorDir)"; : "$${D:=`go list -m -f '{{.Dir}}' k8s.io/code-generator`}"; \
 	source "$$D/kube_codegen.sh" ; \
 	kube::codegen::gen_helpers \
