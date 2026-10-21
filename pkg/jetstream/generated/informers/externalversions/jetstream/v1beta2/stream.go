@@ -31,11 +31,39 @@ import (
 )
 
 // StreamInformer provides access to a shared informer and lister for
-// Streams.
+// Streams. Prefer using the type-safe variant (see [TypedStreamInformer]).
 type StreamInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() jetstreamv1beta2.StreamLister
 }
+
+// TypedStreamInformer provides access to a shared informer and lister for
+// Streams, including the type-safe TypedInformer variant.
+// It is a superset of StreamInformer.
+type TypedStreamInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() StreamIndexInformer
+	Lister() jetstreamv1beta2.StreamLister
+}
+
+// StreamIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type StreamIndexInformer cache.TypedSharedIndexInformer[*apisjetstreamv1beta2.Stream]
+
+// StreamHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for Stream.
+type StreamHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apisjetstreamv1beta2.Stream]
+
+// StreamDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for Stream.
+type StreamDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apisjetstreamv1beta2.Stream]
+
+// StreamFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for Stream.
+type StreamFilteringHandler = cache.TypedFilteringResourceEventHandler[*apisjetstreamv1beta2.Stream]
+
+// StreamIndexers is a specialization of [cache.TypedIndexers] for Stream.
+type StreamIndexers = cache.TypedIndexers[*apisjetstreamv1beta2.Stream]
+
+// DeletedStream is a specialization of [cache.DeletedObject] for Stream.
+type DeletedStream = cache.DeletedObject[*apisjetstreamv1beta2.Stream]
 
 type streamInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -46,25 +74,49 @@ type streamInformer struct {
 // NewStreamInformer constructs a new informer for Stream type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedStreamInformer]).
 func NewStreamInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
 	return NewStreamInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedStreamInformer constructs a new informer for Stream type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedStreamInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers StreamIndexers) StreamIndexInformer {
+	return NewTypedStreamInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredStreamInformer constructs a new informer for Stream type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredStreamInformer]).
 func NewFilteredStreamInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewStreamInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedStreamInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredStreamInformer constructs a new informer for Stream type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredStreamInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers StreamIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) StreamIndexInformer {
+	return NewTypedStreamInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
 }
 
 // NewStreamInformerWithOptions constructs a new informer for Stream type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedStreamInformerWithOptions]).
 func NewStreamInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedStreamInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedStreamInformerWithOptions constructs a new informer for Stream type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedStreamInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) StreamIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "jetstream.nats.io", Version: "v1beta2", Resource: "streams"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.NewTypedSharedIndexInformer[*apisjetstreamv1beta2.Stream](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -97,17 +149,57 @@ func NewStreamInformerWithOptions(client versioned.Interface, namespace string, 
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *streamInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewStreamInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedStreamInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *streamInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apisjetstreamv1beta2.Stream{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *streamInformer) TypedInformer() StreamIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apisjetstreamv1beta2.Stream](f.factory.InformerFor(&apisjetstreamv1beta2.Stream{}, f.defaultInformer))
 }
 
 func (f *streamInformer) Lister() jetstreamv1beta2.StreamLister {
 	return jetstreamv1beta2.NewStreamLister(f.Informer().GetIndexer())
+}
+
+// ToTypedStreamInformer converts an untyped informer into a TypedStreamInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *Stream. If that is not the case, calling type-safe methods of the returned
+// TypedStreamInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedStreamInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedStreamInformer(informer StreamInformer) TypedStreamInformer {
+	if informer, ok := informer.(TypedStreamInformer); ok {
+		return informer
+	}
+	return &streamTypedInformerAdapter{informer}
+}
+
+type streamTypedInformerAdapter struct {
+	StreamInformer
+}
+
+func (a *streamTypedInformerAdapter) TypedInformer() StreamIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apisjetstreamv1beta2.Stream](a.Informer())
+}
+
+// ToStreamIndexInformer converts an untyped informer into a StreamIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *Stream. If that is not the case, calling type-safe methods of the returned
+// StreamIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a StreamIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToStreamIndexInformer(informer cache.SharedIndexInformer) StreamIndexInformer {
+	if informer, ok := informer.(StreamIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apisjetstreamv1beta2.Stream](informer)
 }

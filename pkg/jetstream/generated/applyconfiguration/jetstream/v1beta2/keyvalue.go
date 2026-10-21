@@ -26,7 +26,7 @@ import (
 //
 // KeyValue is a specification for a KeyValue resource
 type KeyValueApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration    `json:""`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                             *KeyValueSpecApplyConfiguration `json:"spec,omitempty"`
 	Status                           *StatusApplyConfiguration       `json:"status,omitempty"`

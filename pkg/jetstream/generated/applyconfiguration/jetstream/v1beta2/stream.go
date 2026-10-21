@@ -26,7 +26,7 @@ import (
 //
 // Stream is a specification for a Stream resource
 type StreamApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration    `json:""`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                             *StreamSpecApplyConfiguration `json:"spec,omitempty"`
 	Status                           *StatusApplyConfiguration     `json:"status,omitempty"`

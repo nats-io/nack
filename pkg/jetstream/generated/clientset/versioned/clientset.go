@@ -26,7 +26,7 @@ import (
 )
 
 type Interface interface {
-	Discovery() discovery.DiscoveryInterface
+	Discovery() discovery.DiscoveryInterfaces
 	JetstreamV1beta2() jetstreamv1beta2.JetstreamV1beta2Interface
 }
 
@@ -42,7 +42,7 @@ func (c *Clientset) JetstreamV1beta2() jetstreamv1beta2.JetstreamV1beta2Interfac
 }
 
 // Discovery retrieves the DiscoveryClient
-func (c *Clientset) Discovery() discovery.DiscoveryInterface {
+func (c *Clientset) Discovery() discovery.DiscoveryInterfaces {
 	if c == nil {
 		return nil
 	}
