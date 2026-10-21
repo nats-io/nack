@@ -17,13 +17,10 @@ limitations under the License.
 package controller
 
 import (
-	"os"
 	"testing"
 	"time"
 
 	jsmapi "github.com/nats-io/jsm.go/api"
-	natsserver "github.com/nats-io/nats-server/v2/test"
-	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -1084,10 +1081,10 @@ func Test_mapSpecToConfig(t *testing.T) {
 // TestStreamUpdateWithoutPlacement verifies that updating replicas doesn't
 // inadvertently set an empty Placement field, which would cause error 10123:
 // "can not move and scale a stream in a single update"
-// This test reproduces issue #273 where enabling control loop resulted in failures
-// when updating streams without placement configuration.
+// This guards against issue #273 where enabling control loop resulted in failures
+// when updating streams without placement configuration. nats-server 2.12+ also
+// ignores an empty Placement, so the error can't be reproduced against a server.
 func TestStreamUpdateWithoutPlacement(t *testing.T) {
-	// First test the config conversion logic
 	t.Run("config conversion", func(t *testing.T) {
 		tests := []struct {
 			name            string
@@ -1097,6 +1094,7 @@ func TestStreamUpdateWithoutPlacement(t *testing.T) {
 			expectedCluster string
 		}{
 			{
+				// The #273 case: an empty Placement here was treated as a move.
 				name: "spec without placement, no current placement - should not set placement",
 				spec: &api.StreamSpec{
 					Name:     "test-stream",
@@ -1167,63 +1165,6 @@ func TestStreamUpdateWithoutPlacement(t *testing.T) {
 				}
 			})
 		}
-	})
-
-	// Integration test that reproduces the actual NATS error scenario from issue #273
-	t.Run("scale replicas without placement error", func(t *testing.T) {
-		// Create test NATS server without using Gomega
-		opts := &natsserver.DefaultTestOptions
-		opts.JetStream = true
-		opts.Port = -1
-		opts.Debug = true
-
-		dir, err := os.MkdirTemp("", "nats-*")
-		assert.NoError(t, err)
-		defer os.RemoveAll(dir)
-		opts.StoreDir = dir
-
-		srv := natsserver.RunServer(opts)
-		assert.NotNil(t, srv)
-		defer srv.Shutdown()
-
-		// Create NATS connection and JetStream client
-		nc, err := nats.Connect(srv.ClientURL())
-		assert.NoError(t, err)
-		defer nc.Close()
-
-		js, err := nc.JetStream()
-		assert.NoError(t, err)
-
-		// Create initial stream with 1 replica and no placement
-		streamName := "test-scale-stream"
-		initialConfig := &nats.StreamConfig{
-			Name:     streamName,
-			Subjects: []string{"test.>"},
-			Storage:  nats.FileStorage,
-			Replicas: 1,
-			// Explicitly no Placement field set
-		}
-
-		_, err = js.AddStream(initialConfig)
-		assert.NoError(t, err, "Failed to create initial stream")
-
-		// Now attempt to scale replicas from 1 to 3 without setting placement
-		// This should NOT fail with error 10123
-		updateConfig := &nats.StreamConfig{
-			Name:     streamName,
-			Subjects: []string{"test.>"},
-			Storage:  nats.FileStorage,
-			Replicas: 3,
-			// Still no Placement field - this is the critical test
-		}
-
-		_, err = js.UpdateStream(updateConfig)
-		assert.NoError(t, err, "Scaling replicas should not fail with error 10123")
-
-		// Verify the stream was updated successfully
-		info, err := js.StreamInfo(streamName)
-		assert.NoError(t, err)
-		assert.Equal(t, 3, info.Config.Replicas, "Replicas should be scaled to 3")
 	})
 }
 

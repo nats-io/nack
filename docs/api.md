@@ -213,7 +213,7 @@ Resource Types:
         <td><b>maxConsumers</b></td>
         <td>integer</td>
         <td>
-          How many Consumers can be defined for a given Stream. -1 for unlimited.<br/>
+          How many Consumers can be defined for a given Stream. -1 for unlimited. From nats-server 2.15, -1 falls back to the account limit or server default (1000).<br/>
           <br/>
             <i>Default</i>: -1<br/>
             <i>Minimum</i>: -1<br/>
@@ -2867,7 +2867,7 @@ Resource Types:
         <td><b>maxConsumers</b></td>
         <td>integer</td>
         <td>
-          How many Consumers can be defined for a given Stream. -1 for unlimited.<br/>
+          How many Consumers can be defined for a given Stream. -1 for unlimited. From nats-server 2.15, -1 falls back to the account limit or server default (1000).<br/>
           <br/>
             <i>Default</i>: -1<br/>
             <i>Minimum</i>: -1<br/>
