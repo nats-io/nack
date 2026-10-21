@@ -66,6 +66,6 @@ func main() {
 	log.Infof("Starting NATS Server boot config v%s (%s, %s)", Version, GitInfo, BuildTime)
 	err := controller.Run(context.Background())
 	if err != nil && err != context.Canceled {
-		log.Fatalf(err.Error())
+		log.Fatal(err)
 	}
 }
