@@ -14,6 +14,7 @@
 package jetstream
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -552,65 +553,136 @@ func (c *Controller) getAccountOverrides(account string, ns string) (*accountOve
 	}
 
 	// Lookup the UserCredentials.
-	if acc.Spec.Creds != nil && acc.Spec.Creds.Secret != nil {
-		secretName := acc.Spec.Creds.Secret.Name
-		secret, err := c.ki.Secrets(ns).Get(c.ctx, secretName, k8smeta.GetOptions{})
-		if err != nil {
-			return nil, err
-		}
+	if acc.Spec.Creds != nil {
+		if acc.Spec.Creds.Secret == nil {
+			if acc.Spec.Creds.File == "" {
+				return nil, fmt.Errorf("account %q credentials file is empty", account)
+			}
+			overrides.userCreds = acc.Spec.Creds.File
+		} else {
+			secretName := acc.Spec.Creds.Secret.Name
+			if secretName == "" {
+				return nil, fmt.Errorf("account %q credentials secret name is empty", account)
+			}
+			credsKey := acc.Spec.Creds.File
+			if credsKey == "" {
+				return nil, fmt.Errorf("account %q credentials key is empty", account)
+			}
 
-		// Write the user credentials to the cache dir.
-		accDir := filepath.Join(c.cacheDir, ns, account)
-		if err := os.MkdirAll(accDir, 0o755); err != nil {
-			return nil, err
-		}
+			secret, err := c.ki.Secrets(ns).Get(c.ctx, secretName, k8smeta.GetOptions{})
+			if err != nil {
+				return nil, err
+			}
+			credsBytes, ok := secret.Data[credsKey]
+			if !ok {
+				return nil, fmt.Errorf("account %q credentials key %q not found in secret %q", account, credsKey, secretName)
+			}
+			if len(bytes.TrimSpace(credsBytes)) == 0 {
+				return nil, fmt.Errorf("account %q credentials key %q in secret %q is empty", account, credsKey, secretName)
+			}
 
-		if credsBytes, ok := secret.Data[acc.Spec.Creds.File]; ok {
-			overrides.userCreds = filepath.Join(accDir, acc.Spec.Creds.File)
-			if err := os.WriteFile(overrides.userCreds, credsBytes, 0o644); err != nil {
+			// Write the user credentials to the cache dir.
+			accDir := filepath.Join(c.cacheDir, ns, account)
+			if err := os.MkdirAll(accDir, 0o755); err != nil {
+				return nil, err
+			}
+			overrides.userCreds = filepath.Join(accDir, credsKey)
+			if err := os.WriteFile(overrides.userCreds, credsBytes, 0o600); err != nil {
 				return nil, err
 			}
 		}
 	}
 
 	// Lookup the NKey seed.
-	if acc.Spec.NKey != nil && acc.Spec.NKey.Secret != nil {
+	if acc.Spec.NKey != nil {
+		if acc.Spec.NKey.Secret == nil {
+			return nil, fmt.Errorf("account %q nkey secret is required", account)
+		}
 		secretName := acc.Spec.NKey.Secret.Name
+		if secretName == "" {
+			return nil, fmt.Errorf("account %q nkey secret name is empty", account)
+		}
+		seedKey := acc.Spec.NKey.Seed
+		if seedKey == "" {
+			return nil, fmt.Errorf("account %q nkey seed key is empty", account)
+		}
+
 		secret, err := c.ki.Secrets(ns).Get(c.ctx, secretName, k8smeta.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
+		nkeyBytes, ok := secret.Data[seedKey]
+		if !ok {
+			return nil, fmt.Errorf("account %q nkey seed key %q not found in secret %q", account, seedKey, secretName)
+		}
+		if len(bytes.TrimSpace(nkeyBytes)) == 0 {
+			return nil, fmt.Errorf("account %q nkey seed key %q in secret %q is empty", account, seedKey, secretName)
+		}
 
-		if nkeyBytes, ok := secret.Data[acc.Spec.NKey.Seed]; ok {
-			overrides.nkey = string(nkeyBytes)
+		accDir := filepath.Join(c.cacheDir, ns, account)
+		if err := os.MkdirAll(accDir, 0o755); err != nil {
+			return nil, err
+		}
+		overrides.nkey = filepath.Join(accDir, seedKey)
+		if err := os.WriteFile(overrides.nkey, nkeyBytes, 0o600); err != nil {
+			return nil, err
 		}
 	}
 
 	// Lookup the Token.
 	if acc.Spec.Token != nil {
 		secretName := acc.Spec.Token.Secret.Name
+		if secretName == "" {
+			return nil, fmt.Errorf("account %q token secret name is empty", account)
+		}
+		tokenKey := acc.Spec.Token.Token
+		if tokenKey == "" {
+			return nil, fmt.Errorf("account %q token key is empty", account)
+		}
+
 		secret, err := c.ki.Secrets(ns).Get(c.ctx, secretName, k8smeta.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
-
-		if token, ok := secret.Data[acc.Spec.Token.Token]; ok {
-			overrides.token = string(token)
+		token, ok := secret.Data[tokenKey]
+		if !ok {
+			return nil, fmt.Errorf("account %q token key %q not found in secret %q", account, tokenKey, secretName)
 		}
+		if len(token) == 0 {
+			return nil, fmt.Errorf("account %q token key %q in secret %q is empty", account, tokenKey, secretName)
+		}
+		overrides.token = string(token)
 	}
 
 	// Lookup the User.
 	if acc.Spec.User != nil {
 		secretName := acc.Spec.User.Secret.Name
+		if secretName == "" {
+			return nil, fmt.Errorf("account %q user secret name is empty", account)
+		}
+		userKey := acc.Spec.User.User
+		if userKey == "" {
+			return nil, fmt.Errorf("account %q username key is empty", account)
+		}
+		passwordKey := acc.Spec.User.Password
+
 		secret, err := c.ki.Secrets(ns).Get(c.ctx, secretName, k8smeta.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
-
-		userBytes := secret.Data[acc.Spec.User.User]
-		passwordBytes := secret.Data[acc.Spec.User.Password]
-		if userBytes != nil && passwordBytes != nil {
-			overrides.user = string(userBytes)
+		userBytes, ok := secret.Data[userKey]
+		if !ok {
+			return nil, fmt.Errorf("account %q username key %q not found in secret %q", account, userKey, secretName)
+		}
+		if len(userBytes) == 0 {
+			return nil, fmt.Errorf("account %q username key %q in secret %q is empty", account, userKey, secretName)
+		}
+		overrides.user = string(userBytes)
+		if passwordKey != "" {
+			passwordBytes, ok := secret.Data[passwordKey]
+			if !ok {
+				return nil, fmt.Errorf("account %q password key %q not found in secret %q", account, passwordKey, secretName)
+			}
 			overrides.password = string(passwordBytes)
 		}
 	}
@@ -664,7 +736,7 @@ func (c *Controller) runWithJsmc(jsm jsmClientFunc, acc *accountOverrides, spec 
 		natsCtx.Nkey = acc.nkey
 	}
 
-	if acc.user != "" && acc.password != "" {
+	if acc.user != "" {
 		natsCtx.Username = acc.user
 		natsCtx.Password = acc.password
 	} else if acc.token != "" {
