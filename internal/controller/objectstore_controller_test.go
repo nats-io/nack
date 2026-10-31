@@ -72,7 +72,7 @@ var _ = Describe("ObjectStore Controller", func() {
 				Spec: api.ObjectStoreSpec{
 					Bucket:      objectStoreName,
 					Replicas:    1,
-					TTL:         "5m",
+					TTL:         mustParseDuration("5m"),
 					Compression: true,
 					Description: "test objectstore",
 					Storage:     "file",
@@ -172,7 +172,7 @@ var _ = Describe("ObjectStore Controller", func() {
 				Spec: api.ObjectStoreSpec{
 					Bucket:      alternateResource,
 					Replicas:    1,
-					TTL:         "5m",
+					TTL:         mustParseDuration("5m"),
 					Description: "objectstore in alternate namespace",
 					Storage:     "file",
 				},
@@ -437,7 +437,7 @@ var _ = Describe("ObjectStore Controller", func() {
 
 			By("updating the resource")
 			objectStore.Spec.Description = "new description"
-			objectStore.Spec.TTL = "1h"
+			objectStore.Spec.TTL = mustParseDuration("1h")
 			Expect(k8sClient.Update(ctx, objectStore)).To(Succeed())
 
 			By("reconciling the updated resource")
@@ -690,7 +690,7 @@ func Test_mapobjectstoreSpecToConfig(t *testing.T) {
 			spec: &api.ObjectStoreSpec{
 				Description: "objectstore description",
 				MaxBytes:    1048576,
-				TTL:         "1h",
+				TTL:         mustParseDuration("1h"),
 				Bucket:      "objectstore-name",
 				Placement: &api.StreamPlacement{
 					Cluster: "test-cluster",

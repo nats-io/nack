@@ -1,8 +1,6 @@
 package v1beta2
 
 import (
-	"time"
-
 	k8smeta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -28,7 +26,7 @@ type KeyValueSpec struct {
 	Description  string           `json:"description,omitempty"`
 	MaxValueSize int              `json:"maxValueSize,omitempty"`
 	History      int              `json:"history,omitempty"`
-	TTL          string           `json:"ttl,omitempty"`
+	TTL          k8smeta.Duration `json:"ttl,omitempty"`
 	MaxBytes     int              `json:"maxBytes,omitempty"`
 	Storage      string           `json:"storage,omitempty"`
 	Replicas     int              `json:"replicas,omitempty"`
@@ -39,7 +37,7 @@ type KeyValueSpec struct {
 	Compression  bool             `json:"compression,omitempty"`
 	// LimitMarkerTTL is how long the bucket keeps markers when keys are removed by the TTL setting, 0 meaning markers are not supported
 	// +optional
-	LimitMarkerTTL time.Duration `json:"limitMarkerTtl,omitempty"`
+	LimitMarkerTTL k8smeta.Duration `json:"limitMarkerTtl,omitempty"`
 
 	BaseStreamConfig
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	jsmapi "github.com/nats-io/jsm.go/api"
 
@@ -17,6 +18,16 @@ import (
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 )
+
+func mustParseDuration(s string) k8smeta.Duration {
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		panic(err)
+	}
+	return k8smeta.Duration{
+		Duration: d,
+	}
+}
 
 func TestProcessStream(t *testing.T) {
 	t.Parallel()
@@ -54,7 +65,7 @@ func TestProcessStream(t *testing.T) {
 			},
 			Spec: apis.StreamSpec{
 				Name:         name,
-				MaxAge:       "1h",
+				MaxAge:       mustParseDuration("1h"),
 				Storage:      "memory",
 				AllowBatched: true,
 				Sources: []*apis.StreamSource{{
@@ -132,7 +143,7 @@ func TestProcessStream(t *testing.T) {
 			},
 			Spec: apis.StreamSpec{
 				Name:              name,
-				MaxAge:            "1h",
+				MaxAge:            mustParseDuration("1h"),
 				Storage:           "memory",
 				AllowMsgSchedules: true,
 				AllowBatched:      true,
@@ -221,7 +232,7 @@ func TestProcessStream(t *testing.T) {
 			},
 			Spec: apis.StreamSpec{
 				Name:    name,
-				MaxAge:  "1h",
+				MaxAge:  mustParseDuration("1h"),
 				Storage: "memory",
 			},
 			Status: apis.Status{
@@ -280,7 +291,7 @@ func TestProcessStream(t *testing.T) {
 			},
 			Spec: apis.StreamSpec{
 				Name:    name,
-				MaxAge:  "1h",
+				MaxAge:  mustParseDuration("1h"),
 				Storage: "memory",
 			},
 		})

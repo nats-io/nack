@@ -46,13 +46,13 @@ type ConsumerSpec struct {
 	MaxRequestBatch    int               `json:"maxRequestBatch,omitempty"`
 	MaxRequestExpires  string            `json:"maxRequestExpires,omitempty"`
 	MaxRequestMaxBytes int               `json:"maxRequestMaxBytes,omitempty"`
-	InactiveThreshold  string            `json:"inactiveThreshold,omitempty"`
+	InactiveThreshold  k8smeta.Duration  `json:"inactiveThreshold,omitempty"`
 	Replicas           int               `json:"replicas,omitempty"`
 	MemStorage         bool              `json:"memStorage,omitempty"`
 	Metadata           map[string]string `json:"metadata,omitempty"`
 	PauseUntil         string            `json:"pauseUntil,omitempty"`
 	PriorityPolicy     string            `json:"priorityPolicy,omitempty"`
-	PinnedTTL          string            `json:"pinnedTtl,omitempty"`
+	PinnedTTL          k8smeta.Duration  `json:"pinnedTtl,omitempty"`
 	PriorityGroups     []string          `json:"priorityGroups,omitempty"`
 
 	StreamName string `json:"streamName"`

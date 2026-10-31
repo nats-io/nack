@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/go-logr/logr"
 	api "github.com/nats-io/nack/pkg/jetstream/apis/jetstream/v1beta2"
@@ -335,16 +334,12 @@ func keyValueSpecToConfig(spec *api.KeyValueSpec) (jetstream.KeyValueConfig, err
 		MaxBytes:       int64(spec.MaxBytes),
 		MaxValueSize:   int32(spec.MaxValueSize),
 		Replicas:       spec.Replicas,
-		LimitMarkerTTL: spec.LimitMarkerTTL,
+		LimitMarkerTTL: spec.LimitMarkerTTL.Duration,
 	}
 
 	// TTL
-	if spec.TTL != "" {
-		t, err := time.ParseDuration(spec.TTL)
-		if err != nil {
-			return jetstream.KeyValueConfig{}, fmt.Errorf("invalid ttl: %w", err)
-		}
-		config.TTL = t
+	if d := spec.TTL.Duration; d > 0 {
+		config.TTL = d
 	}
 
 	// storage
