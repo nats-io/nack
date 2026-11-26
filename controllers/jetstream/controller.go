@@ -71,6 +71,9 @@ type Options struct {
 	NATSCredentials string
 	NATSNKey        string
 	NATSServerURL   string
+	// NATSInboxPrefix is the prefix of the reply inboxes of NATS requests.
+	// Empty keeps the nats.go default (_INBOX).
+	NATSInboxPrefix string
 
 	NATSCA          string
 	NATSCertificate string
@@ -237,6 +240,11 @@ func (c *Controller) Run() error {
 	opts := make([]nats.Option, 0)
 	// Always attempt to have a connection to NATS.
 	opts = append(opts, nats.MaxReconnects(-1))
+	if c.opts.NATSInboxPrefix != "" {
+		// nats.CustomInboxPrefix rejects a trailing dot, which prefixes
+		// are commonly written with (e.g. _INBOX.nack.).
+		opts = append(opts, nats.CustomInboxPrefix(strings.TrimSuffix(c.opts.NATSInboxPrefix, ".")))
+	}
 	if c.opts.NATSTLSFirst {
 		opts = append(opts, nats.TLSHandshakeFirst())
 	}

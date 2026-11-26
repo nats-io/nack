@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/nats-io/jsm.go"
 	"github.com/nats-io/nats.go"
@@ -21,10 +22,13 @@ type NatsConfig struct {
 	CAs         []string `json:"tls_ca,omitempty"`
 	Credentials string   `json:"credential,omitempty"`
 	NKey        string   `json:"nkey,omitempty"`
-	Token       string   `json:"token,omitempty"`
-	User        string   `json:"username,omitempty"`
-	Password    string   `json:"password,omitempty"`
-	JsDomain    string   `json:"js_domain,omitempty"`
+	// InboxPrefix is the prefix of the reply inboxes of NATS requests. Empty
+	// keeps the nats.go default (_INBOX).
+	InboxPrefix string `json:"inbox_prefix,omitempty"`
+	Token       string `json:"token,omitempty"`
+	User        string `json:"username,omitempty"`
+	Password    string `json:"password,omitempty"`
+	JsDomain    string `json:"js_domain,omitempty"`
 }
 
 func (o *NatsConfig) Copy() *NatsConfig {
@@ -115,6 +119,10 @@ func (o *NatsConfig) Overlay(overlay *NatsConfig) {
 		o.TLSFirst = overlay.TLSFirst
 	}
 
+	if overlay.InboxPrefix != "" {
+		o.InboxPrefix = overlay.InboxPrefix
+	}
+
 	if !overlay.HasAuth() {
 		return
 	}
@@ -163,6 +171,12 @@ func (o *NatsConfig) buildOptions() ([]nats.Option, error) {
 
 	if o.TLSFirst {
 		opts = append(opts, nats.TLSHandshakeFirst())
+	}
+
+	if o.InboxPrefix != "" {
+		// nats.CustomInboxPrefix rejects a trailing dot, which prefixes are
+		// commonly written with (e.g. _INBOX.nack.).
+		opts = append(opts, nats.CustomInboxPrefix(strings.TrimSuffix(o.InboxPrefix, ".")))
 	}
 
 	if len(o.CAs) > 0 {

@@ -70,6 +70,7 @@ func run() error {
 	version := flag.Bool("version", false, "Print the version and exit")
 	creds := flag.String("creds", "", "NATS Credentials")
 	nkey := flag.String("nkey", "", "NATS NKey")
+	inboxPrefix := flag.String("inbox-prefix", "", "Custom prefix for the reply inboxes of NATS requests, e.g. _INBOX.nack. A trailing dot is ignored. Use it when the NATS user is only allowed to subscribe to its own inbox prefix.")
 	cert := flag.String("tlscert", "", "NATS TLS public certificate")
 	key := flag.String("tlskey", "", "NATS TLS private key")
 	ca := flag.String("tlsca", "", "NATS TLS certificate authority chain")
@@ -106,6 +107,7 @@ func run() error {
 			ClientName:  "jetstream-controller",
 			Credentials: *creds,
 			NKey:        *nkey,
+			InboxPrefix: *inboxPrefix,
 			ServerURL:   *server,
 			CAs:         []string{},
 			Certificate: *cert,
@@ -149,6 +151,7 @@ func run() error {
 		Ctx:             ctx,
 		NATSCredentials: *creds,
 		NATSNKey:        *nkey,
+		NATSInboxPrefix: *inboxPrefix,
 		NATSServerURL:   *server,
 		NATSCA:          *ca,
 		NATSCertificate: *cert,
