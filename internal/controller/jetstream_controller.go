@@ -169,6 +169,8 @@ func (c *jsController) natsConfigFromOpts(opts api.ConnectionOpts, ns string) (*
 		accountOverlay.ServerURL = strings.Join(account.Spec.Servers, ",")
 	}
 
+	accountOverlay.InboxPrefix = account.Spec.InboxPrefix
+
 	c.cacheLock.Lock()
 	defer c.cacheLock.Unlock()
 

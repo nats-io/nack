@@ -1106,6 +1106,9 @@ spec:
                   seed:
                     description: Key in the secret that contains the NKey seed.
                     type: string
+              inboxPrefix:
+                description: Prefix of the reply inboxes used for NATS requests, e.g. _INBOX.nack. Overrides the controller's --inbox-prefix.
+                type: string
               servers:
                 description: A list of servers to connect.
                 type: array

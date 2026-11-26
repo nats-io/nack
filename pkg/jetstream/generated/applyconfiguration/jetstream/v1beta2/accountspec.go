@@ -20,12 +20,14 @@ package v1beta2
 //
 // AccountSpec is the spec for a Account resource
 type AccountSpecApplyConfiguration struct {
-	Servers []string                       `json:"servers,omitempty"`
-	TLS     *TLSSecretApplyConfiguration   `json:"tls,omitempty"`
-	Creds   *CredsSecretApplyConfiguration `json:"creds,omitempty"`
-	NKey    *NKeySecretApplyConfiguration  `json:"nkey,omitempty"`
-	Token   *TokenSecretApplyConfiguration `json:"token,omitempty"`
-	User    *UserApplyConfiguration        `json:"user,omitempty"`
+	Servers []string `json:"servers,omitempty"`
+	// InboxPrefix is the prefix of the reply inboxes of NATS requests.
+	InboxPrefix *string                        `json:"inboxPrefix,omitempty"`
+	TLS         *TLSSecretApplyConfiguration   `json:"tls,omitempty"`
+	Creds       *CredsSecretApplyConfiguration `json:"creds,omitempty"`
+	NKey        *NKeySecretApplyConfiguration  `json:"nkey,omitempty"`
+	Token       *TokenSecretApplyConfiguration `json:"token,omitempty"`
+	User        *UserApplyConfiguration        `json:"user,omitempty"`
 }
 
 // AccountSpecApplyConfiguration constructs a declarative configuration of the AccountSpec type for use with
@@ -41,6 +43,14 @@ func (b *AccountSpecApplyConfiguration) WithServers(values ...string) *AccountSp
 	for i := range values {
 		b.Servers = append(b.Servers, values[i])
 	}
+	return b
+}
+
+// WithInboxPrefix sets the InboxPrefix field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the InboxPrefix field is set to the value of the last call.
+func (b *AccountSpecApplyConfiguration) WithInboxPrefix(value string) *AccountSpecApplyConfiguration {
+	b.InboxPrefix = &value
 	return b
 }
 

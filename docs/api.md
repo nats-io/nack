@@ -1411,6 +1411,13 @@ A client's TLS certs and keys.
         </td>
         <td>false</td>
       </tr><tr>
+        <td><b>inboxPrefix</b></td>
+        <td>string</td>
+        <td>
+          Prefix of the reply inboxes used for NATS requests, e.g. _INBOX.nack. Overrides the controller's --inbox-prefix.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
         <td><b>name</b></td>
         <td>string</td>
         <td>
